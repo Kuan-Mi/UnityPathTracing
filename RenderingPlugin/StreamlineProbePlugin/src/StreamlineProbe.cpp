@@ -52,19 +52,17 @@ namespace
     std::atomic<int>       g_fgDesired{-1};
     std::atomic<bool>      g_fgApplied{false};
 
-    // Dummy DLSS-G inputs + per-frame tagging state.
     ComPtr<ID3D12Device>   g_device;
-    ComPtr<ID3D12Resource> g_depth, g_mvec, g_hudless, g_ui;
-    UINT                   g_w = 0, g_h = 0;
-    bool                   g_dummiesReady = false;
+    UINT                   g_w = 0, g_h = 0;     // adopted swapchain backbuffer dims (info)
+    bool                   g_adopted = false;    // swapchain adopted → BeginFrame may run
 
     // Real per-frame DLSS-G inputs pushed from the NRD feature via IssuePluginEventAndData
     // (StreamlineProbe::ConsumeFrameInputs). RENDER-THREAD ONLY — the data event, BeginFrame
     // and the present hook are all the Unity render thread, so no synchronization is needed.
-    // Once g_haveRealInputs latches, BeginFrame stops tagging dummies and the data event
-    // tags these real resources instead (reusing the frame token BeginFrame minted).
     StreamlineProbe::FrameInputs g_inputs{};
     bool                         g_haveRealInputs = false;
+    uint32_t                     g_curFrameIdx     = 0xFFFFFFFFu; // token frame idx (set in BeginFrame)
+    uint32_t                     g_appliedFrameIdx = 0xFFFFFFFFu; // last frame tags+constants were set
     bool                   g_reflexOn = false;
     uint32_t               g_frameIndex = 0;
     uint64_t               g_taggedFrames = 0;
@@ -206,124 +204,6 @@ namespace
              "DLSSGState: status=0x%x [%s] framesPresentedSinceLast=%u maxGen=%u minDim=%u",
              s, flags, st.numFramesActuallyPresented, st.numFramesToGenerateMax,
              st.minWidthOrHeight);
-    }
-
-    bool CreateTex(DXGI_FORMAT fmt, ComPtr<ID3D12Resource>& out, const char* name)
-    {
-        D3D12_HEAP_PROPERTIES heap{}; heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-        D3D12_RESOURCE_DESC d{};
-        d.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        d.Width = g_w; d.Height = g_h; d.DepthOrArraySize = 1; d.MipLevels = 1;
-        d.Format = fmt; d.SampleDesc.Count = 1;
-        d.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        d.Flags  = D3D12_RESOURCE_FLAG_NONE;
-        HRESULT hr = g_device->CreateCommittedResource(
-            &heap, D3D12_HEAP_FLAG_NONE, &d, D3D12_RESOURCE_STATE_COMMON, nullptr,
-            IID_PPV_ARGS(&out));
-        if (FAILED(hr)) { Logf(2, "Create dummy %s failed hr=0x%08lx", name, (unsigned long)hr); return false; }
-        return true;
-    }
-
-    // Fill the dummy motion-vector texture (R16G16_FLOAT) with a CONSTANT non-zero
-    // value so DLSS-G's generated (interpolated) frames are visibly WARPED relative to
-    // the real frames — a deliberate, unmistakable proof that generated frames are
-    // actually being displayed. R = horizontal motion, G = 0. Large value for a big,
-    // obvious sideways vibration; bump kHalfVX further for more.
-    void FillMvecConstant()
-    {
-        if (!g_device || !g_mvec || !g_w || !g_h) return;
-
-        const uint16_t kHalfVX = 0x4400;  // ~4.0 (half-float) — large horizontal motion
-        const uint16_t kHalfVY = 0x0000;  // 0.0
-        const uint32_t texel = (uint32_t)kHalfVX | ((uint32_t)kHalfVY << 16);
-
-        const UINT  rowPitch   = (g_w * 4u + 255u) & ~255u;   // R16G16 = 4 bytes/texel, 256-aligned
-        const UINT64 uploadSize = (UINT64)rowPitch * g_h;
-
-        D3D12_HEAP_PROPERTIES up{}; up.Type = D3D12_HEAP_TYPE_UPLOAD;
-        D3D12_RESOURCE_DESC bd{};
-        bd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        bd.Width = uploadSize; bd.Height = 1; bd.DepthOrArraySize = 1; bd.MipLevels = 1;
-        bd.Format = DXGI_FORMAT_UNKNOWN; bd.SampleDesc.Count = 1;
-        bd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        ComPtr<ID3D12Resource> upload;
-        if (FAILED(g_device->CreateCommittedResource(&up, D3D12_HEAP_FLAG_NONE, &bd,
-                D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
-        { Logf(2, "FillMvec: upload buffer failed"); return; }
-
-        uint8_t* mapped = nullptr;
-        D3D12_RANGE noRead{ 0, 0 };
-        if (FAILED(upload->Map(0, &noRead, reinterpret_cast<void**>(&mapped))) || !mapped)
-        { Logf(2, "FillMvec: Map failed"); return; }
-        for (UINT y = 0; y < g_h; ++y)
-        {
-            uint32_t* row = reinterpret_cast<uint32_t*>(mapped + (UINT64)y * rowPitch);
-            for (UINT x = 0; x < g_w; ++x) row[x] = texel;
-        }
-        upload->Unmap(0, nullptr);
-
-        // One-shot DIRECT queue/list/fence (queue is SL-proxied via our hook; fine for a copy).
-        D3D12_COMMAND_QUEUE_DESC qd{}; qd.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-        ComPtr<ID3D12CommandQueue>        q;
-        ComPtr<ID3D12CommandAllocator>    alloc;
-        ComPtr<ID3D12GraphicsCommandList> list;
-        ComPtr<ID3D12Fence>               fence;
-        if (FAILED(g_device->CreateCommandQueue(&qd, IID_PPV_ARGS(&q))) ||
-            FAILED(g_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&alloc))) ||
-            FAILED(g_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, alloc.Get(), nullptr, IID_PPV_ARGS(&list))) ||
-            FAILED(g_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))))
-        { Logf(2, "FillMvec: temp cmd objects failed"); return; }
-
-        auto barrier = [&](D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
-        {
-            D3D12_RESOURCE_BARRIER b{};
-            b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            b.Transition.pResource   = g_mvec.Get();
-            b.Transition.Subresource = 0;
-            b.Transition.StateBefore = before;
-            b.Transition.StateAfter  = after;
-            list->ResourceBarrier(1, &b);
-        };
-        barrier(D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-
-        D3D12_TEXTURE_COPY_LOCATION dst{}; dst.pResource = g_mvec.Get();
-        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX; dst.SubresourceIndex = 0;
-        D3D12_TEXTURE_COPY_LOCATION src{}; src.pResource = upload.Get();
-        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        src.PlacedFootprint.Offset = 0;
-        src.PlacedFootprint.Footprint.Format   = DXGI_FORMAT_R16G16_FLOAT;
-        src.PlacedFootprint.Footprint.Width    = g_w;
-        src.PlacedFootprint.Footprint.Height   = g_h;
-        src.PlacedFootprint.Footprint.Depth    = 1;
-        src.PlacedFootprint.Footprint.RowPitch = rowPitch;
-        list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-
-        barrier(D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
-        list->Close();
-
-        ID3D12CommandList* lists[] = { list.Get() };
-        q->ExecuteCommandLists(1, lists);
-        q->Signal(fence.Get(), 1);
-        if (fence->GetCompletedValue() < 1)
-        {
-            HANDLE ev = CreateEventA(nullptr, FALSE, FALSE, nullptr);
-            if (ev) { fence->SetEventOnCompletion(1, ev); WaitForSingleObject(ev, 2000); CloseHandle(ev); }
-        }
-        Logf(0, "FillMvec: motion-vector dummy filled (R=0x%04x G=0x%04x) — generated "
-                "frames should now be VISIBLY shifted vs real ones.", kHalfVX, kHalfVY);
-    }
-
-    void CreateDummies(DXGI_FORMAT bbFmt)
-    {
-        if (g_dummiesReady) return;
-        const bool ok = CreateTex(DXGI_FORMAT_R32_FLOAT,    g_depth,   "depth")
-                     && CreateTex(DXGI_FORMAT_R16G16_FLOAT, g_mvec,    "mvec")
-                     && CreateTex(bbFmt,                     g_hudless, "hudless")
-                     && CreateTex(bbFmt,                     g_ui,      "ui");
-        g_dummiesReady = ok;
-        Logf(ok ? 0 : 2, "Dummy DLSS-G inputs %s (%ux%u): depth R32F, mvec RG16F, "
-                         "hudless+ui bbFmt.", ok ? "created" : "FAILED", g_w, g_h);
-        if (ok) FillMvecConstant();   // make generated frames visibly warped (FG proof)
     }
 
     void identity(sl::float4x4& m)
@@ -531,6 +411,7 @@ namespace StreamlineProbe
             sl::kFeatureDLSS_G, sl::kFeatureReflex, sl::kFeaturePCL,
         };
         sl::Preferences pref{};
+        pref.showConsole = true;
         pref.logLevel           = sl::LogLevel::eVerbose;
         pref.logMessageCallback = &SLLog;
         pref.featuresToLoad     = kFeatures;
@@ -659,12 +540,13 @@ namespace StreamlineProbe
         g_proxySwapchain = *ppSwapChain;   // borrowed; for per-frame GetCurrentBackBufferIndex
         g_proxySwapchain->QueryInterface(IID_PPV_ARGS(&g_proxySC3));
 
-        CreateDummies(desc.Format);
         InstallPresentHookOnProxy(*ppSwapChain);   // close out present markers per frame
+        g_adopted = true;                          // BeginFrame may now run
         // NOTE: Reflex is enabled lazily on the PRESENT thread (DLSS-G PG §6.0); DLSS-G is
         // toggled on/off there too, driven by SetFrameGeneration / the NR_SL_ENABLE_FG seed.
-        Logf(0, "STEP 2b: per-frame Reflex loop driven from Unity frame-begin; Reflex enabled "
-                "+ DLSS-G toggle reconciled on present thread. Watch present cadence ~2x when ON.");
+        // DLSS-G tags + constants come from the NRD feature each frame (ConsumeFrameInputs).
+        Logf(0, "Swapchain adopted (%ux%u); per-frame Reflex loop from Unity frame-begin; real "
+                "DLSS-G inputs fed by the NRD feature. Watch present cadence ~2x when FG ON.", g_w, g_h);
     }
 
     // Tag the real DLSS-G inputs + set constants for `token`. RENDER-THREAD ONLY (called by
@@ -676,17 +558,16 @@ namespace StreamlineProbe
     static void ApplyRealInputs(const StreamlineProbe::FrameInputs& in, sl::FrameToken& token)
     {
         sl::ViewportHandle viewport{ 0 };
-        sl::Extent colorExt{ 0, 0, in.colorW, in.colorH };
-        sl::Extent mvExt   { 0, 0, in.mvecDepthW, in.mvecDepthH };
+        sl::Extent fullExtent { 0, 0, in.colorW, in.colorH };
 
         sl::Resource rDepth(sl::ResourceType::eTex2d, in.depth,         (uint32_t)in.depthState);
         sl::Resource rMvec (sl::ResourceType::eTex2d, in.motionVectors, (uint32_t)in.mvecState);
-        sl::Resource rColor(sl::ResourceType::eTex2d, in.color,         (uint32_t)in.colorState);
+        // sl::Resource rColor(sl::ResourceType::eTex2d, in.color,         (uint32_t)in.colorState);
 
         sl::ResourceTag tags[] = {
-            sl::ResourceTag(&rDepth, sl::kBufferTypeDepth,         sl::ResourceLifecycle::eValidUntilPresent, &mvExt),
-            sl::ResourceTag(&rMvec,  sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent, &mvExt),
-            sl::ResourceTag(&rColor, sl::kBufferTypeHUDLessColor,  sl::ResourceLifecycle::eValidUntilPresent, &colorExt),
+            sl::ResourceTag(&rDepth, sl::kBufferTypeDepth,         sl::ResourceLifecycle::eValidUntilPresent, &fullExtent),
+            sl::ResourceTag(&rMvec,  sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent),
+            // sl::ResourceTag(&rColor, sl::kBufferTypeHUDLessColor,  sl::ResourceLifecycle::eValidUntilPresent, &fullExtent),
         };
         sl::Result rTag = slSetTagForFrame(token, viewport, tags, (uint32_t)_countof(tags), nullptr);
 
@@ -720,9 +601,12 @@ namespace StreamlineProbe
                  (unsigned long long)f, R(rTag), R(rC));
     }
 
+    // Frame-begin pacing ONLY. Mints this frame's token and drives the Reflex frame loop;
+    // the actual DLSS-G tags + constants are applied later this frame by ConsumeFrameInputs
+    // (the NRD feature's IssuePluginEventAndData handler), which reuses this token.
     void BeginFrame()
     {
-        if (!IsInited() || !g_dummiesReady) return;   // swapchain not adopted yet
+        if (!IsInited() || !g_adopted) return;   // swapchain not adopted yet
 
         static bool s_loggedTid = false;
         if (!s_loggedTid)
@@ -736,65 +620,13 @@ namespace StreamlineProbe
         uint32_t idx = g_frameIndex++;
         sl::Result rt = slGetNewFrameToken(token, &idx);
         if (rt != sl::Result::eOk || !token) { Logf(1, "slGetNewFrameToken -> %s", R(rt)); return; }
-        g_curToken = token;   // shared with ConsumeFrameInputs / EmitPresentMarkersPre / PostPresentMarker
+        g_curToken    = token;   // shared with ConsumeFrameInputs / EmitPresentMarkersPre / PostPresentMarker
+        g_curFrameIdx = idx;
 
-        // The whole point of step 2b: drive Reflex at the START of the frame. DLSS-G's
-        // pacer is built on the Reflex frame loop; without slReflexSleep + an early
-        // eSimulationStart the pacer has no frame interval to interpolate across.
+        // DLSS-G's pacer is built on the Reflex frame loop; without slReflexSleep + an early
+        // eSimulationStart at the START of the frame the pacer has no interval to interpolate.
         slReflexSleep(*token);
         slPCLSetMarker(sl::PCLMarker::eSimulationStart, *token);
-
-        // When the NRD feature is feeding real inputs, tagging + constants happen on the
-        // render thread in ConsumeFrameInputs (issued later this frame via
-        // IssuePluginEventAndData, reusing this token). Only tag the dummy textures here for
-        // the env-gated spike path where nothing feeds real inputs.
-        if (g_haveRealInputs) return;
-
-        sl::ViewportHandle viewport{ 0 };
-        sl::Extent ext{ 0, 0, g_w, g_h };
-
-        sl::Resource rDepth  (sl::ResourceType::eTex2d, g_depth.Get(),   D3D12_RESOURCE_STATE_COMMON);
-        sl::Resource rMvec   (sl::ResourceType::eTex2d, g_mvec.Get(),    D3D12_RESOURCE_STATE_COMMON);
-        sl::Resource rHudless(sl::ResourceType::eTex2d, g_hudless.Get(), D3D12_RESOURCE_STATE_COMMON);
-        sl::Resource rUI     (sl::ResourceType::eTex2d, g_ui.Get(),      D3D12_RESOURCE_STATE_COMMON);
-
-        sl::ResourceTag tags[] = {
-            sl::ResourceTag(&rDepth,   sl::kBufferTypeDepth,            sl::ResourceLifecycle::eValidUntilPresent, &ext),
-            sl::ResourceTag(&rMvec,    sl::kBufferTypeMotionVectors,    sl::ResourceLifecycle::eValidUntilPresent, &ext),
-            sl::ResourceTag(&rHudless, sl::kBufferTypeHUDLessColor,     sl::ResourceLifecycle::eValidUntilPresent, &ext),
-            sl::ResourceTag(&rUI,      sl::kBufferTypeUIColorAndAlpha,  sl::ResourceLifecycle::eValidUntilPresent, &ext),
-        };
-        sl::Result rTag = slSetTagForFrame(*token, viewport, tags, (uint32_t)_countof(tags), nullptr);
-
-        sl::Constants c{};
-        identity(c.cameraViewToClip);
-        identity(c.clipToCameraView);
-        identity(c.clipToLensClip);
-        identity(c.clipToPrevClip);
-        identity(c.prevClipToClip);
-        c.jitterOffset        = sl::float2(0, 0);
-        c.mvecScale           = sl::float2(1, 1);
-        c.cameraPinholeOffset = sl::float2(0, 0);
-        c.cameraPos   = sl::float3(0, 0, 0);
-        c.cameraUp    = sl::float3(0, 1, 0);
-        c.cameraRight = sl::float3(1, 0, 0);
-        c.cameraFwd   = sl::float3(0, 0, 1);
-        c.cameraNear = 0.1f; c.cameraFar = 1000.0f;
-        c.cameraFOV = 1.0f;
-        c.cameraAspectRatio = g_h ? (float)g_w / (float)g_h : 1.0f;
-        c.depthInverted        = sl::Boolean::eFalse;
-        c.cameraMotionIncluded = sl::Boolean::eTrue;
-        c.motionVectors3D      = sl::Boolean::eFalse;
-        // Signal a hard reset for the first couple of frames (no valid history yet).
-        c.reset                = (g_taggedFrames < 2) ? sl::Boolean::eTrue : sl::Boolean::eFalse;
-        sl::Result rC = slSetConstants(c, *token, viewport);
-
-        const uint64_t f = ++g_taggedFrames;
-        if (f <= 4 || (f & 0xFF) == 0 || rTag != sl::Result::eOk || rC != sl::Result::eOk)
-            Logf((rTag != sl::Result::eOk || rC != sl::Result::eOk) ? 2 : 0,
-                 "BEGIN(dummy) frame #%llu: slSetTagForFrame -> %s, slSetConstants -> %s",
-                 (unsigned long long)f, R(rTag), R(rC));
-        // DLSS-G state is now queried on the present thread (see PostPresentMarker).
     }
 
     void ConsumeFrameInputs(const FrameInputs& inputs)
@@ -804,15 +636,20 @@ namespace StreamlineProbe
         if (!g_haveRealInputs)
         {
             g_haveRealInputs = true;
-            Logf(0, "First real DLSS-G inputs received (color %ux%u, mvec/depth %ux%u) — "
-                    "dummy textures off; tagging real resources.",
+            Logf(0, "First real DLSS-G inputs received (color %ux%u, mvec/depth %ux%u).",
                  inputs.colorW, inputs.colorH, inputs.mvecDepthW, inputs.mvecDepthH);
         }
-        // Reuse the token BeginFrame minted at the start of this frame (it runs first).
-        if (g_curToken)
-            ApplyRealInputs(g_inputs, *g_curToken);
-        else
+        if (!g_curToken)
+        {
             Logf(1, "ConsumeFrameInputs: no frame token yet (BeginFrame not run) — stored, not tagged.");
+            return;
+        }
+        // Common constants may be set only ONCE per frame (SL rule). Skip if this frame was
+        // already applied by an earlier camera's input event this frame.
+        if (g_appliedFrameIdx == g_curFrameIdx) return;
+
+        ApplyRealInputs(g_inputs, *g_curToken);
+        g_appliedFrameIdx = g_curFrameIdx;
     }
 
     IUnknown* NativeIfProxy(IUnknown* maybeProxy)
@@ -835,9 +672,10 @@ namespace StreamlineProbe
         g_inited.store(false);
         // Reset the FG toggle so a re-init (editor enter/exit play) re-seeds from env.
         g_fgDesired.store(-1); g_fgApplied.store(false); g_featuresEnabledOnPresent = false;
-        g_haveRealInputs = false; g_inputs = {};
+        g_haveRealInputs = false; g_inputs = {}; g_adopted = false;
+        g_curFrameIdx = 0xFFFFFFFFu; g_appliedFrameIdx = 0xFFFFFFFFu;
         g_proxySwapchain = nullptr; g_curToken = nullptr; g_proxySC3.Reset();
-        g_depth.Reset(); g_mvec.Reset(); g_hudless.Reset(); g_ui.Reset(); g_device.Reset();
+        g_device.Reset();
         // After this the CreateCommandQueue hook falls back to native (g_proxyDevice
         // null + g_inited false), so the persistent vtable patch stays safe.
         g_proxyDevice.Reset();
