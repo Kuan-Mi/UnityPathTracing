@@ -388,6 +388,10 @@ namespace SLDlssg
         sl::Resource rMvec (sl::ResourceType::eTex2d, in.motionVectors, (uint32_t)in.mvecState);
 
         // DLSS-G tags are eValidUntilPresent (SL reads them at present; no per-frame copy).
+        // DLSS-G REQUIRES kBufferTypeDepth (see ProgrammingGuideDLSS_G §5.1/§5.2) — it does not
+        // consume kBufferTypeLinearDepth (that is a DLSS-SR/RR input). Tagging linear depth here
+        // leaves DLSS-G with no depth input and frame generation stops. The depth *values* fed
+        // (pool.ViewZ) and the depthInverted flag are the tuning knobs for the is_dynamic test.
         sl::ResourceTag tags[] = {
             sl::ResourceTag(&rDepth, sl::kBufferTypeDepth,         sl::ResourceLifecycle::eValidUntilPresent, &depthMvecExtent),
             sl::ResourceTag(&rMvec,  sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent, &depthMvecExtent),

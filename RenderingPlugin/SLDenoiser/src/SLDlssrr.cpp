@@ -237,7 +237,10 @@ namespace SLDlssrr
         sl::ResourceTag tags[] = {
             sl::ResourceTag(&rInput,  sl::kBufferTypeScalingInputColor,  kLifecycle, &renderExtent),
             sl::ResourceTag(&rOutput, sl::kBufferTypeScalingOutputColor, kLifecycle, &outputExtent),
-            sl::ResourceTag(&rDepth,  sl::kBufferTypeLinearDepth,        kLifecycle, &renderExtent),
+            // pool.ViewZ is now HW/NDC depth (clip.z/clip.w) — DlssBefore converts it for all
+            // paths (RR accepts either; see DLSS-RR guide §4.1.7). depthInverted/near/far in the
+            // constants describe its reversed-Z convention. Was kBufferTypeLinearDepth.
+            sl::ResourceTag(&rDepth,  sl::kBufferTypeDepth,              kLifecycle, &renderExtent),
             sl::ResourceTag(&rMv,     sl::kBufferTypeMotionVectors,      kLifecycle, &renderExtent),
             sl::ResourceTag(&rDiff,   sl::kBufferTypeAlbedo,             kLifecycle, &renderExtent),
             sl::ResourceTag(&rSpec,   sl::kBufferTypeSpecularAlbedo,     kLifecycle, &renderExtent),
