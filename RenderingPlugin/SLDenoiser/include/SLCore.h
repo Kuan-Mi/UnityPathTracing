@@ -11,6 +11,7 @@
 #include "sl_result.h" // sl::Result (lightweight; for ResultStr)
 
 struct ID3D12Device;
+namespace sl { struct FrameToken; }
 
 namespace SLCore
 {
@@ -39,4 +40,21 @@ namespace SLCore
 
     // slShutdown. Idempotent. Call before the device is destroyed.
     void Shutdown();
+
+    // --- Shared per-frame token ---------------------------------------------------------
+    // Streamline correlates everything belonging to one frame (constants, resource tags,
+    // the Reflex sleep, the PCL sim->render->present markers) by FrameToken. The latency
+    // math only works if a frame's calls all carry the SAME token, so the token is owned
+    // here, not per feature. slGetNewFrameToken(idx) returns the same object for the same
+    // index — every feature must read CurrentFrameToken rather than minting its own.
+    //
+    // BeginFrame: advance the frame index and mint its token. Call EXACTLY ONCE per Unity
+    // frame, at the earliest render-thread tick (RenderPipelineManager.beginContextRendering).
+    // Returns the new token (nullptr if SL is not initialized / mint failed).
+    sl::FrameToken* BeginFrame();
+    // The token for the frame currently in flight, or nullptr before the first BeginFrame.
+    // Does NOT mint — readers (DLSS-RR evaluate, DLSS-G present markers) just consume it.
+    sl::FrameToken* CurrentFrameToken();
+    // Index of the current token (UINT32_MAX before the first BeginFrame).
+    unsigned CurrentFrameIndex();
 }

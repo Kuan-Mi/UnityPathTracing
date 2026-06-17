@@ -487,6 +487,7 @@ add_library(SLDenoiser SHARED
     SLDenoiser/src/SLCore.cpp
     SLDenoiser/src/SLDlssrr.cpp
     SLDenoiser/src/SLDlssg.cpp
+    SLDenoiser/src/SLReflex.cpp
 )
 
 target_include_directories(SLDenoiser PRIVATE

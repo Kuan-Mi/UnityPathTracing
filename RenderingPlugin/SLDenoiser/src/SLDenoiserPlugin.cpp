@@ -28,6 +28,9 @@
 #include "SLDlssrr.h"
 #include "SLDlssrrFrameData.h"
 #include "SLDlssg.h"
+#include "SLReflex.h"
+
+namespace sl { struct FrameToken; }
 
 using Microsoft::WRL::ComPtr;
 
@@ -168,6 +171,7 @@ namespace
         }
         else if (eventType == kUnityGfxDeviceEventShutdown)
         {
+            SLReflex::Shutdown();
             SLDlssg::Shutdown();
             SLDlssrr::Shutdown();
             SLCore::Shutdown();
@@ -184,8 +188,14 @@ namespace
         SLDlssrr::Dispatch(reinterpret_cast<SLDlssrrFrameData*>(data), state.commandList);
     }
 
-    // DLSS-G frame-begin tick (render thread): mint token + drive Reflex loop.
-    void UNITY_INTERFACE_API OnFGBeginFrame(int /*eventId*/) { SLDlssg::BeginFrame(); }
+    // Per-frame begin tick (render thread): advance the shared SL frame token and run the
+    // Reflex sleep + eSimulationStart on it. Drives Reflex regardless of frame generation
+    // (works with FG off and in the editor); DLSS-G's present hook closes out the markers.
+    void UNITY_INTERFACE_API OnFGBeginFrame(int /*eventId*/)
+    {
+        sl::FrameToken* token = SLCore::BeginFrame();
+        if (token) SLReflex::OnFrameBegin(*token);
+    }
 
     // DLSS-G per-frame inputs (render thread): tag depth/mvec + set constants.
     void UNITY_INTERFACE_API OnFGFrameInputs(int /*eventId*/, void* data)
@@ -269,5 +279,23 @@ extern "C"
     int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_IsFrameGenerationOn()
     {
         return SLDlssg::IsFrameGenerationOn() ? 1 : 0;
+    }
+
+    // ---- Reflex (low latency) ----
+    // mode: 0 = Off, 1 = On (Low Latency), 2 = On + Boost. fpsCapUs: 0 = uncapped.
+    // Independent of frame generation — safe to use with FG off and in the editor.
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_SetReflexMode(int mode, unsigned fpsCapUs)
+    {
+        SLReflex::SetMode(mode, fpsCapUs);
+    }
+
+    int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_GetReflexMode()
+    {
+        return SLReflex::GetMode();
+    }
+
+    int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_IsReflexLowLatencyAvailable()
+    {
+        return SLReflex::IsLowLatencyAvailable() ? 1 : 0;
     }
 }

@@ -1,8 +1,10 @@
 // SLDlssrr.cpp — see SLDlssrr.h.
 //
 // DLSS Ray Reconstruction via Streamline. Per frame on Unity's command list:
-//   slGetNewFrameToken -> slDLSSDSetOptions (on change) -> slSetConstants ->
+//   SLCore::CurrentFrameToken -> slDLSSDSetOptions (on change) -> slSetConstants ->
 //   slSetTagForFrame(all RR guides) -> slEvaluateFeature(kFeatureDLSS_RR).
+// The frame token is the shared one owned by SLCore (all SL features must tag the same
+// token per frame); RR no longer mints its own.
 // SL manages the resource state transitions for tagged resources; the host is
 // responsible for restoring command-list state afterwards — we rely on Unity
 // rebinding its own pipeline for subsequent passes (same as the NRI path).
@@ -34,8 +36,6 @@
 
 namespace
 {
-    uint32_t g_frameIndex = 0;
-
     // Per-instance (== per-viewport) tracked options so we only re-issue slDLSSDSetOptions
     // when something changes (matches DLRRInstance recreate-on-change behaviour).
     struct InstanceState
@@ -130,11 +130,13 @@ namespace SLDlssrr
 
         sl::ViewportHandle viewport{ (uint32_t)data->instanceId };
 
-        // --- frame token ---
-        sl::FrameToken* token = nullptr;
-        uint32_t idx = g_frameIndex++;
-        sl::Result rt = slGetNewFrameToken(token, &idx);
-        if (rt != sl::Result::eOk || !token) { Logf(1, "slGetNewFrameToken -> %s", R(rt)); return; }
+        // --- frame token (shared, owned by SLCore) ---
+        // All SL features must tag against the SAME per-frame token (see SLCore.h). The
+        // frame is advanced once per Unity frame at beginContextRendering; if that tick has
+        // not run yet this run (RR-only, no FG driver), establish one here as a fallback.
+        sl::FrameToken* token = SLCore::CurrentFrameToken();
+        if (!token) token = SLCore::BeginFrame();
+        if (!token) { Logf(1, "no frame token (SLCore::BeginFrame failed)"); return; }
 
         // --- options (only when changed) ---
         {

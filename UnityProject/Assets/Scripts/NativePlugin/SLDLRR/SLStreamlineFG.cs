@@ -28,6 +28,14 @@ namespace SLDLRR
         [DllImport(DllName)] private static extern void   SL_SetFrameGeneration(int enable);
         [DllImport(DllName)] private static extern int    SL_IsFrameGenerationOn();
 
+        // Reflex low latency (independent of frame generation; works with FG off + in editor).
+        [DllImport(DllName)] private static extern void   SL_SetReflexMode(int mode, uint fpsCapUs);
+        [DllImport(DllName)] private static extern int    SL_GetReflexMode();
+        [DllImport(DllName)] private static extern int    SL_IsReflexLowLatencyAvailable();
+
+        /// <summary>Reflex low-latency mode. Mirrors sl::ReflexMode.</summary>
+        public enum ReflexMode { Off = 0, On = 1, OnPlusBoost = 2 }
+
         // D3D12_RESOURCE_STATES for the tagged depth/mvec (Unity UAV pool RTs).
         public const uint D3D12_STATE_UNORDERED_ACCESS    = 0x08;
         public const uint D3D12_STATE_ALL_SHADER_RESOURCE = 0x40 | 0x80;
@@ -89,6 +97,40 @@ namespace SLDLRR
         {
             if (!_available) return false;
             try { return SL_IsFrameGenerationOn() != 0; }
+            catch (DllNotFoundException) { _available = false; return false; }
+        }
+
+        /// <summary>
+        /// Set the Reflex low-latency mode. Applies on the next frame begin. This is the
+        /// primary lever for the high-latency feel with frame generation — DLSS-G adds a
+        /// frame of latency, and Reflex claws it back by pacing the CPU. <see cref="ReflexMode.OnPlusBoost"/>
+        /// gives the lowest latency (at a small FPS cost). Independent of FG, so it also
+        /// lowers latency with FG off. <paramref name="fpsCapUs"/> is an optional FPS cap in
+        /// microseconds (0 = uncapped); works even when mode is Off.
+        /// </summary>
+        public static void SetReflexMode(ReflexMode mode, uint fpsCapUs = 0)
+        {
+            if (!_available) return;
+            try { SL_SetReflexMode((int)mode, fpsCapUs); }
+            catch (DllNotFoundException) { _available = false; }
+        }
+
+        /// <summary>The Reflex mode currently applied (-1 until first applied).</summary>
+        public static int GetReflexMode()
+        {
+            if (!_available) return -1;
+            try { return SL_GetReflexMode(); }
+            catch (DllNotFoundException) { _available = false; return -1; }
+        }
+
+        /// <summary>
+        /// sl::ReflexState::lowLatencyAvailable — use only to gate Reflex UI (hide/disable on
+        /// non-NVIDIA / older hardware). Do everything else the same regardless.
+        /// </summary>
+        public static bool IsReflexLowLatencyAvailable()
+        {
+            if (!_available) return false;
+            try { return SL_IsReflexLowLatencyAvailable() != 0; }
             catch (DllNotFoundException) { _available = false; return false; }
         }
 

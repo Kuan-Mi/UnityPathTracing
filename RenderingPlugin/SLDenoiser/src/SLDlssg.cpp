@@ -6,12 +6,13 @@
 //   * Inputs are REAL path-tracer depth + motion vectors + camera constants (no dummies,
 //     no HUDLessColor — SL interpolates the presented backbuffer for now).
 //
-// Frame timeline (matches the working probe):
-//   * BeginFrame() at Unity's frame begin (render thread): slGetNewFrameToken +
-//     slReflexSleep + eSimulationStart.
+// Frame timeline:
+//   * SLCore::BeginFrame() at Unity's frame begin (render thread): mints the shared frame
+//     token. SLReflex::OnFrameBegin then does slReflexSleep + eSimulationStart on it.
 //   * ConsumeFrameInputs() later the same frame (render thread): tag depth/mvec + set
-//     constants on that token.
-//   * Present hook (SL proxy swapchain): close out the present-side PCL markers.
+//     constants on the shared token (SLCore::CurrentFrameToken).
+//   * Present hook (SL proxy swapchain): close out the present-side PCL markers on the
+//     same shared token (eSimulationEnd .. ePresentEnd).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -24,8 +25,9 @@
 #include "sl.h"
 #include "sl_consts.h"
 #include "sl_dlss_g.h"
-#include "sl_reflex.h"
 #include "sl_pcl.h"
+// Reflex (slReflexSetOptions/slReflexSleep) now lives in SLReflex.cpp; the frame token in
+// SLCore. This file only owns the FG present path + the present-side PCL markers.
 
 #include "SLCore.h" // shared slInit/slSetD3DDevice/slShutdown + logging/result helpers
 #include "SLDlssg.h"
@@ -47,16 +49,12 @@ namespace
 
     SLDlssg::FrameInputs   g_inputs{};
     bool                   g_haveRealInputs = false;
-    uint32_t               g_curFrameIdx     = 0xFFFFFFFFu;
     uint32_t               g_appliedFrameIdx = 0xFFFFFFFFu;
-    bool                   g_reflexOn = false;
-    uint32_t               g_frameIndex = 0;
     uint64_t               g_taggedFrames = 0;
     uint64_t               g_presentCount = 0;
     bool                   g_featuresEnabledOnPresent = false;
     IDXGISwapChain1*       g_proxySwapchain = nullptr;
     ComPtr<IDXGISwapChain3> g_proxySC3;
-    sl::FrameToken*        g_curToken = nullptr;
 
     constexpr UINT kPresentVTIdx  = 8;
     constexpr UINT kPresent1VTIdx = 22;
@@ -103,17 +101,6 @@ namespace
         if (r == sl::Result::eOk) g_fgApplied.store(on);
     }
 
-    void EnableReflex()
-    {
-        if (g_reflexOn) return;
-        sl::ReflexOptions opt{};
-        opt.mode = sl::ReflexMode::eLowLatency;
-        opt.frameLimitUs = 0;
-        sl::Result r = slReflexSetOptions(opt);
-        Logf(r == sl::Result::eOk ? 0 : 2, "slReflexSetOptions(eLowLatency) -> %s", R(r));
-        g_reflexOn = (r == sl::Result::eOk);
-    }
-
     void LogDlssgState()
     {
         sl::ViewportHandle viewport{ 0 };
@@ -149,9 +136,8 @@ namespace
         if (!g_featuresEnabledOnPresent)
         {
             g_featuresEnabledOnPresent = true;
-            Logf(0, "First present on thread %lu — enabling Reflex on the present thread.",
+            Logf(0, "First present on thread %lu (Reflex is driven from frame begin via SLReflex).",
                  (unsigned long)GetCurrentThreadId());
-            EnableReflex();
             if (g_fgDesired.load() < 0)
             {
                 char env[8] = {};
@@ -170,7 +156,9 @@ namespace
     void EmitPresentMarkersPre()
     {
         EnsureFeaturesOnPresentThread();
-        sl::FrameToken* token = g_curToken;
+        // eSimulationStart is emitted at frame begin by SLReflex on this same shared token;
+        // here we close out the rest of the PCL timeline on the present thread.
+        sl::FrameToken* token = SLCore::CurrentFrameToken();
         if (!token) return;
         if (g_proxySC3) g_proxySC3->GetCurrentBackBufferIndex();
         slPCLSetMarker(sl::PCLMarker::eSimulationEnd,     *token);
@@ -181,8 +169,9 @@ namespace
 
     void PostPresentMarker()
     {
-        if (!g_curToken) return;
-        slPCLSetMarker(sl::PCLMarker::ePresentEnd, *g_curToken);
+        sl::FrameToken* token = SLCore::CurrentFrameToken();
+        if (!token) return;
+        slPCLSetMarker(sl::PCLMarker::ePresentEnd, *token);
         const uint64_t p = ++g_presentCount;
         if (p <= 3 || (p & 0x7F) == 0) LogDlssgState();
     }
@@ -428,28 +417,6 @@ namespace SLDlssg
                  (unsigned long long)f, R(rTag), R(rC));
     }
 
-    void BeginFrame()
-    {
-        if (!g_adopted) return;
-
-        static bool s_loggedTid = false;
-        if (!s_loggedTid)
-        {
-            s_loggedTid = true;
-            Logf(0, "BeginFrame runs on thread %lu.", (unsigned long)GetCurrentThreadId());
-        }
-
-        sl::FrameToken* token = nullptr;
-        uint32_t idx = g_frameIndex++;
-        sl::Result rt = slGetNewFrameToken(token, &idx);
-        if (rt != sl::Result::eOk || !token) { Logf(1, "slGetNewFrameToken -> %s", R(rt)); return; }
-        g_curToken    = token;
-        g_curFrameIdx = idx;
-
-        slReflexSleep(*token);
-        slPCLSetMarker(sl::PCLMarker::eSimulationStart, *token);
-    }
-
     void ConsumeFrameInputs(const FrameInputs& inputs)
     {
         g_inputs = inputs;
@@ -459,14 +426,16 @@ namespace SLDlssg
             Logf(0, "First real DLSS-G inputs received (mvec/depth %ux%u, frame %ux%u).",
                  inputs.mvecDepthW, inputs.mvecDepthH, inputs.colorW, inputs.colorH);
         }
-        if (!g_curToken)
+        sl::FrameToken* token = SLCore::CurrentFrameToken();
+        if (!token)
         {
-            Logf(1, "ConsumeFrameInputs: no frame token yet (BeginFrame not run).");
+            Logf(1, "ConsumeFrameInputs: no frame token yet (SLCore::BeginFrame not run).");
             return;
         }
-        if (g_appliedFrameIdx == g_curFrameIdx) return;
-        ApplyRealInputs(g_inputs, *g_curToken);
-        g_appliedFrameIdx = g_curFrameIdx;
+        const uint32_t idx = (uint32_t)(*token);
+        if (g_appliedFrameIdx == idx) return;
+        ApplyRealInputs(g_inputs, *token);
+        g_appliedFrameIdx = idx;
     }
 
     void SetFrameGeneration(bool enable)
@@ -481,8 +450,8 @@ namespace SLDlssg
     {
         g_fgDesired.store(-1); g_fgApplied.store(false); g_featuresEnabledOnPresent = false;
         g_haveRealInputs = false; g_inputs = {}; g_adopted = false;
-        g_curFrameIdx = 0xFFFFFFFFu; g_appliedFrameIdx = 0xFFFFFFFFu;
-        g_proxySwapchain = nullptr; g_curToken = nullptr; g_proxySC3.Reset();
+        g_appliedFrameIdx = 0xFFFFFFFFu;
+        g_proxySwapchain = nullptr; g_proxySC3.Reset();
         g_device.Reset();
         g_proxyDevice.Reset(); g_proxyFactory.Reset();
         // slShutdown is owned by the RR module (shared slInit).

@@ -59,9 +59,8 @@ namespace SLDlssg
     void AdoptSwapChain(IDXGISwapChain1** ppSwapChain, IUnknown* presentQueue, bool alreadyProxy);
     IUnknown* NativeIfProxy(IUnknown* maybeProxy);
 
-    // Per-frame: mint the frame token + drive the Reflex loop at frame begin (render thread).
-    void BeginFrame();
-    // Tag real depth/mvec + set constants for this frame's token (render thread, after BeginFrame).
+    // Tag real depth/mvec + set constants for the shared frame token (render thread, after
+    // SLCore::BeginFrame). The frame token + Reflex sleep are owned by SLCore/SLReflex now.
     void ConsumeFrameInputs(const FrameInputs& inputs);
 
     // Runtime FG on/off (applied on the present thread).
