@@ -107,7 +107,8 @@ namespace
             return hr;
         }
 
-        // No queue proxy (e.g. editor): original path — native create + upgrade swapchain.
+        // No queue proxy (SL proxy device unavailable): fall back to native create +
+        // in-place swapchain upgrade.
         HRESULT hr = s_OrigCreateSwapChainForHwnd(This, pDevice, hWnd, pDesc, pFS, pOut, ppSwapChain);
         if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
             StreamlineProbe::AdoptSwapChain(ppSwapChain, pDevice);
@@ -177,6 +178,21 @@ extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_SL_GetReflexBeginEventFunc()
 {
     return ReflexBeginCallback;
+}
+
+// Runtime DLSS-G frame-generation toggle (callable from C# any thread). The change is
+// applied on the present thread at the next present; see StreamlineProbe::SetFrameGeneration.
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_SL_SetFrameGeneration(int enable)
+{
+    StreamlineProbe::SetFrameGeneration(enable != 0);
+}
+
+// Returns 1 if DLSS-G frame generation is currently applied, 0 otherwise.
+extern "C" int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_SL_IsFrameGenerationOn()
+{
+    return StreamlineProbe::IsFrameGenerationOn() ? 1 : 0;
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

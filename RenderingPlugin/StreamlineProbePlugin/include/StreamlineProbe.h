@@ -55,7 +55,7 @@ namespace StreamlineProbe
     void AdoptSwapChain(IDXGISwapChain1** ppSwapChain, IUnknown* presentQueue,
                         bool alreadyProxy = false);
 
-    // True when Unity's command queue is being SL-proxied (NR_SL_PROXY_QUEUE=1).
+    // True when Unity's command queue is being SL-proxied (queue proxy installed).
     bool IsQueueProxyActive();
 
     // Create the swapchain through SL's proxy factory so SL establishes the
@@ -81,6 +81,18 @@ namespace StreamlineProbe
     // queue when Unity's queue has been SL-proxied (DXGI must not be given a proxy
     // queue — its present path crashes; SL still tracks the proxy by creation).
     IUnknown* NativeIfProxy(IUnknown* maybeProxy);
+
+    // Request DLSS-G frame generation ON (enable=true) or OFF at runtime. Thread-safe:
+    // it only records the desired state; the actual slDLSSGSetOptions call is applied on
+    // the PRESENT thread at the next present (slDLSSGSetOptions is not thread-safe and
+    // must run on the presenting thread — DLSS-G PG §6.0). OFF uses
+    // eRetainResourcesWhenOff so re-enabling is stutter-free without recreating the
+    // swapchain (PG §6.4). No-op (request still recorded) until the swapchain is adopted.
+    void SetFrameGeneration(bool enable);
+
+    // True if DLSS-G frame generation is currently applied (as last set on the present
+    // thread). Reflects the actual applied mode, not a pending request.
+    bool IsFrameGenerationOn();
 
     // slShutdown. Idempotent. Call before the device is destroyed.
     void Shutdown();

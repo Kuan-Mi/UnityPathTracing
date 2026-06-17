@@ -29,6 +29,12 @@ namespace PathTracing
         [DllImport(DllName)]
         private static extern IntPtr NR_SL_GetReflexBeginEventFunc();
 
+        [DllImport(DllName)]
+        private static extern void NR_SL_SetFrameGeneration(int enable);
+
+        [DllImport(DllName)]
+        private static extern int NR_SL_IsFrameGenerationOn();
+
         private static CommandBuffer _cmd;
         private static IntPtr        _eventFunc = IntPtr.Zero;
         // Set false if the probe DLL is absent/disabled so we stop trying every frame.
@@ -94,6 +100,40 @@ namespace PathTracing
             _cmd.Clear();
             _cmd.IssuePluginEvent(_eventFunc, 0);
             Graphics.ExecuteCommandBuffer(_cmd);
+        }
+
+        /// <summary>
+        /// Enable or disable DLSS-G frame generation at runtime. Safe to call any time
+        /// (e.g. from a UI toggle); the native side records the request and applies it on
+        /// the present thread at the next present. No-op if the probe plugin is absent.
+        /// </summary>
+        public static void SetFrameGeneration(bool enable)
+        {
+            if (!_available) return;
+            try
+            {
+                NR_SL_SetFrameGeneration(enable ? 1 : 0);
+            }
+            catch (DllNotFoundException)
+            {
+                _available = false;
+                Debug.LogWarning("StreamlineFrameDriver: StreamlineProbePlugin not found; SetFrameGeneration ignored.");
+            }
+        }
+
+        /// <summary>True if DLSS-G frame generation is currently applied on the present thread.</summary>
+        public static bool IsFrameGenerationOn()
+        {
+            if (!_available) return false;
+            try
+            {
+                return NR_SL_IsFrameGenerationOn() != 0;
+            }
+            catch (DllNotFoundException)
+            {
+                _available = false;
+                return false;
+            }
         }
 
         private static bool IsPreviewOnlyContext(List<Camera> cameras)

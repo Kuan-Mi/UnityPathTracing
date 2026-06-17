@@ -42,7 +42,14 @@ namespace
     StreamlineProbe::LogFn g_log = nullptr;
     std::atomic<bool>      g_inited{false};
     bool                   g_deviceSet = false;
-    bool                   g_dlssgEnabled = false;
+
+    // Runtime FG toggle. g_fgDesired is set from any thread (C# main thread via
+    // SetFrameGeneration, or the NR_SL_ENABLE_FG env seed); g_fgApplied is the mode
+    // actually pushed to SL, only ever written on the PRESENT thread. -1 = not yet
+    // seeded. The present hook reconciles desired -> applied (slDLSSGSetOptions must
+    // run on the presenting thread, DLSS-G PG §6.0).
+    std::atomic<int>       g_fgDesired{-1};
+    std::atomic<bool>      g_fgApplied{false};
 
     // Dummy DLSS-G inputs + per-frame tagging state.
     ComPtr<ID3D12Device>   g_device;
@@ -139,16 +146,23 @@ namespace
         }
     }
 
-    void EnableDLSSG()
+    // Apply a DLSS-G on/off mode change. MUST be called on the present thread.
+    // eRetainResourcesWhenOff keeps DLSS-G's internal resources allocated while OFF so
+    // re-enabling doesn't stutter and we don't have to tear down/recreate the swapchain
+    // (PG §6.4 — the full swapchain-recreate of §18.0 is the only way to also reclaim
+    // the off-screen-copy overhead, but that's out of scope for this in-place spike).
+    void ApplyDlssgMode(bool on)
     {
-        if (g_dlssgEnabled) return;
+        if (g_fgApplied.load() == on) return;
         sl::ViewportHandle viewport{ 0 };
         sl::DLSSGOptions opt{};
-        opt.mode = sl::DLSSGMode::eOn;
+        opt.mode = on ? sl::DLSSGMode::eOn : sl::DLSSGMode::eOff;
         opt.numFramesToGenerate = 1;
+        opt.flags = sl::DLSSGFlags::eRetainResourcesWhenOff;
         sl::Result r = slDLSSGSetOptions(viewport, opt);
-        Logf(r == sl::Result::eOk ? 0 : 2, "slDLSSGSetOptions(mode=eOn, gen=1) -> %s", R(r));
-        g_dlssgEnabled = (r == sl::Result::eOk);
+        Logf(r == sl::Result::eOk ? 0 : 2, "slDLSSGSetOptions(mode=%s, gen=1, retain) -> %s",
+             on ? "eOn" : "eOff", R(r));
+        if (r == sl::Result::eOk) g_fgApplied.store(on);
     }
 
     // DLSS-G requires Reflex active at runtime (eFailReflexNotDetectedAtRuntime).
@@ -317,21 +331,34 @@ namespace
     // runs on the swapchain-creation thread, so we defer enabling to the first present.
     void EnsureFeaturesOnPresentThread()
     {
-        if (g_featuresEnabledOnPresent) return;
-        g_featuresEnabledOnPresent = true;
-        Logf(0, "First present on thread %lu — enabling Reflex on the present thread.",
-             (unsigned long)GetCurrentThreadId());
-        EnableReflex();   // harmless; DLSS-G requires Reflex active
+        if (!g_featuresEnabledOnPresent)
+        {
+            g_featuresEnabledOnPresent = true;
+            Logf(0, "First present on thread %lu — enabling Reflex on the present thread.",
+                 (unsigned long)GetCurrentThreadId());
+            EnableReflex();   // harmless; DLSS-G requires Reflex active
 
-        // DLSS-G enable gated separately so we can test proxy-queue stability with FG
-        // OFF (it currently crashes inside FG's first evaluate on the DUMMY inputs).
-        char env[8] = {};
-        DWORD n = GetEnvironmentVariableA("NR_SL_ENABLE_FG", env, sizeof(env));
-        if (n > 0 && env[0] == '1')
-            EnableDLSSG();
-        else
-            Logf(0, "DLSS-G enable SKIPPED (set NR_SL_ENABLE_FG=1 to turn FG on). "
-                    "Running proxy-queue stability test with FG OFF.");
+            // Seed the initial FG request if nobody has called SetFrameGeneration() yet.
+            // NR_SL_ENABLE_FG keeps the old env-gated default (FG starts ON only when
+            // explicitly opted in; it can still crash inside FG's first evaluate on the
+            // DUMMY inputs). C# can override either way via NR_SL_SetFrameGeneration.
+            if (g_fgDesired.load() < 0)
+            {
+                char env[8] = {};
+                DWORD n = GetEnvironmentVariableA("NR_SL_ENABLE_FG", env, sizeof(env));
+                const bool on = (n > 0 && env[0] == '1');
+                g_fgDesired.store(on ? 1 : 0);
+                Logf(0, on ? "DLSS-G initial state ON (NR_SL_ENABLE_FG=1)."
+                           : "DLSS-G initial state OFF (NR_SL_SetFrameGeneration(1) or "
+                             "NR_SL_ENABLE_FG=1 to turn FG on).");
+            }
+        }
+
+        // Reconcile any pending on/off request on the present thread (slDLSSGSetOptions
+        // is not thread-safe and must run here). No-op when already in the desired mode.
+        const int desired = g_fgDesired.load();
+        if (desired >= 0)
+            ApplyDlssgMode(desired != 0);
     }
 
     // Present-side markers. The token + sleep + sim-start + tagging now happen at
@@ -518,20 +545,10 @@ namespace StreamlineProbe
 
     void InstallDeviceQueueHook()
     {
-        // OPT-IN ONLY. Proxying Unity's command queue crashes Unity the moment it uses
-        // the SL-proxied queue (confirmed: editor dies right after "Upgraded ID3D12Device
-        // v0 to v10"). Leaving this on would crash the editor on every launch since the
-        // plugin loads on startup. Enable explicitly for player-only experiments:
-        //     set NR_SL_PROXY_QUEUE=1  (before launching the player)
-        char env[8] = {};
-        DWORD n = GetEnvironmentVariableA("NR_SL_PROXY_QUEUE", env, sizeof(env));
-        if (n == 0 || env[0] != '1')
-        {
-            Logf(0, "CreateCommandQueue proxy DISABLED (set NR_SL_PROXY_QUEUE=1 to enable; "
-                    "it currently crashes Unity once the proxy queue is used).");
-            return;
-        }
-
+        // Proxying Unity's command queue used to crash the editor (which loaded this
+        // plugin on startup) the moment it touched the SL-proxied queue. The plugin is
+        // now player-only (the editor no longer loads it), so the queue proxy is always
+        // installed — DLSS-G needs an SL-proxied PRESENT queue to attach.
         bool expected = false;
         if (!g_deviceHooked.compare_exchange_strong(expected, true)) return;
 
@@ -556,6 +573,16 @@ namespace StreamlineProbe
     }
 
     bool IsQueueProxyActive() { return g_proxyDevice != nullptr; }
+
+    void SetFrameGeneration(bool enable)
+    {
+        // Just record the request; the present hook applies it on the present thread.
+        g_fgDesired.store(enable ? 1 : 0, std::memory_order_release);
+        Logf(0, "SetFrameGeneration(%s) requested; applies on next present.",
+             enable ? "ON" : "OFF");
+    }
+
+    bool IsFrameGenerationOn() { return g_fgApplied.load(std::memory_order_acquire); }
 
     // Lazily build an SL proxy DXGI factory (used to create the swapchain so SL
     // establishes the device/queue/swapchain proxy links — the piece the plain
@@ -625,9 +652,10 @@ namespace StreamlineProbe
 
         CreateDummies(desc.Format);
         InstallPresentHookOnProxy(*ppSwapChain);   // close out present markers per frame
-        // NOTE: Reflex + DLSS-G are enabled lazily on the PRESENT thread (DLSS-G PG §6.0).
-        Logf(0, "STEP 2b: per-frame Reflex loop driven from Unity frame-begin; Reflex+DLSS-G "
-                "enabled on first present (present thread). Watch present cadence ~2x.");
+        // NOTE: Reflex is enabled lazily on the PRESENT thread (DLSS-G PG §6.0); DLSS-G is
+        // toggled on/off there too, driven by SetFrameGeneration / the NR_SL_ENABLE_FG seed.
+        Logf(0, "STEP 2b: per-frame Reflex loop driven from Unity frame-begin; Reflex enabled "
+                "+ DLSS-G toggle reconciled on present thread. Watch present cadence ~2x when ON.");
     }
 
     void BeginFrame()
@@ -719,6 +747,8 @@ namespace StreamlineProbe
     {
         if (!IsInited()) return;
         g_inited.store(false);
+        // Reset the FG toggle so a re-init (editor enter/exit play) re-seeds from env.
+        g_fgDesired.store(-1); g_fgApplied.store(false); g_featuresEnabledOnPresent = false;
         g_proxySwapchain = nullptr; g_curToken = nullptr; g_proxySC3.Reset();
         g_depth.Reset(); g_mvec.Reset(); g_hudless.Reset(); g_ui.Reset(); g_device.Reset();
         // After this the CreateCommandQueue hook falls back to native (g_proxyDevice
