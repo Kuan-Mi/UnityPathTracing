@@ -28,8 +28,14 @@ namespace SLDlssrr
     bool InitSL(LogFn log);
     bool IsInited();
 
-    // slSetD3DDevice + DLSS-RR capability log. Call once the Unity device exists.
+    // slSetD3DDevice + DLSS-RR capability log. Idempotent + guarded: the FIRST successful
+    // call wins; later calls (e.g. the FG queue hook and the graphics-init event both racing
+    // to set it) are no-ops. Calling slSetD3DDevice twice makes SL reject the second
+    // ("plugins already initialized") and would leave the device flag false → RR never runs.
     void SetDevice(ID3D12Device* device);
+
+    // True once slSetD3DDevice has succeeded (shared by the RR and FG paths).
+    bool IsDeviceSet();
 
     // Instance lifecycle (one viewport per instance; viewport id == instance id).
     int  CreateInstance();

@@ -71,6 +71,11 @@ namespace PathTracing
         [Tooltip("Run DLSS Ray Reconstruction through Streamline (SLDenoiser) instead of NRI. " +
                  "A/B comparison toggle — keep mutually exclusive with the DLSS-G probe at runtime.")]
         public bool         RRViaSL              = false;
+
+        [Tooltip("Enable DLSS-G Frame Generation through Streamline (SLDenoiser). Player-only " +
+                 "(present-path takeover; the editor ignores it). Keep mutually exclusive with " +
+                 "the legacy StreamlineProbePlugin (one slInit per process).")]
+        public bool         FGViaSL              = false;
         public UpscalerMode upscalerMode         = UpscalerMode.NATIVE;
         public bool         confidence           = true;
         public float        denoisingRange       = 1000f;

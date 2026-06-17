@@ -22,6 +22,8 @@
 #include "sl_consts.h"
 #include "sl_dlss.h"
 #include "sl_dlss_d.h"
+#include "sl_reflex.h"
+#include "sl_pcl.h"
 
 #include "SLDlssrr.h"
 #include "SLDlssrrFrameData.h"
@@ -148,10 +150,15 @@ namespace SLDlssrr
         bool expected = false;
         if (!g_inited.compare_exchange_strong(expected, true)) return true;
 
-        Logf(0, "slInit Streamline %u.%u.%u for DLSS-RR (manual hooking)...",
+        Logf(0, "slInit Streamline %u.%u.%u for DLSS-RR + DLSS-G (manual hooking)...",
              SL_VERSION_MAJOR, SL_VERSION_MINOR, SL_VERSION_PATCH);
 
-        static const sl::Feature kFeatures[] = { sl::kFeatureDLSS_RR };
+        // DLSS_RR (evaluate-time) + DLSS_G/Reflex/PCL (present-path frame generation).
+        // One slInit serves both; the FG present/queue hooks are installed only in the
+        // player (see SLDenoiserPlugin.cpp editor auto-detect).
+        static const sl::Feature kFeatures[] = {
+            sl::kFeatureDLSS_RR, sl::kFeatureDLSS_G, sl::kFeatureReflex, sl::kFeaturePCL,
+        };
         sl::Preferences pref{};
         // eDefault (warnings/errors only) + no console: eVerbose logs every NGX SRV-cache hit
         // and VRAM op per frame through the Unity log callback, a real per-frame CPU cost.
@@ -177,6 +184,8 @@ namespace SLDlssrr
     }
 
     bool IsInited() { return g_inited.load(std::memory_order_acquire); }
+
+    bool IsDeviceSet() { return g_deviceSet; }
 
     void SetDevice(ID3D12Device* device)
     {

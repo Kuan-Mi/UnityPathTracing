@@ -77,6 +77,8 @@ namespace PathTracing
         private NRDDlssAfterPass        _nrdDlssAfterPass;
         private DlssRRPass              _dlssrrPass;
         private SLDlssrrPass            _slDlssrrPass;
+        private SLDlssgInputsPass       _slDlssgInputsPass;
+        private bool                    _slFgLastEnabled;
         private DlssSRPass              _dlsssrPass;
         private NisPass                 _nisPass;
         private NativeNrdOutputBlitPass _outputBlitPass;
@@ -165,6 +167,7 @@ namespace PathTracing
             _nrdDlssAfterPass        ??= new NRDDlssAfterPass(nrdDlssAfterShader) { renderPassEvent                                                = renderPassEvent };
             _dlssrrPass              ??= new DlssRRPass { renderPassEvent                                                                          = renderPassEvent };
             _slDlssrrPass            ??= new SLDlssrrPass { renderPassEvent                                                                        = renderPassEvent };
+            _slDlssgInputsPass       ??= new SLDlssgInputsPass { renderPassEvent                                                                  = renderPassEvent };
             _dlsssrPass              ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
             _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
@@ -787,6 +790,72 @@ namespace PathTracing
 
                 _nisPass.Setup(nis.GetInteropDataPtr(nisInput, nisRes, nisSettings));
                 renderer.EnqueuePass(_nisPass);
+            }
+
+            // DLSS-G Frame Generation via Streamline (SLDenoiser). Player-only: in the editor
+            // the swapchain is never adopted so BeginFrame/inputs are no-ops. The Reflex/begin
+            // tick is driven separately by SLStreamlineFG at beginContextRendering.
+            if (eyeIndex == 0)
+            {
+                if (setting.FGViaSL != _slFgLastEnabled)
+                {
+                    SLDLRR.SLStreamlineFG.SetFrameGeneration(setting.FGViaSL);
+                    _slFgLastEnabled = setting.FGViaSL;
+                }
+
+                if (setting.FGViaSL)
+                {
+                    var fgEventFunc = SLDLRR.SLStreamlineFG.GetFrameInputsEventFunc();
+                    if (fgEventFunc != IntPtr.Zero)
+                    {
+                        var viewToWorld   = frameState.worldToView.inverse;
+                        var clipToCamView = frameState.viewToClip.inverse;
+                        var clipToPrev    = frameState.prevWorldToClip * frameState.worldToClip.inverse;
+                        var prevToClip    = frameState.worldToClip * frameState.prevWorldToClip.inverse;
+                        var camRight =  new Vector3(viewToWorld.m00, viewToWorld.m10, viewToWorld.m20);
+                        var camUp    =  new Vector3(viewToWorld.m01, viewToWorld.m11, viewToWorld.m21);
+                        var camFwd   = -new Vector3(viewToWorld.m02, viewToWorld.m12, viewToWorld.m22);
+                        var jit      = setting.cameraJitter ? frameState.viewportJitter : float2.zero;
+                        float rW     = math.max(1, frameState.renderResolution.x);
+                        float rH     = math.max(1, frameState.renderResolution.y);
+
+                        var fg = new SLDLRR.SLStreamlineFG.DlssgInputs
+                        {
+                            depth                = pool.ViewZ.NativePtr,
+                            motionVectors        = pool.Mv.NativePtr,
+                            depthState           = SLDLRR.SLStreamlineFG.D3D12_STATE_UNORDERED_ACCESS,
+                            mvecState            = SLDLRR.SLStreamlineFG.D3D12_STATE_UNORDERED_ACCESS,
+                            mvecDepthW           = (uint)frameState.renderResolution.x,
+                            mvecDepthH           = (uint)frameState.renderResolution.y,
+                            colorW               = (uint)outputResolution.x,
+                            colorH               = (uint)outputResolution.y,
+                            cameraViewToClip     = frameState.viewToClip,
+                            clipToCameraView     = clipToCamView,
+                            clipToPrevClip       = clipToPrev,
+                            prevClipToClip       = prevToClip,
+                            cameraPos            = new Vector3(frameState.camPos.x, frameState.camPos.y, frameState.camPos.z),
+                            cameraUp             = camUp,
+                            cameraRight          = camRight,
+                            cameraFwd            = camFwd,
+                            jitterX              = jit.x,
+                            jitterY              = jit.y,
+                            mvecScaleX           = 1f / rW,
+                            mvecScaleY           = 1f / rH,
+                            cameraNear           = cam.nearClipPlane,
+                            cameraFar            = cam.farClipPlane,
+                            cameraFOV            = cam.fieldOfView * Mathf.Deg2Rad,
+                            cameraAspect         = cam.aspect,
+                            depthInverted        = 1,
+                            cameraMotionIncluded = 1,
+                            motionVectors3D      = 0,
+                            reset                = 0,
+                        };
+
+                        var fgPtr = SLDLRR.SLStreamlineFG.GetInteropDataPtr(fg, curFrame);
+                        _slDlssgInputsPass.Setup(fgEventFunc, fgPtr);
+                        renderer.EnqueuePass(_slDlssgInputsPass);
+                    }
+                }
             }
 
             // Final (tone-map + validation overlay → Final RT)

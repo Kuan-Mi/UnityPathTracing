@@ -485,6 +485,7 @@ target_link_libraries(StreamlineProbePlugin PRIVATE
 add_library(SLDenoiser SHARED
     SLDenoiser/src/SLDenoiserPlugin.cpp
     SLDenoiser/src/SLDlssrr.cpp
+    SLDenoiser/src/SLDlssg.cpp
 )
 
 target_include_directories(SLDenoiser PRIVATE
@@ -537,10 +538,12 @@ if(NOT NR_SKIP_UNITY_COPY)
         )
     endforeach()
 
-    # Streamline runtime DLLs required by SLDenoiser (DLSS-RR). Attached to SLDenoiser
-    # too so the RR plugin works even when StreamlineProbePlugin isn't built. sl.dlss_d +
-    # nvngx_dlssd are the Ray Reconstruction plugin/model.
-    foreach(_SLDLL sl.interposer.dll sl.common.dll sl.dlss_d.dll sl.pcl.dll nvngx_dlssd.dll)
+    # Streamline runtime DLLs required by SLDenoiser. sl.dlss_d + nvngx_dlssd = Ray
+    # Reconstruction (evaluate); sl.dlss_g + sl.reflex + nvngx_dlssg = Frame Generation
+    # (present-path, player-only). WinPixEventRuntime is required by sl.dlss_g.
+    foreach(_SLDLL sl.interposer.dll sl.common.dll sl.pcl.dll
+                   sl.dlss_d.dll nvngx_dlssd.dll
+                   sl.dlss_g.dll sl.reflex.dll nvngx_dlssg.dll WinPixEventRuntime.dll)
         add_custom_command(TARGET SLDenoiser POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${SL_DIR}/bin/x64/development/${_SLDLL}"

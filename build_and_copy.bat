@@ -81,6 +81,12 @@ copy /Y "%OUT_DIR%\SLDenoiser.pdb"        "%UNITY_PLUGINS%\" >nul
 :: DLSS-RR Streamline plugin + model (sl.interposer/common/pcl already copied above).
 copy /Y "%SL_BIN%\sl.dlss_d.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssd.dll"        "%UNITY_PLUGINS%\" >nul
+:: DLSS-G plugin + Reflex + model (also used by the StreamlineProbePlugin section above;
+:: repeated here so SLDenoiser FG works even if that section is removed). Player-only.
+copy /Y "%SL_BIN%\sl.dlss_g.dll"          "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\sl.reflex.dll"          "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\nvngx_dlssg.dll"        "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\WinPixEventRuntime.dll" "%UNITY_PLUGINS%\" >nul
 
 :: DXC (dxcompiler / dxil)
 copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
