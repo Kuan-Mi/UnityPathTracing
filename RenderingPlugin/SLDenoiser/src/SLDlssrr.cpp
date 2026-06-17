@@ -286,7 +286,10 @@ namespace SLDlssrr
         c.clipToLensClip.row[1] = sl::float4(0, 1, 0, 0);
         c.clipToLensClip.row[2] = sl::float4(0, 0, 1, 0);
         c.clipToLensClip.row[3] = sl::float4(0, 0, 0, 1);
-        c.jitterOffset        = sl::float2(data->cameraJitter[0], data->cameraJitter[1]);
+        // Negate to match the NRI DLSS-RR path (DLRRInstance: cameraJitter = {-x,-y}) and the
+        // NGX/SL sign convention: jitterOffset is the opposite sign of the applied projection
+        // offset. Passing it un-negated makes DLSS reproject the wrong way → the image "shakes".
+        c.jitterOffset        = sl::float2(-data->cameraJitter[0], -data->cameraJitter[1]);
         c.mvecScale           = sl::float2(data->mvecScale[0], data->mvecScale[1]);
         c.cameraPinholeOffset = sl::float2(0, 0);
         c.cameraPos   = sl::float3(data->cameraPos[0],   data->cameraPos[1],   data->cameraPos[2]);

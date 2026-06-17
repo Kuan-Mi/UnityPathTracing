@@ -625,7 +625,10 @@ namespace PathTracing
                     worldToClip             = frameState.worldToClip,
                     prevWorldToClip         = frameState.prevWorldToClip,
                     camPos                  = frameState.camPos,
-                    viewportJitter          = frameState.viewportJitter,
+                    // Gate by the cameraJitter toggle so the jitter reported to DLSS matches the
+                    // ACTUAL projection offset (0 when off; see CameraFrameStateNrdExtensions.cs:64).
+                    // The native side negates it to match the NRI/NGX sign convention.
+                    viewportJitter          = setting.cameraJitter ? frameState.viewportJitter : new float2(0f, 0f),
                     renderResolution        = frameState.renderResolution,
                     outputResolution        = outputResolution,
                     frameIndex              = curFrame,
