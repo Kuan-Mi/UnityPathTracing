@@ -78,6 +78,7 @@ namespace PathTracing
         private DlssRRPass              _dlssrrPass;
         private SLDlssrrPass            _slDlssrrPass;
         private SLDlssgInputsPass       _slDlssgInputsPass;
+        private SLReflexBeginPass       _slReflexBeginPass;
         private bool                    _slFgLastEnabled;
         private DlssSRPass              _dlsssrPass;
         private NisPass                 _nisPass;
@@ -168,6 +169,8 @@ namespace PathTracing
             _dlssrrPass              ??= new DlssRRPass { renderPassEvent                                                                          = renderPassEvent };
             _slDlssrrPass            ??= new SLDlssrrPass { renderPassEvent                                                                        = renderPassEvent };
             _slDlssgInputsPass       ??= new SLDlssgInputsPass { renderPassEvent                                                                  = renderPassEvent };
+            // Token latch must precede the RR/FG passes + present, so it sits at BeforeRendering.
+            _slReflexBeginPass       ??= new SLReflexBeginPass { renderPassEvent                                                                  = RenderPassEvent.BeforeRendering };
             _dlsssrPass              ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
             _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
@@ -597,6 +600,21 @@ namespace PathTracing
                     rectGridH = rectGridH
                 });
                 renderer.EnqueuePass(_nrdDlssBeforePass);
+            }
+
+            // Pin the SL render/present side to this frame's token (minted on the main thread
+            // at frame top). Runs at BeforeRendering, ahead of the RR/FG passes + present.
+            // Once per frame (token is global); needed whenever an SL render-thread consumer
+            // (RR-via-SL evaluate or FG present markers) is active.
+            if (eyeIndex == 0 && (setting.FGViaSL || (setting.RR && setting.RRViaSL)))
+            {
+                var slBeginFunc = SLDLRR.SLStreamlineFG.GetBeginEventFunc();
+                var slTokenPtr  = SLDLRR.SLStreamlineFG.CurrentFrameTokenPtr;
+                if (slBeginFunc != IntPtr.Zero && slTokenPtr != IntPtr.Zero)
+                {
+                    _slReflexBeginPass.Setup(slBeginFunc, slTokenPtr);
+                    renderer.EnqueuePass(_slReflexBeginPass);
+                }
             }
 
             if (setting.RR && setting.RRViaSL)

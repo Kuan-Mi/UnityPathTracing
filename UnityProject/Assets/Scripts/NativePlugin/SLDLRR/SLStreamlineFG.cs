@@ -166,12 +166,25 @@ namespace SLDLRR
         // ---- Reflex frame loop ----
         // The latency-critical Reflex sleep + eSimulationStart run on the MAIN thread at the
         // very top of the frame (before input) via a PlayerLoop system — slReflexSleep paces
-        // the simulation thread, so it must NOT be a render-thread plugin event. The render
-        // thread is told which frame it is rendering by forwarding the frame token pointer as
-        // the begin event's data; the present hook then closes the PCL timeline on that frame.
-        private static CommandBuffer _cmd;
-        private static IntPtr        _beginFunc  = IntPtr.Zero;
-        private static IntPtr        _frameToken = IntPtr.Zero;
+        // the simulation thread, so it must NOT be a render-thread plugin event. The frame
+        // token minted here is forwarded to the render thread by SLReflexBeginPass (a RenderGraph
+        // pass at BeforeRendering) so DLSS tagging + present markers pin to this frame; the
+        // present hook then closes the PCL timeline on it.
+        private static IntPtr _beginFunc  = IntPtr.Zero;
+        private static IntPtr _frameToken = IntPtr.Zero;
+
+        /// <summary>Native render-thread begin/latch event func (forward this frame's token as data).</summary>
+        public static IntPtr GetBeginEventFunc()
+        {
+            if (!_available) return IntPtr.Zero;
+            if (_beginFunc != IntPtr.Zero) return _beginFunc;
+            try { _beginFunc = GetSLFGBeginFrameFunc(); }
+            catch (DllNotFoundException) { _available = false; }
+            return _beginFunc;
+        }
+
+        /// <summary>This frame's Streamline FrameToken (minted on the main thread); Zero if none yet.</summary>
+        public static IntPtr CurrentFrameTokenPtr => _frameToken;
 
         // Marker type identifying our injected PlayerLoop system.
         private struct SLReflexFrameBegin { }
@@ -185,7 +198,6 @@ namespace SLDLRR
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Initialize()
         {
-            _cmd ??= new CommandBuffer { name = "SLStreamlineFGBegin" };
             RenderPipelineManager.beginContextRendering -= OnBeginContextRendering;
             RenderPipelineManager.beginContextRendering += OnBeginContextRendering;
 
@@ -241,26 +253,16 @@ namespace SLDLRR
             catch (DllNotFoundException) { _available = false; }
         }
 
+        // Simulation (Update/LateUpdate) just finished and rendering is starting — close the
+        // sim window on the MAIN thread. Direct P/Invoke, no command buffer. The render-thread
+        // token latch is issued separately by SLReflexBeginPass inside the RenderGraph.
         private static void OnBeginContextRendering(ScriptableRenderContext context, List<Camera> cameras)
         {
-            if (_cmd == null || !_available) return;
+            if (!_available) return;
             if (IsPreviewOnlyContext(cameras)) return;
 
-            if (_beginFunc == IntPtr.Zero)
-            {
-                try { _beginFunc = GetSLFGBeginFrameFunc(); }
-                catch (DllNotFoundException) { _available = false; return; }
-                if (_beginFunc == IntPtr.Zero) { _available = false; return; }
-            }
-
-            // Simulation (Update/LateUpdate) just finished and rendering is starting: close
-            // the sim window on the main thread, then pin the render thread to this frame.
             try { SL_MarkSimulationEnd(); }
-            catch (DllNotFoundException) { _available = false; return; }
-
-            _cmd.Clear();
-            _cmd.IssuePluginEventAndData(_beginFunc, 0, _frameToken);
-            Graphics.ExecuteCommandBuffer(_cmd);
+            catch (DllNotFoundException) { _available = false; }
         }
 
         private static void Teardown()
