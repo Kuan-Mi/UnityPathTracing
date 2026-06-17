@@ -180,6 +180,25 @@ NR_SL_GetReflexBeginEventFunc()
     return ReflexBeginCallback;
 }
 
+// Render-thread callback issued once per frame via cmd.IssuePluginEventAndData with a
+// pointer to a StreamlineProbe::FrameInputs (the real DLSS-G inputs). Runs on the render
+// thread in command-stream order, after BeginFrame minted the frame token, so it can tag
+// the real resources + set constants for that token (no cross-thread sync needed).
+void UNITY_INTERFACE_API FrameInputsCallback(int /*eventId*/, void* data)
+{
+    if (data)
+        StreamlineProbe::ConsumeFrameInputs(*reinterpret_cast<const StreamlineProbe::FrameInputs*>(data));
+}
+
+// Returns the render-event-and-data function for pushing per-frame DLSS-G inputs. Issue via
+// cmd.IssuePluginEventAndData(NR_SL_GetFrameInputsEventFunc(), 0, ptrToFrameInputs). The
+// FrameInputs struct must match the C# [StructLayout(Sequential)] mirror.
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_SL_GetFrameInputsEventFunc()
+{
+    return FrameInputsCallback;
+}
+
 // Runtime DLSS-G frame-generation toggle (callable from C# any thread). The change is
 // applied on the present thread at the next present; see StreamlineProbe::SetFrameGeneration.
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

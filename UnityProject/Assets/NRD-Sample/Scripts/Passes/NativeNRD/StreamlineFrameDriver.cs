@@ -35,6 +35,75 @@ namespace PathTracing
         [DllImport(DllName)]
         private static extern int NR_SL_IsFrameGenerationOn();
 
+        [DllImport(DllName)]
+        private static extern IntPtr NR_SL_GetFrameInputsEventFunc();
+
+        private static IntPtr _frameInputsEventFunc = IntPtr.Zero;
+
+        // D3D12_RESOURCE_STATES the tagged textures are in when Streamline reads them at
+        // present. NRI SRV textures (ViewZ/Mv) sit in ALL_SHADER_RESOURCE; UAV textures
+        // (Final) in UNORDERED_ACCESS. These are best-effort steady states — if the debug
+        // layer complains about a barrier, this is the first knob to adjust.
+        public const uint D3D12_STATE_ALL_SHADER_RESOURCE = 0x40 | 0x80; // NON_PIXEL | PIXEL
+        public const uint D3D12_STATE_UNORDERED_ACCESS    = 0x08;
+
+        /// <summary>
+        /// Mirror of the native <c>StreamlineProbe::FrameInputs</c> (sequential layout, must
+        /// match field-for-field). Matrices are Unity <see cref="Matrix4x4"/> (column-major);
+        /// the native side memcpy's them into row-major sl::float4x4, which applies the
+        /// column→row-vector transpose Streamline expects — so pass Unity matrices as-is.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DlssgInputs
+        {
+            public IntPtr color;          // HUDLessColor (final, no UI)  — ID3D12Resource*
+            public IntPtr depth;          // depth / viewZ
+            public IntPtr motionVectors;  // screen-space motion vectors
+            public uint   colorW, colorH;
+            public uint   mvecDepthW, mvecDepthH;
+            public uint   colorState, depthState, mvecState;
+
+            public Matrix4x4 cameraViewToClip; // = viewToClip
+            public Matrix4x4 clipToCameraView; // = viewToClip.inverse
+            public Matrix4x4 clipToPrevClip;   // = prevWorldToClip * worldToClip.inverse
+            public Matrix4x4 prevClipToClip;   // = worldToClip    * prevWorldToClip.inverse
+
+            public float jitterX, jitterY;
+            public float mvecScaleX, mvecScaleY;
+            public float cameraPosX, cameraPosY, cameraPosZ;
+            public float cameraUpX, cameraUpY, cameraUpZ;
+            public float cameraRightX, cameraRightY, cameraRightZ;
+            public float cameraFwdX, cameraFwdY, cameraFwdZ;
+            public float cameraNear, cameraFar, cameraFOV, cameraAspect;
+            public int   depthInverted;
+            public int   cameraMotionIncluded;
+            public int   motionVectors3D;
+            public int   reset;
+        }
+
+        /// <summary>
+        /// Render-event-and-data function for pushing per-frame DLSS-G inputs. Issue via
+        /// <c>cmd.IssuePluginEventAndData(func, 0, ptrToDlssgInputs)</c> on the render thread
+        /// (see <see cref="NrdDlssgInputsPass"/>). The data pointer must stay valid until the
+        /// render thread runs the event — back it with a persistent ring buffer. Returns
+        /// <see cref="IntPtr.Zero"/> if the probe plugin is absent (cached after first miss).
+        /// </summary>
+        public static IntPtr GetFrameInputsEventFunc()
+        {
+            if (!_available) return IntPtr.Zero;
+            if (_frameInputsEventFunc != IntPtr.Zero) return _frameInputsEventFunc;
+            try
+            {
+                _frameInputsEventFunc = NR_SL_GetFrameInputsEventFunc();
+            }
+            catch (DllNotFoundException)
+            {
+                _available = false;
+                return IntPtr.Zero;
+            }
+            return _frameInputsEventFunc;
+        }
+
         private static CommandBuffer _cmd;
         private static IntPtr        _eventFunc = IntPtr.Zero;
         // Set false if the probe DLL is absent/disabled so we stop trying every frame.

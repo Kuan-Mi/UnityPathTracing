@@ -25,6 +25,7 @@
 #include <atomic>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 #include <wrl/client.h>
 
 #include "sl.h"
@@ -56,6 +57,14 @@ namespace
     ComPtr<ID3D12Resource> g_depth, g_mvec, g_hudless, g_ui;
     UINT                   g_w = 0, g_h = 0;
     bool                   g_dummiesReady = false;
+
+    // Real per-frame DLSS-G inputs pushed from the NRD feature via IssuePluginEventAndData
+    // (StreamlineProbe::ConsumeFrameInputs). RENDER-THREAD ONLY — the data event, BeginFrame
+    // and the present hook are all the Unity render thread, so no synchronization is needed.
+    // Once g_haveRealInputs latches, BeginFrame stops tagging dummies and the data event
+    // tags these real resources instead (reusing the frame token BeginFrame minted).
+    StreamlineProbe::FrameInputs g_inputs{};
+    bool                         g_haveRealInputs = false;
     bool                   g_reflexOn = false;
     uint32_t               g_frameIndex = 0;
     uint64_t               g_taggedFrames = 0;
@@ -658,6 +667,59 @@ namespace StreamlineProbe
                 "+ DLSS-G toggle reconciled on present thread. Watch present cadence ~2x when ON.");
     }
 
+    // Tag the real DLSS-G inputs + set constants for `token`. RENDER-THREAD ONLY (called by
+    // ConsumeFrameInputs from the IssuePluginEventAndData handler, which runs later in the
+    // frame than BeginFrame — so the token it reuses is this frame's). Depth+motion at render
+    // res, color at output res (mirrors donut TagResourcesGeneral). Unity matrices are
+    // column-major; memcpy'ing their raw bytes into the row-major sl::float4x4 applies the
+    // column->row-vector transpose SL expects (see header).
+    static void ApplyRealInputs(const StreamlineProbe::FrameInputs& in, sl::FrameToken& token)
+    {
+        sl::ViewportHandle viewport{ 0 };
+        sl::Extent colorExt{ 0, 0, in.colorW, in.colorH };
+        sl::Extent mvExt   { 0, 0, in.mvecDepthW, in.mvecDepthH };
+
+        sl::Resource rDepth(sl::ResourceType::eTex2d, in.depth,         (uint32_t)in.depthState);
+        sl::Resource rMvec (sl::ResourceType::eTex2d, in.motionVectors, (uint32_t)in.mvecState);
+        sl::Resource rColor(sl::ResourceType::eTex2d, in.color,         (uint32_t)in.colorState);
+
+        sl::ResourceTag tags[] = {
+            sl::ResourceTag(&rDepth, sl::kBufferTypeDepth,         sl::ResourceLifecycle::eValidUntilPresent, &mvExt),
+            sl::ResourceTag(&rMvec,  sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent, &mvExt),
+            sl::ResourceTag(&rColor, sl::kBufferTypeHUDLessColor,  sl::ResourceLifecycle::eValidUntilPresent, &colorExt),
+        };
+        sl::Result rTag = slSetTagForFrame(token, viewport, tags, (uint32_t)_countof(tags), nullptr);
+
+        sl::Constants c{};
+        std::memcpy(&c.cameraViewToClip.row[0].x, in.cameraViewToClip, sizeof(float) * 16);
+        std::memcpy(&c.clipToCameraView.row[0].x, in.clipToCameraView, sizeof(float) * 16);
+        std::memcpy(&c.clipToPrevClip.row[0].x,   in.clipToPrevClip,   sizeof(float) * 16);
+        std::memcpy(&c.prevClipToClip.row[0].x,   in.prevClipToClip,   sizeof(float) * 16);
+        identity(c.clipToLensClip);
+        c.jitterOffset        = sl::float2(in.jitterX, in.jitterY);
+        c.mvecScale           = sl::float2(in.mvecScaleX, in.mvecScaleY);
+        c.cameraPinholeOffset = sl::float2(0, 0);
+        c.cameraPos   = sl::float3(in.cameraPos[0],   in.cameraPos[1],   in.cameraPos[2]);
+        c.cameraUp    = sl::float3(in.cameraUp[0],    in.cameraUp[1],    in.cameraUp[2]);
+        c.cameraRight = sl::float3(in.cameraRight[0], in.cameraRight[1], in.cameraRight[2]);
+        c.cameraFwd   = sl::float3(in.cameraFwd[0],   in.cameraFwd[1],   in.cameraFwd[2]);
+        c.cameraNear        = in.cameraNear;
+        c.cameraFar         = in.cameraFar;
+        c.cameraFOV         = in.cameraFOV;
+        c.cameraAspectRatio = in.cameraAspect;
+        c.depthInverted        = in.depthInverted        ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+        c.cameraMotionIncluded = in.cameraMotionIncluded ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+        c.motionVectors3D      = in.motionVectors3D      ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+        c.reset                = (in.reset || g_taggedFrames < 2) ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+        sl::Result rC = slSetConstants(c, token, viewport);
+
+        const uint64_t f = ++g_taggedFrames;
+        if (f <= 4 || (f & 0xFF) == 0 || rTag != sl::Result::eOk || rC != sl::Result::eOk)
+            Logf((rTag != sl::Result::eOk || rC != sl::Result::eOk) ? 2 : 0,
+                 "REAL frame #%llu: slSetTagForFrame -> %s, slSetConstants -> %s",
+                 (unsigned long long)f, R(rTag), R(rC));
+    }
+
     void BeginFrame()
     {
         if (!IsInited() || !g_dummiesReady) return;   // swapchain not adopted yet
@@ -674,13 +736,19 @@ namespace StreamlineProbe
         uint32_t idx = g_frameIndex++;
         sl::Result rt = slGetNewFrameToken(token, &idx);
         if (rt != sl::Result::eOk || !token) { Logf(1, "slGetNewFrameToken -> %s", R(rt)); return; }
-        g_curToken = token;   // shared with EmitPresentMarkersPre / PostPresentMarker
+        g_curToken = token;   // shared with ConsumeFrameInputs / EmitPresentMarkersPre / PostPresentMarker
 
         // The whole point of step 2b: drive Reflex at the START of the frame. DLSS-G's
         // pacer is built on the Reflex frame loop; without slReflexSleep + an early
         // eSimulationStart the pacer has no frame interval to interpolate across.
         slReflexSleep(*token);
         slPCLSetMarker(sl::PCLMarker::eSimulationStart, *token);
+
+        // When the NRD feature is feeding real inputs, tagging + constants happen on the
+        // render thread in ConsumeFrameInputs (issued later this frame via
+        // IssuePluginEventAndData, reusing this token). Only tag the dummy textures here for
+        // the env-gated spike path where nothing feeds real inputs.
+        if (g_haveRealInputs) return;
 
         sl::ViewportHandle viewport{ 0 };
         sl::Extent ext{ 0, 0, g_w, g_h };
@@ -724,9 +792,27 @@ namespace StreamlineProbe
         const uint64_t f = ++g_taggedFrames;
         if (f <= 4 || (f & 0xFF) == 0 || rTag != sl::Result::eOk || rC != sl::Result::eOk)
             Logf((rTag != sl::Result::eOk || rC != sl::Result::eOk) ? 2 : 0,
-                 "BEGIN frame #%llu: slSetTagForFrame -> %s, slSetConstants -> %s",
+                 "BEGIN(dummy) frame #%llu: slSetTagForFrame -> %s, slSetConstants -> %s",
                  (unsigned long long)f, R(rTag), R(rC));
         // DLSS-G state is now queried on the present thread (see PostPresentMarker).
+    }
+
+    void ConsumeFrameInputs(const FrameInputs& inputs)
+    {
+        if (!IsInited()) return;
+        g_inputs = inputs;
+        if (!g_haveRealInputs)
+        {
+            g_haveRealInputs = true;
+            Logf(0, "First real DLSS-G inputs received (color %ux%u, mvec/depth %ux%u) — "
+                    "dummy textures off; tagging real resources.",
+                 inputs.colorW, inputs.colorH, inputs.mvecDepthW, inputs.mvecDepthH);
+        }
+        // Reuse the token BeginFrame minted at the start of this frame (it runs first).
+        if (g_curToken)
+            ApplyRealInputs(g_inputs, *g_curToken);
+        else
+            Logf(1, "ConsumeFrameInputs: no frame token yet (BeginFrame not run) — stored, not tagged.");
     }
 
     IUnknown* NativeIfProxy(IUnknown* maybeProxy)
@@ -749,6 +835,7 @@ namespace StreamlineProbe
         g_inited.store(false);
         // Reset the FG toggle so a re-init (editor enter/exit play) re-seeds from env.
         g_fgDesired.store(-1); g_fgApplied.store(false); g_featuresEnabledOnPresent = false;
+        g_haveRealInputs = false; g_inputs = {};
         g_proxySwapchain = nullptr; g_curToken = nullptr; g_proxySC3.Reset();
         g_depth.Reset(); g_mvec.Reset(); g_hudless.Reset(); g_ui.Reset(); g_device.Reset();
         // After this the CreateCommandQueue hook falls back to native (g_proxyDevice

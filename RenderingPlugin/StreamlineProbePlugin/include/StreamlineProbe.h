@@ -82,6 +82,51 @@ namespace StreamlineProbe
     // queue — its present path crashes; SL still tracks the proxy by creation).
     IUnknown* NativeIfProxy(IUnknown* maybeProxy);
 
+    // Real per-frame DLSS-G inputs pushed from C# (replace the dummy textures once the
+    // first set arrives). Pointers are native ID3D12Resource* (RenderTexture native ptr).
+    //
+    // Matrices are Unity Matrix4x4 raw bytes (column-major storage). They are memcpy'd
+    // straight into sl::float4x4 (row-major), which performs the column->row-vector
+    // transpose that Streamline/donut expect — so just pass Unity's matrices as-is:
+    //   cameraViewToClip = viewToClip,  clipToCameraView = viewToClip.inverse,
+    //   clipToPrevClip   = prevWorldToClip * worldToClip.inverse,
+    //   prevClipToClip   = worldToClip    * prevWorldToClip.inverse.
+    //
+    // Resolutions: color at display/output res; depth+motion at render res (a mismatch is
+    // supported — see donut TagResourcesGeneral). States are D3D12_RESOURCE_STATES the
+    // textures are in when SL reads them at present.
+    //
+    // Layout MUST match the C# [StructLayout(Sequential)] mirror exactly.
+    struct FrameInputs
+    {
+        void*        color;          // HUDLessColor (final, no UI)
+        void*        depth;          // depth / viewZ
+        void*        motionVectors;  // screen-space motion vectors
+        unsigned     colorW, colorH;
+        unsigned     mvecDepthW, mvecDepthH;
+        unsigned     colorState, depthState, mvecState;   // D3D12_RESOURCE_STATES
+
+        float        cameraViewToClip[16];
+        float        clipToCameraView[16];
+        float        clipToPrevClip[16];
+        float        prevClipToClip[16];
+
+        float        jitterX, jitterY;       // pixels
+        float        mvecScaleX, mvecScaleY; // normalize mvec; donut uses 1/renderRes
+        float        cameraPos[3], cameraUp[3], cameraRight[3], cameraFwd[3];
+        float        cameraNear, cameraFar, cameraFOV, cameraAspect;
+        int          depthInverted;
+        int          cameraMotionIncluded;
+        int          motionVectors3D;
+        int          reset;
+    };
+
+    // Consume this frame's real DLSS-G inputs. RENDER-THREAD ONLY — called from the
+    // IssuePluginEventAndData handler (see NR_SL_GetFrameInputsEventFunc), which runs later
+    // in the frame than BeginFrame, so it reuses the token BeginFrame minted to tag the real
+    // resources + set constants. Once any real set arrives, BeginFrame stops tagging dummies.
+    void ConsumeFrameInputs(const FrameInputs& inputs);
+
     // Request DLSS-G frame generation ON (enable=true) or OFF at runtime. Thread-safe:
     // it only records the desired state; the actual slDLSSGSetOptions call is applied on
     // the PRESENT thread at the next present (slDLSSGSetOptions is not thread-safe and

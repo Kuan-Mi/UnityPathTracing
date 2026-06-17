@@ -7,6 +7,8 @@ using NativeRender;
 using NIS;
 using Nrd;
 using Nri;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -77,6 +79,12 @@ namespace PathTracing
         private NisPass                 _nisPass;
         private NativeNrdOutputBlitPass _outputBlitPass;
         private NativeToneMappingPass   _toneMappingPass;
+        private NrdDlssgInputsPass      _dlssgInputsPass;
+
+        // Persistent ring backing the DLSS-G input pointers handed to IssuePluginEventAndData
+        // (must outlive the render thread's consumption of the event — see DlsrUpscaler).
+        private const int DlssgInputsRingCount = 3;
+        private NativeArray<StreamlineFrameDriver.DlssgInputs> _dlssgInputsRing;
 
         private NRDSampleResource _nrdSampleResource;
         public NRDSampleResource NrdSampleResource => _nrdSampleResource;
@@ -158,6 +166,7 @@ namespace PathTracing
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
             _depthBarrierFixPass     ??= new DepthBarrierFixPass { renderPassEvent                                                                 = RenderPassEvent.AfterRendering };
             _toneMappingPass         ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent };
+            _dlssgInputsPass         ??= new NrdDlssgInputsPass { renderPassEvent                                                                  = renderPassEvent };
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -757,6 +766,92 @@ namespace PathTracing
 
                 renderer.EnqueuePass(_depthBarrierFixPass);
             }
+
+            // DLSS-G frame generation: feed the real path-traced color/depth/motion + camera
+            // matrices to the Streamline probe (non-RR / NRD-denoising mode only; the RR path
+            // is wired separately later). No-op when the probe plugin isn't present.
+            if (!setting.RR && eyeIndex == 0)
+                PushDlssgFrameInputs(renderer, cam, frameState, pool, outputResolution, renderResolution, resourcesChanged);
+        }
+
+        /// <summary>
+        /// Pushes this frame's real DLSS-G inputs to the Streamline probe: color = pool.Final
+        /// (output res), depth = pool.ViewZ + motion = pool.Mv (render res), and the camera
+        /// constants from <paramref name="frameState"/>. See StreamlineFrameDriver.DlssgInputs.
+        /// </summary>
+        private void PushDlssgFrameInputs(ScriptableRenderer renderer, Camera cam, CameraFrameState frameState,
+                                          NativeNrdTextureResources pool, int2 outputResolution, int2 renderResolution,
+                                          bool resourcesChanged)
+        {
+            var eventFunc = StreamlineFrameDriver.GetFrameInputsEventFunc();
+            if (eventFunc == IntPtr.Zero) return; // probe plugin absent
+
+            if (pool?.Final == null || pool.Mv == null || pool.ViewZ == null) return;
+
+            var colorPtr = pool.Final.NativePtr;
+            var depthPtr = pool.ViewZ.NativePtr;
+            var mvPtr    = pool.Mv.NativePtr;
+            if (colorPtr == IntPtr.Zero || depthPtr == IntPtr.Zero || mvPtr == IntPtr.Zero) return;
+
+            var viewToClip      = frameState.viewToClip;
+            var worldToClip     = frameState.worldToClip;
+            var prevWorldToClip = frameState.prevWorldToClip;
+            var t               = cam.transform;
+
+            float mvScaleX = renderResolution.x > 0 ? 1f / renderResolution.x : 1f;
+            float mvScaleY = renderResolution.y > 0 ? 1f / renderResolution.y : 1f;
+
+            var inputs = new StreamlineFrameDriver.DlssgInputs
+            {
+                color = colorPtr, depth = depthPtr, motionVectors = mvPtr,
+                colorW     = (uint)outputResolution.x, colorH     = (uint)outputResolution.y,
+                mvecDepthW = (uint)renderResolution.x, mvecDepthH = (uint)renderResolution.y,
+                // All three are last consumed as shader resources before present (Final is
+                // sampled by the output blit; ViewZ/Mv are denoiser SRV inputs), so they sit
+                // in a shader-resource state at present. Exact state is a verify knob.
+                colorState = StreamlineFrameDriver.D3D12_STATE_ALL_SHADER_RESOURCE,
+                depthState = StreamlineFrameDriver.D3D12_STATE_ALL_SHADER_RESOURCE,
+                mvecState  = StreamlineFrameDriver.D3D12_STATE_ALL_SHADER_RESOURCE,
+
+                cameraViewToClip = viewToClip,
+                clipToCameraView = viewToClip.inverse,
+                clipToPrevClip   = prevWorldToClip * worldToClip.inverse,
+                prevClipToClip   = worldToClip * prevWorldToClip.inverse,
+
+                jitterX    = frameState.viewportJitter.x, jitterY    = frameState.viewportJitter.y,
+                mvecScaleX = mvScaleX,                     mvecScaleY = mvScaleY,
+                cameraPosX   = frameState.camPos.x, cameraPosY   = frameState.camPos.y, cameraPosZ   = frameState.camPos.z,
+                cameraUpX    = t.up.x,              cameraUpY    = t.up.y,              cameraUpZ    = t.up.z,
+                cameraRightX = t.right.x,           cameraRightY = t.right.y,           cameraRightZ = t.right.z,
+                cameraFwdX   = t.forward.x,         cameraFwdY   = t.forward.y,         cameraFwdZ   = t.forward.z,
+                cameraNear   = cam.nearClipPlane,
+                cameraFar    = cam.farClipPlane,
+                cameraFOV    = cam.fieldOfView * Mathf.Deg2Rad,
+                cameraAspect = outputResolution.y > 0 ? (float)outputResolution.x / outputResolution.y : 1f,
+                depthInverted        = 0, // ViewZ is linear positive view distance (verify knob)
+                cameraMotionIncluded = 1,
+                motionVectors3D      = 0, // NRD Mv treated as 2D screen-space (verify knob)
+                reset                = resourcesChanged ? 1 : 0,
+            };
+
+            // Stash into the persistent ring and hand the stable pointer to the render thread
+            // via IssuePluginEventAndData (the native side copies it synchronously on consume).
+            var dataPtr = WriteDlssgInputsToRing(in inputs, frameState.frameIndex);
+            if (dataPtr == IntPtr.Zero) return;
+
+            _dlssgInputsPass.Setup(eventFunc, dataPtr);
+            renderer.EnqueuePass(_dlssgInputsPass);
+        }
+
+        private unsafe IntPtr WriteDlssgInputsToRing(in StreamlineFrameDriver.DlssgInputs inputs, uint frameIndex)
+        {
+            if (!_dlssgInputsRing.IsCreated)
+                _dlssgInputsRing = new NativeArray<StreamlineFrameDriver.DlssgInputs>(DlssgInputsRingCount, Allocator.Persistent);
+
+            int idx = (int)(frameIndex % DlssgInputsRingCount);
+            _dlssgInputsRing[idx] = inputs;
+            return (IntPtr)((byte*)_dlssgInputsRing.GetUnsafePtr()
+                            + idx * UnsafeUtility.SizeOf<StreamlineFrameDriver.DlssgInputs>());
         }
 
         private void EnqueueDlssAfterPass(ScriptableRenderer renderer, NativeNrdTextureResources pool, int2 outputResolution, VolatileConstantBuffer nrdConstantBuffer)
@@ -859,6 +954,10 @@ namespace PathTracing
             _outputBlitPass      = null;
             _depthBarrierFixPass = null;
             _toneMappingPass     = null;
+            _dlssgInputsPass     = null;
+
+            if (_dlssgInputsRing.IsCreated)
+                _dlssgInputsRing.Dispose();
 
             if (scramblingRankingUintTex != null)
                 scramblingRankingUintTex.Release();
