@@ -28,10 +28,15 @@ namespace SLReflex
     // the same regardless; see the guide). False on non-NVIDIA / older hardware.
     bool IsLowLatencyAvailable();
 
-    // Frame begin: apply pending options (once / on change), then slReflexSleep +
-    // eSimulationStart for this frame's token. Idempotent per token (won't double-sleep).
-    // Drive from SLCore::BeginFrame on the render-thread frame-begin tick.
+    // Frame begin, MAIN thread, top of frame BEFORE input sampling: apply pending options
+    // (once / on change), then slReflexSleep + eSimulationStart for this frame's token.
+    // slReflexSleep paces the simulation thread, so it MUST run here (not on the render
+    // thread) to actually reduce latency. Idempotent per token (won't double-sleep).
     void OnFrameBegin(const sl::FrameToken& token);
+
+    // MAIN thread, end of game logic (simulation done, rendering about to begin):
+    // slPCLSetMarker(eSimulationEnd). Idempotent per token.
+    void MarkSimulationEnd(const sl::FrameToken& token);
 
     void Shutdown();
 }

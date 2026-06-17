@@ -23,9 +23,10 @@ namespace
     std::atomic<int>      g_modeApplied{ -1 };
     std::atomic<unsigned> g_fpsCapApplied{ 0xFFFFFFFFu };
 
-    // Dedupe: the index of the frame we last slept on, so multiple begin ticks (or a stale
-    // re-issue) in one frame don't call slReflexSleep twice.
+    // Dedupe: the index of the frame we last slept on / marked sim-end, so multiple begin
+    // ticks (or a re-issued SRP context) in one frame don't emit twice.
     std::atomic<uint32_t> g_lastSleptIndex{ 0xFFFFFFFFu };
+    std::atomic<uint32_t> g_lastSimEndIndex{ 0xFFFFFFFFu };
 
     sl::ReflexMode MapMode(int m)
     {
@@ -108,11 +109,21 @@ namespace SLReflex
                  (unsigned long long)f, R(rs));
     }
 
+    void MarkSimulationEnd(const sl::FrameToken& token)
+    {
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+        const uint32_t idx  = (uint32_t)token;
+        const uint32_t prev = g_lastSimEndIndex.exchange(idx, std::memory_order_acq_rel);
+        if (prev == idx) return;
+        slPCLSetMarker(sl::PCLMarker::eSimulationEnd, token);
+    }
+
     void Shutdown()
     {
         g_modeApplied.store(-1, std::memory_order_release);
         g_fpsCapApplied.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastSleptIndex.store(0xFFFFFFFFu, std::memory_order_release);
+        g_lastSimEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
         // slShutdown is owned by SLCore.
     }
 }

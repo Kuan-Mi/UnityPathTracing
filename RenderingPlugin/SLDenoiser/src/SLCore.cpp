@@ -21,12 +21,12 @@ namespace
     std::atomic<bool> g_inited{ false };
     bool              g_deviceSet = false;
 
-    // Shared per-frame token (see SLCore.h). BeginFrame runs on the render thread;
-    // CurrentFrameToken is also read from the present thread (DLSS-G markers), so the
-    // pointer + index are atomic. g_nextIndex is the index handed to the NEXT BeginFrame.
-    std::atomic<sl::FrameToken*> g_frameToken{ nullptr };
-    std::atomic<uint32_t>        g_frameIndex{ 0xFFFFFFFFu }; // index of the current token
-    std::atomic<uint32_t>        g_nextIndex{ 0 };
+    // Shared per-frame token (see SLCore.h). BeginFrame runs on the main thread; the sim token
+    // it mints is read on the main thread (Reflex sleep + sim markers) and forwarded to the
+    // render thread, where SetRenderFrame caches it as the render token read on the render AND
+    // present threads (tagging + present markers). Both atomic.
+    std::atomic<sl::FrameToken*> g_simToken{ nullptr };
+    std::atomic<sl::FrameToken*> g_renderToken{ nullptr };
 
     // Directory containing THIS module (SLDenoiser.dll). In a player build Unity copies
     // native plugins — and the SL runtime DLLs deployed beside us (sl.dlss_g.dll,
@@ -178,30 +178,35 @@ namespace SLCore
     sl::FrameToken* BeginFrame()
     {
         if (!IsInited()) return nullptr;
-        uint32_t idx = g_nextIndex.fetch_add(1, std::memory_order_acq_rel);
+        // nullptr index = SL auto-increments its internal frame counter (matches donut's
+        // SimStart). One mint per frame; the pointer is reused everywhere for this frame.
         sl::FrameToken* token = nullptr;
-        sl::Result r = slGetNewFrameToken(token, &idx);
+        sl::Result r = slGetNewFrameToken(token, nullptr);
         if (r != sl::Result::eOk || !token)
         {
-            Logf("SLCore", 1, "slGetNewFrameToken(%u) -> %s", idx, ResultStr(r));
+            Logf("SLCore", 1, "slGetNewFrameToken -> %s", ResultStr(r));
             return nullptr;
         }
-        g_frameIndex.store(idx, std::memory_order_release);
-        g_frameToken.store(token, std::memory_order_release);
+        g_simToken.store(token, std::memory_order_release);
         return token;
     }
 
-    sl::FrameToken* CurrentFrameToken() { return g_frameToken.load(std::memory_order_acquire); }
-    unsigned        CurrentFrameIndex() { return g_frameIndex.load(std::memory_order_acquire); }
+    sl::FrameToken* SimFrameToken() { return g_simToken.load(std::memory_order_acquire); }
+
+    void SetRenderFrame(sl::FrameToken* token)
+    {
+        if (token) g_renderToken.store(token, std::memory_order_release);
+    }
+
+    sl::FrameToken* CurrentFrameToken() { return g_renderToken.load(std::memory_order_acquire); }
 
     void Shutdown()
     {
         if (!IsInited()) return;
         g_inited.store(false);
         g_deviceSet = false;
-        g_frameToken.store(nullptr);
-        g_frameIndex.store(0xFFFFFFFFu);
-        g_nextIndex.store(0);
+        g_simToken.store(nullptr);
+        g_renderToken.store(nullptr);
         sl::Result r = slShutdown();
         Logf("SLCore", r == sl::Result::eOk ? 0 : 1, "slShutdown -> %s", ResultStr(r));
     }

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.LowLevel;
 using UnityEngine.Rendering;
 
 namespace SLDLRR
@@ -32,6 +33,12 @@ namespace SLDLRR
         [DllImport(DllName)] private static extern void   SL_SetReflexMode(int mode, uint fpsCapUs);
         [DllImport(DllName)] private static extern int    SL_GetReflexMode();
         [DllImport(DllName)] private static extern int    SL_IsReflexLowLatencyAvailable();
+
+        // Reflex frame loop — called DIRECTLY on the main thread (not via render events).
+        // SL_FrameBegin must run at the very top of the frame, before input; it returns the
+        // frame token pointer to forward to the render-thread begin event as its data.
+        [DllImport(DllName)] private static extern IntPtr SL_FrameBegin();
+        [DllImport(DllName)] private static extern void   SL_MarkSimulationEnd();
 
         /// <summary>Reflex low-latency mode. Mirrors sl::ReflexMode.</summary>
         public enum ReflexMode { Off = 0, On = 1, OnPlusBoost = 2 }
@@ -156,9 +163,19 @@ namespace SLDLRR
             if (_ring.IsCreated) _ring.Dispose();
         }
 
-        // ---- Frame-begin Reflex tick (mirrors StreamlineFrameDriver) ----
+        // ---- Reflex frame loop ----
+        // The latency-critical Reflex sleep + eSimulationStart run on the MAIN thread at the
+        // very top of the frame (before input) via a PlayerLoop system — slReflexSleep paces
+        // the simulation thread, so it must NOT be a render-thread plugin event. The render
+        // thread is told which frame it is rendering by forwarding the frame token pointer as
+        // the begin event's data; the present hook then closes the PCL timeline on that frame.
         private static CommandBuffer _cmd;
-        private static IntPtr        _beginFunc = IntPtr.Zero;
+        private static IntPtr        _beginFunc  = IntPtr.Zero;
+        private static IntPtr        _frameToken = IntPtr.Zero;
+
+        // Marker type identifying our injected PlayerLoop system.
+        private struct SLReflexFrameBegin { }
+        private static bool _playerLoopInstalled;
 
 #if UNITY_EDITOR
         [UnityEditor.InitializeOnLoadMethod]
@@ -172,12 +189,56 @@ namespace SLDLRR
             RenderPipelineManager.beginContextRendering -= OnBeginContextRendering;
             RenderPipelineManager.beginContextRendering += OnBeginContextRendering;
 
-            Application.quitting -= DisposeRing;
-            Application.quitting += DisposeRing;
+            InstallPlayerLoop();
+
+            Application.quitting -= Teardown;
+            Application.quitting += Teardown;
 #if UNITY_EDITOR
-            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= DisposeRing;
-            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += DisposeRing;
+            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= Teardown;
+            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += Teardown;
 #endif
+        }
+
+        // Inserts SL_FrameBegin at the very front of the PlayerLoop (before input/sim).
+        private static void InstallPlayerLoop()
+        {
+            var loop = PlayerLoop.GetCurrentPlayerLoop();
+            var list = new List<PlayerLoopSystem>(loop.subSystemList);
+            list.RemoveAll(s => s.type == typeof(SLReflexFrameBegin));
+            list.Insert(0, new PlayerLoopSystem
+            {
+                type           = typeof(SLReflexFrameBegin),
+                updateDelegate = OnPlayerLoopFrameBegin,
+            });
+            loop.subSystemList = list.ToArray();
+            PlayerLoop.SetPlayerLoop(loop);
+            _playerLoopInstalled = true;
+        }
+
+        private static void RemovePlayerLoop()
+        {
+            if (!_playerLoopInstalled) return;
+            var loop = PlayerLoop.GetCurrentPlayerLoop();
+            var list = new List<PlayerLoopSystem>(loop.subSystemList);
+            if (list.RemoveAll(s => s.type == typeof(SLReflexFrameBegin)) > 0)
+            {
+                loop.subSystemList = list.ToArray();
+                PlayerLoop.SetPlayerLoop(loop);
+            }
+            _playerLoopInstalled = false;
+        }
+
+        // MAIN thread, top of frame. slReflexSleep + eSimulationStart for the new frame.
+        // Edit mode is intentionally skipped — we don't want Reflex pacing the editor's loop
+        // when not playing (DLSS-RR mints its own token natively in that case).
+        private static void OnPlayerLoopFrameBegin()
+        {
+            if (!_available) return;
+#if UNITY_EDITOR
+            if (!Application.isPlaying) return;
+#endif
+            try { _frameToken = SL_FrameBegin(); }
+            catch (DllNotFoundException) { _available = false; }
         }
 
         private static void OnBeginContextRendering(ScriptableRenderContext context, List<Camera> cameras)
@@ -192,9 +253,20 @@ namespace SLDLRR
                 if (_beginFunc == IntPtr.Zero) { _available = false; return; }
             }
 
+            // Simulation (Update/LateUpdate) just finished and rendering is starting: close
+            // the sim window on the main thread, then pin the render thread to this frame.
+            try { SL_MarkSimulationEnd(); }
+            catch (DllNotFoundException) { _available = false; return; }
+
             _cmd.Clear();
-            _cmd.IssuePluginEvent(_beginFunc, 0);
+            _cmd.IssuePluginEventAndData(_beginFunc, 0, _frameToken);
             Graphics.ExecuteCommandBuffer(_cmd);
+        }
+
+        private static void Teardown()
+        {
+            RemovePlayerLoop();
+            DisposeRing();
         }
 
         private static bool IsPreviewOnlyContext(List<Camera> cameras)

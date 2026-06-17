@@ -188,13 +188,14 @@ namespace
         SLDlssrr::Dispatch(reinterpret_cast<SLDlssrrFrameData*>(data), state.commandList);
     }
 
-    // Per-frame begin tick (render thread): advance the shared SL frame token and run the
-    // Reflex sleep + eSimulationStart on it. Drives Reflex regardless of frame generation
-    // (works with FG off and in the editor); DLSS-G's present hook closes out the markers.
-    void UNITY_INTERFACE_API OnFGBeginFrame(int /*eventId*/)
+    // Render-thread frame-begin event: data is the FrameToken* minted on the main thread by
+    // SL_FrameBegin, forwarded verbatim via IssuePluginEventAndData. Pins the render/present
+    // side to that exact token so DLSS-G tagging + present markers and DLSS-RR evaluate all
+    // use the frame actually being rendered. The latency-critical Reflex sleep is NOT here —
+    // it runs on the main thread.
+    void UNITY_INTERFACE_API OnFGBeginFrame(int /*eventId*/, void* data)
     {
-        sl::FrameToken* token = SLCore::BeginFrame();
-        if (token) SLReflex::OnFrameBegin(*token);
+        SLCore::SetRenderFrame(reinterpret_cast<sl::FrameToken*>(data));
     }
 
     // DLSS-G per-frame inputs (render thread): tag depth/mvec + set constants.
@@ -263,8 +264,9 @@ extern "C"
     }
 
     // ---- DLSS-G (frame generation) ----
-    // Issue at frame begin: cmd.IssuePluginEvent(GetSLFGBeginFrameFunc(), 0).
-    UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+    // Issue at frame begin with the token from SL_FrameBegin as data:
+    //   cmd.IssuePluginEventAndData(GetSLFGBeginFrameFunc(), 0, frameToken).
+    UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
     GetSLFGBeginFrameFunc() { return OnFGBeginFrame; }
 
     // Issue per frame: cmd.IssuePluginEventAndData(GetSLFGFrameInputsFunc(), 0, ptrToFrameInputs).
@@ -279,6 +281,26 @@ extern "C"
     int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_IsFrameGenerationOn()
     {
         return SLDlssg::IsFrameGenerationOn() ? 1 : 0;
+    }
+
+    // ---- Reflex frame loop (called DIRECTLY from the C# main thread, NOT plugin events) ----
+    // SL_FrameBegin: main thread, top of frame BEFORE input. Mints the frame token, applies
+    // Reflex options, slReflexSleep + eSimulationStart. Returns the token pointer (opaque
+    // handle) to forward to the render-thread frame-begin event (OnFGBeginFrame) as its data.
+    // null on failure. (typedef so the EXPORT/API macros sit after the type, like the others.)
+    typedef void* SLFrameTokenHandle;
+    SLFrameTokenHandle UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_FrameBegin()
+    {
+        sl::FrameToken* token = SLCore::BeginFrame();
+        if (token) SLReflex::OnFrameBegin(*token);
+        return token;
+    }
+
+    // SL_MarkSimulationEnd: main thread, after game logic (before rendering). eSimulationEnd.
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_MarkSimulationEnd()
+    {
+        sl::FrameToken* token = SLCore::SimFrameToken();
+        if (token) SLReflex::MarkSimulationEnd(*token);
     }
 
     // ---- Reflex (low latency) ----

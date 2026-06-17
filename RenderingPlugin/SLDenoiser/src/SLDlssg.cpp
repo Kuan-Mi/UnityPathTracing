@@ -6,13 +6,15 @@
 //   * Inputs are REAL path-tracer depth + motion vectors + camera constants (no dummies,
 //     no HUDLessColor — SL interpolates the presented backbuffer for now).
 //
-// Frame timeline:
-//   * SLCore::BeginFrame() at Unity's frame begin (render thread): mints the shared frame
-//     token. SLReflex::OnFrameBegin then does slReflexSleep + eSimulationStart on it.
-//   * ConsumeFrameInputs() later the same frame (render thread): tag depth/mvec + set
-//     constants on the shared token (SLCore::CurrentFrameToken).
-//   * Present hook (SL proxy swapchain): close out the present-side PCL markers on the
-//     same shared token (eSimulationEnd .. ePresentEnd).
+// Frame timeline (token shared by index — see SLCore.h):
+//   * MAIN thread, top of frame: SLCore::BeginFrame mints the frame token; SLReflex does
+//     slReflexSleep + eSimulationStart. End of game logic: SLReflex eSimulationEnd.
+//   * RENDER thread frame-begin event (data == the FrameToken*): SLCore::SetRenderFrame
+//     pins the render/present side to that exact token.
+//   * RENDER thread: ConsumeFrameInputs() tags depth/mvec + sets constants on the render
+//     token (SLCore::CurrentFrameToken).
+//   * PRESENT thread (SL proxy swapchain hook): eRenderSubmitStart/End, ePresentStart/End
+//     on the render token.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -156,12 +158,12 @@ namespace
     void EmitPresentMarkersPre()
     {
         EnsureFeaturesOnPresentThread();
-        // eSimulationStart is emitted at frame begin by SLReflex on this same shared token;
-        // here we close out the rest of the PCL timeline on the present thread.
+        // eSimulationStart/eSimulationEnd are emitted on the MAIN thread (SLReflex) for the
+        // frame currently being rendered; here we close out the render/present side of the
+        // PCL timeline on the present thread, using the render-latched token for that frame.
         sl::FrameToken* token = SLCore::CurrentFrameToken();
         if (!token) return;
         if (g_proxySC3) g_proxySC3->GetCurrentBackBufferIndex();
-        slPCLSetMarker(sl::PCLMarker::eSimulationEnd,     *token);
         slPCLSetMarker(sl::PCLMarker::eRenderSubmitStart, *token);
         slPCLSetMarker(sl::PCLMarker::eRenderSubmitEnd,   *token);
         slPCLSetMarker(sl::PCLMarker::ePresentStart,      *token);
