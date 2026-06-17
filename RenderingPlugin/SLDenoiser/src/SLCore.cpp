@@ -8,6 +8,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "sl.h"
 #include "sl_consts.h"
@@ -19,6 +20,34 @@ namespace
     SLCore::LogFn     g_log = nullptr;
     std::atomic<bool> g_inited{ false };
     bool              g_deviceSet = false;
+
+    // Directory containing THIS module (SLDenoiser.dll). In a player build Unity copies
+    // native plugins — and the SL runtime DLLs deployed beside us (sl.dlss_g.dll,
+    // nvngx_dlssg.dll, sl.dlss_d.dll, …) — into <build>_Data\Plugins\x86_64\, NOT next to
+    // the .exe. SL's default plugin search is the executable directory, so it fails to load
+    // NGXCore (error 126) there. We pass this directory via Preferences::pathsToPlugins.
+    const wchar_t* SelfModuleDir()
+    {
+        static std::wstring dir;
+        static bool tried = false;
+        if (tried) return dir.empty() ? nullptr : dir.c_str();
+        tried = true;
+
+        HMODULE self = nullptr;
+        if (GetModuleHandleExW(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                reinterpret_cast<LPCWSTR>(&SelfModuleDir), &self) && self)
+        {
+            wchar_t path[MAX_PATH] = {};
+            DWORD n = GetModuleFileNameW(self, path, MAX_PATH);
+            if (n > 0 && n < MAX_PATH)
+            {
+                if (wchar_t* slash = wcsrchr(path, L'\\')) *slash = L'\0';
+                dir = path;
+            }
+        }
+        return dir.empty() ? nullptr : dir.c_str();
+    }
 
     void SLLogCallback(sl::LogType type, const char* msg)
     {
@@ -92,6 +121,20 @@ namespace SLCore
         pref.logMessageCallback = &SLLogCallback;
         pref.featuresToLoad     = kFeatures;
         pref.numFeaturesToLoad  = (uint32_t)_countof(kFeatures);
+        // Point SL at the folder holding this DLL + the SL runtime/NGX DLLs (player build:
+        // <build>_Data\Plugins\x86_64\). Without this SL searches only the .exe dir and fails
+        // to load nvngx_dlssg.dll (NGXCore error 126 -> "no matching adapter found").
+        static const wchar_t* s_pluginPath = SelfModuleDir();
+        if (s_pluginPath)
+        {
+            pref.pathsToPlugins    = &s_pluginPath;
+            pref.numPathsToPlugins = 1;
+            Logf("SLCore", 0, "pathsToPlugins = %ls", s_pluginPath);
+        }
+        else
+        {
+            Logf("SLCore", 1, "could not resolve self-module dir; SL will search the .exe dir only.");
+        }
         pref.flags             |= sl::PreferenceFlags::eUseManualHooking;
         pref.flags             |= sl::PreferenceFlags::eUseFrameBasedResourceTagging;
         pref.engine             = sl::EngineType::eUnity;

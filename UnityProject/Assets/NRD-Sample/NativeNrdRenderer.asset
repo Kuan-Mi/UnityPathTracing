@@ -113,6 +113,7 @@ MonoBehaviour:
     SR: 0
     RR: 1
     RRViaSL: 1
+    FGViaSL: 1
     upscalerMode: 0
     confidence: 1
     denoisingRange: 1000
