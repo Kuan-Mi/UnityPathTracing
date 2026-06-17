@@ -10,11 +10,11 @@ namespace PathTracing
 
         private void Update()
         {
-            if (Input.GetKeyDown(_key))
-            {
-                bool on = StreamlineFrameDriver.IsFrameGenerationOn();
-                StreamlineFrameDriver.SetFrameGeneration(!on);
-            }
+            // if (Input.GetKeyDown(_key))
+            // {
+            //     bool on = StreamlineFrameDriver.IsFrameGenerationOn();
+            //     StreamlineFrameDriver.SetFrameGeneration(!on);
+            // }
         }
     }
 }

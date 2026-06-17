@@ -67,6 +67,10 @@ namespace PathTracing
         public bool         boost                = false;
         public bool         SR                   = false;
         public bool         RR                   = false;
+        
+        [Tooltip("Run DLSS Ray Reconstruction through Streamline (SLDenoiser) instead of NRI. " +
+                 "A/B comparison toggle — keep mutually exclusive with the DLSS-G probe at runtime.")]
+        public bool         RRViaSL              = false;
         public UpscalerMode upscalerMode         = UpscalerMode.NATIVE;
         public bool         confidence           = true;
         public float        denoisingRange       = 1000f;

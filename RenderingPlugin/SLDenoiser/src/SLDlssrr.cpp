@@ -153,8 +153,11 @@ namespace SLDlssrr
 
         static const sl::Feature kFeatures[] = { sl::kFeatureDLSS_RR };
         sl::Preferences pref{};
-        pref.showConsole        = true;
-        pref.logLevel           = sl::LogLevel::eVerbose;
+        // eDefault (warnings/errors only) + no console: eVerbose logs every NGX SRV-cache hit
+        // and VRAM op per frame through the Unity log callback, a real per-frame CPU cost.
+        // Bump to eVerbose + showConsole only when debugging SL itself.
+        pref.showConsole        = false;
+        pref.logLevel           = sl::LogLevel::eDefault;
         pref.logMessageCallback = &SLLog;
         pref.featuresToLoad     = kFeatures;
         pref.numFeaturesToLoad  = (uint32_t)_countof(kFeatures);
@@ -317,15 +320,21 @@ namespace SLDlssrr
                                       ? sl::kBufferTypeSpecularMotionVectors
                                       : sl::kBufferTypeSpecularHitDistance;
 
+        // eValidUntilPresent: SL references these persistent path-tracer RTs DIRECTLY (no
+        // copy). eOnlyValidNow marks a resource "volatile" → SL allocates+copies an internal
+        // texture EVERY FRAME (per-tag) which churns VRAM and tanks the frame rate. These
+        // pool textures are dedicated and not reused within the frame, so direct reference is
+        // correct (matches donut/RTXPT DLSS tagging).
+        const sl::ResourceLifecycle kLifecycle = sl::ResourceLifecycle::eValidUntilPresent;
         sl::ResourceTag tags[] = {
-            sl::ResourceTag(&rInput,  sl::kBufferTypeScalingInputColor,  sl::ResourceLifecycle::eOnlyValidNow,      &renderExtent),
-            sl::ResourceTag(&rOutput, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eOnlyValidNow,      &outputExtent),
-            sl::ResourceTag(&rDepth,  sl::kBufferTypeLinearDepth,        sl::ResourceLifecycle::eValidUntilPresent, &renderExtent),
-            sl::ResourceTag(&rMv,     sl::kBufferTypeMotionVectors,      sl::ResourceLifecycle::eOnlyValidNow,      &renderExtent),
-            sl::ResourceTag(&rDiff,   sl::kBufferTypeAlbedo,             sl::ResourceLifecycle::eOnlyValidNow,      &renderExtent),
-            sl::ResourceTag(&rSpec,   sl::kBufferTypeSpecularAlbedo,     sl::ResourceLifecycle::eOnlyValidNow,      &renderExtent),
-            sl::ResourceTag(&rNorm,   sl::kBufferTypeNormalRoughness,    sl::ResourceLifecycle::eOnlyValidNow,      &renderExtent),
-            sl::ResourceTag(&rSpecMv, specType,                          sl::ResourceLifecycle::eOnlyValidNow,      &renderExtent),
+            sl::ResourceTag(&rInput,  sl::kBufferTypeScalingInputColor,  kLifecycle, &renderExtent),
+            sl::ResourceTag(&rOutput, sl::kBufferTypeScalingOutputColor, kLifecycle, &outputExtent),
+            sl::ResourceTag(&rDepth,  sl::kBufferTypeLinearDepth,        kLifecycle, &renderExtent),
+            sl::ResourceTag(&rMv,     sl::kBufferTypeMotionVectors,      kLifecycle, &renderExtent),
+            sl::ResourceTag(&rDiff,   sl::kBufferTypeAlbedo,             kLifecycle, &renderExtent),
+            sl::ResourceTag(&rSpec,   sl::kBufferTypeSpecularAlbedo,     kLifecycle, &renderExtent),
+            sl::ResourceTag(&rNorm,   sl::kBufferTypeNormalRoughness,    kLifecycle, &renderExtent),
+            sl::ResourceTag(&rSpecMv, specType,                          kLifecycle, &renderExtent),
         };
         sl::Result rtag = slSetTagForFrame(*token, viewport, tags, (uint32_t)_countof(tags),
                                            reinterpret_cast<sl::CommandBuffer*>(cmdList));
