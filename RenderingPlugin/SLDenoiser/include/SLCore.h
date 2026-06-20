@@ -38,6 +38,14 @@ namespace SLCore
     void SetDevice(ID3D12Device* device);
     bool IsDeviceSet();
 
+    // Per-adapter feature capability, cached on the first successful SetDevice. DLSS-G (Frame
+    // Generation) is supported only on Ada (40-series) and newer; Reflex Low Latency on Maxwell
+    // (900-series) and newer. On a 30-series card IsFGSupported() is false but IsReflexSupported()
+    // is true — the plugin then runs Reflex/PCL on the NATIVE swapchain without the FG proxy.
+    // Both are false until the device is set.
+    bool IsFGSupported();
+    bool IsReflexSupported();
+
     // slShutdown. Idempotent. Call before the device is destroyed.
     void Shutdown();
 

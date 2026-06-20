@@ -18,6 +18,7 @@ struct IDXGISwapChain1;
 struct IDXGIOutput;
 struct DXGI_SWAP_CHAIN_DESC1;
 struct DXGI_SWAP_CHAIN_FULLSCREEN_DESC;
+namespace sl { struct FrameToken; }
 
 namespace SLDlssg
 {
@@ -62,6 +63,11 @@ namespace SLDlssg
     // Tag real depth/mvec + set constants for the shared frame token (render thread, after
     // SLCore::BeginFrame). The frame token + Reflex sleep are owned by SLCore/SLReflex now.
     void ConsumeFrameInputs(const FrameInputs& inputs);
+
+    // PCL eRenderSubmitStart for the frame being rendered. Call on the render thread at frame
+    // begin (BeforeRendering), right after the render token is latched. Reflex/PCL only — emitted
+    // on every adapter (PCL is universal), independent of Frame Generation support.
+    void MarkRenderSubmitStart(const sl::FrameToken& token);
 
     // Runtime FG on/off (applied on the present thread).
     void SetFrameGeneration(bool enable);

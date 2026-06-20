@@ -6,15 +6,21 @@
 //   * Inputs are REAL path-tracer depth + motion vectors + camera constants (no dummies,
 //     no HUDLessColor — SL interpolates the presented backbuffer for now).
 //
+// This file owns the FG present path AND the render/present-side PCL markers. The PCL markers
+// are Reflex (not FG): on an adapter WITHOUT Frame Generation (e.g. 30-series) the swapchain is
+// NOT proxied — the present hook is installed on Unity's native swapchain so Reflex/PCL still
+// gets its markers. The FG-specific work (queue/swapchain proxy, slDLSSGSetOptions, DLSSGState)
+// is gated on SLCore::IsFGSupported().
+//
 // Frame timeline (token shared by index — see SLCore.h):
 //   * MAIN thread, top of frame: SLCore::BeginFrame mints the frame token; SLReflex does
 //     slReflexSleep + eSimulationStart. End of game logic: SLReflex eSimulationEnd.
 //   * RENDER thread frame-begin event (data == the FrameToken*): SLCore::SetRenderFrame
-//     pins the render/present side to that exact token.
-//   * RENDER thread: ConsumeFrameInputs() tags depth/mvec + sets constants on the render
-//     token (SLCore::CurrentFrameToken).
-//   * PRESENT thread (SL proxy swapchain hook): eRenderSubmitStart/End, ePresentStart/End
-//     on the render token.
+//     latches the token, then MarkRenderSubmitStart() emits eRenderSubmitStart (render begin).
+//   * RENDER thread: ConsumeFrameInputs() (FG only) tags depth/mvec + sets constants on the
+//     render token (SLCore::CurrentFrameToken).
+//   * PRESENT thread (native or SL proxy swapchain hook): eRenderSubmitEnd + ePresentStart
+//     before Present, ePresentEnd after — all on the render token.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -157,16 +163,22 @@ namespace
 
     void EmitPresentMarkersPre()
     {
-        EnsureFeaturesOnPresentThread();
-        // eSimulationStart/eSimulationEnd are emitted on the MAIN thread (SLReflex) for the
-        // frame currently being rendered; here we close out the render/present side of the
-        // PCL timeline on the present thread, using the render-latched token for that frame.
+        // DLSS-G mode application is FG-only; skip it entirely on a Reflex-only adapter.
+        if (SLCore::IsFGSupported())
+            EnsureFeaturesOnPresentThread();
+
+        // PCL timeline (Reflex — independent of FG). The frame's markers are emitted in order:
+        //   eSimulationStart/End ....... MAIN thread (SLReflex), top + end of game logic
+        //   eRenderSubmitStart ......... RENDER thread frame begin (MarkRenderSubmitStart)
+        //   eRenderSubmitEnd/PresentStart  HERE — render submission done, about to present
+        //   ePresentEnd ................ PostPresentMarker, right after Present returns
+        // (Previously RenderSubmitStart was emitted here too, collapsing the render-submit
+        //  window to ~0 and skewing the Reflex latency report; it now sits at render begin.)
         sl::FrameToken* token = SLCore::CurrentFrameToken();
         if (!token) return;
-        if (g_proxySC3) g_proxySC3->GetCurrentBackBufferIndex();
-        slPCLSetMarker(sl::PCLMarker::eRenderSubmitStart, *token);
-        slPCLSetMarker(sl::PCLMarker::eRenderSubmitEnd,   *token);
-        slPCLSetMarker(sl::PCLMarker::ePresentStart,      *token);
+        if (SLCore::IsFGSupported() && g_proxySC3) g_proxySC3->GetCurrentBackBufferIndex();
+        slPCLSetMarker(sl::PCLMarker::eRenderSubmitEnd, *token);
+        slPCLSetMarker(sl::PCLMarker::ePresentStart,    *token);
     }
 
     void PostPresentMarker()
@@ -175,7 +187,7 @@ namespace
         if (!token) return;
         slPCLSetMarker(sl::PCLMarker::ePresentEnd, *token);
         const uint64_t p = ++g_presentCount;
-        if (p <= 3 || (p & 0x7F) == 0) LogDlssgState();
+        if (SLCore::IsFGSupported() && (p <= 3 || (p & 0x7F) == 0)) LogDlssgState();
     }
 
     HRESULT STDMETHODCALLTYPE Hooked_SLPresent1(
@@ -242,16 +254,28 @@ namespace
             g_proxyDeviceTried = true;
             // Single shared device-set (guarded). This is the earliest reliable point
             // ("immediately after creating the device"), so it usually wins the race with
-            // the graphics-init event.
+            // the graphics-init event — and it populates SLCore's capability flags.
             g_device = This;
             SLCore::SetDevice(This);
-            ID3D12Device* dev = This;
-            sl::Result ru = slUpgradeInterface(reinterpret_cast<void**>(&dev));
-            if (ru == sl::Result::eOk && dev && dev != This)
-                g_proxyDevice.Attach(dev);
-            Logf(ru == sl::Result::eOk ? 0 : 2,
-                 "CreateCommandQueue hook: slUpgradeInterface(device) -> %s%s",
-                 R(ru), g_proxyDevice ? " (proxy device cached)" : "");
+
+            // Only proxy the device/queues when DLSS-G is actually supported on this adapter.
+            // On a card without Frame Generation (e.g. 30-series) we leave the queues native and
+            // run Reflex/PCL on the native swapchain instead (see AdoptSwapChain).
+            if (SLCore::IsFGSupported())
+            {
+                ID3D12Device* dev = This;
+                sl::Result ru = slUpgradeInterface(reinterpret_cast<void**>(&dev));
+                if (ru == sl::Result::eOk && dev && dev != This)
+                    g_proxyDevice.Attach(dev);
+                Logf(ru == sl::Result::eOk ? 0 : 2,
+                     "CreateCommandQueue hook: slUpgradeInterface(device) -> %s%s",
+                     R(ru), g_proxyDevice ? " (proxy device cached)" : "");
+            }
+            else
+            {
+                Logf(0, "CreateCommandQueue hook: DLSS-G unsupported on this adapter; "
+                        "queues left native (Reflex/PCL only, no Frame Generation).");
+            }
         }
 
         if (g_proxyDevice)
@@ -338,6 +362,21 @@ namespace SLDlssg
         DXGI_SWAP_CHAIN_DESC1 desc{};
         (*ppSwapChain)->GetDesc1(&desc);
         g_w = desc.Width; g_h = desc.Height;
+
+        if (!SLCore::IsFGSupported())
+        {
+            // No Frame Generation on this adapter (e.g. 30-series). Do NOT proxy the swapchain;
+            // just hook Unity's native swapchain Present so Reflex/PCL still emits its render/
+            // present markers. PCL is device-level (works on any swapchain). alreadyProxy is
+            // always false here because the queue proxy was not installed.
+            g_proxySwapchain = *ppSwapChain;
+            (*ppSwapChain)->QueryInterface(IID_PPV_ARGS(&g_proxySC3));
+            InstallPresentHookOnProxy(*ppSwapChain);
+            g_adopted = true;
+            Logf(0, "Native swapchain present-hooked (%ux%u) for Reflex/PCL markers; "
+                    "Frame Generation unavailable on this adapter.", g_w, g_h);
+            return;
+        }
 
         if (!alreadyProxy)
         {
@@ -440,13 +479,30 @@ namespace SLDlssg
         g_appliedFrameIdx = idx;
     }
 
+    void MarkRenderSubmitStart(const sl::FrameToken& token)
+    {
+        // RENDER thread, frame begin (BeforeRendering): start of this frame's CPU render
+        // submission. Pairs with eRenderSubmitEnd at present. PCL is supported on every GPU, so
+        // this fires for Reflex regardless of Frame Generation support.
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+        slPCLSetMarker(sl::PCLMarker::eRenderSubmitStart, token);
+    }
+
     void SetFrameGeneration(bool enable)
     {
+        if (enable && !SLCore::IsFGSupported())
+        {
+            Logf(1, "SetFrameGeneration(ON) ignored: Frame Generation is unavailable on this adapter.");
+            return;
+        }
         g_fgDesired.store(enable ? 1 : 0, std::memory_order_release);
         Logf(0, "SetFrameGeneration(%s) requested; applies on next present.", enable ? "ON" : "OFF");
     }
 
-    bool IsFrameGenerationOn() { return g_fgApplied.load(std::memory_order_acquire); }
+    bool IsFrameGenerationOn()
+    {
+        return SLCore::IsFGSupported() && g_fgApplied.load(std::memory_order_acquire);
+    }
 
     void Shutdown()
     {

@@ -195,7 +195,11 @@ namespace
     // it runs on the main thread.
     void UNITY_INTERFACE_API OnFGBeginFrame(int /*eventId*/, void* data)
     {
-        SLCore::SetRenderFrame(reinterpret_cast<sl::FrameToken*>(data));
+        sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
+        SLCore::SetRenderFrame(token);
+        // Start of CPU render submission for this frame — emit eRenderSubmitStart here (Reflex/
+        // PCL), not bunched at present. Universal (PCL works on every adapter, FG or not).
+        if (token) SLDlssg::MarkRenderSubmitStart(*token);
     }
 
     // DLSS-G per-frame inputs (render thread): tag depth/mvec + set constants.
@@ -221,15 +225,19 @@ extern "C"
 
         if (s_IsPlayer)
         {
-            // Player: install the DLSS-G present-path hooks before Unity creates its
-            // device/queues/swapchain. Queue hook FIRST (present queue must be SL-proxied).
+            // Player: install the present-path hooks before Unity creates its device/queues/
+            // swapchain. Queue hook FIRST (the FG present queue must be SL-proxied). These hooks
+            // self-gate on adapter capability at device-creation time: with Frame Generation they
+            // proxy the queue+swapchain for FG; without it (e.g. 30-series) they leave the device
+            // native and only hook Present for the Reflex/PCL markers.
             SLDlssg::InstallDeviceQueueHook();
             InstallFactoryHook();
-            LogBridge(0, "[NR/SLDlssg] Player detected: DLSS-G present hooks installed.");
+            LogBridge(0, "[NR/SLDlssg] Player detected: present-path hooks installed (DLSS-G when "
+                         "supported, else Reflex/PCL on the native swapchain).");
         }
         else
         {
-            LogBridge(0, "[NR/SLDlssg] Editor detected: DLSS-G hooks skipped (DLSS-RR evaluate only).");
+            LogBridge(0, "[NR/SLDlssg] Editor detected: present hooks skipped (DLSS-RR evaluate only).");
         }
 
         // If the device already exists (on-demand load), set it now; otherwise the registered

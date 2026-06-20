@@ -9,9 +9,13 @@ namespace PathTracing
     /// Pins the SLDenoiser render/present side to the frame currently being rendered, by
     /// forwarding this frame's Streamline FrameToken (minted on the main thread at the top of
     /// the frame by <see cref="SLDLRR.SLStreamlineFG"/>) to the render thread via
-    /// <c>IssuePluginEventAndData</c>. The native begin event caches it so DLSS-G tagging +
-    /// present PCL markers and DLSS-RR evaluate all use the same token as the main-thread
-    /// Reflex sleep / sim markers.
+    /// <c>IssuePluginEventAndData</c>. The native begin event latches it (so the present-thread
+    /// PCL markers + DLSS-G tagging use the same token as the main-thread Reflex sleep / sim
+    /// markers) and emits the eRenderSubmitStart PCL marker at this point (render begin).
+    ///
+    /// This is needed for Reflex/PCL on EVERY adapter, not just Frame Generation — the present
+    /// markers run on the native swapchain when FG is unavailable. (DLSS-RR-via-SL does not need
+    /// this latch; it carries its token directly in its frame-data struct.)
     ///
     /// Must run BEFORE the RR pass, the FG-inputs pass and present — enqueue it at
     /// <see cref="RenderPassEvent.BeforeRendering"/> (earlier than those, which sit at

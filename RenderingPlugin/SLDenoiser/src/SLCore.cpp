@@ -20,6 +20,9 @@ namespace
     SLCore::LogFn     g_log = nullptr;
     std::atomic<bool> g_inited{ false };
     bool              g_deviceSet = false;
+    // Per-adapter capability, cached on the first successful SetDevice (see SLCore.h).
+    std::atomic<bool> g_fgSupported{ false };
+    std::atomic<bool> g_reflexSupported{ false };
 
     // Render/present token latch (see SLCore.h). BeginFrame mints on the main thread and returns
     // the pointer to C# (no caching); C# forwards it to the render thread, where SetRenderFrame
@@ -168,11 +171,21 @@ namespace SLCore
         sl::AdapterInfo ai{};
         ai.deviceLUID            = reinterpret_cast<uint8_t*>(&luid);
         ai.deviceLUIDSizeInBytes = sizeof(luid);
-        sl::Result rs = slIsFeatureSupported(sl::kFeatureDLSS_RR, ai);
-        Logf("SLCore", rs == sl::Result::eOk ? 0 : 1, "slIsFeatureSupported(DLSS_RR) -> %s", ResultStr(rs));
+
+        // Cache per-adapter capability. DLSS-G needs Ada+ (40-series); Reflex needs Maxwell+
+        // (900-series). On a 30-series card DLSS_G is unsupported but Reflex is, so the present
+        // path falls back to Reflex/PCL on the native swapchain (see SLDlssg::AdoptSwapChain).
+        auto supported = [&](sl::Feature f) { return slIsFeatureSupported(f, ai) == sl::Result::eOk; };
+        const bool rrOk = supported(sl::kFeatureDLSS_RR);
+        g_fgSupported.store(supported(sl::kFeatureDLSS_G),  std::memory_order_release);
+        g_reflexSupported.store(supported(sl::kFeatureReflex), std::memory_order_release);
+        Logf("SLCore", 0, "feature support: DLSS_RR=%d DLSS_G=%d Reflex=%d",
+             (int)rrOk, (int)g_fgSupported.load(), (int)g_reflexSupported.load());
     }
 
-    bool IsDeviceSet() { return g_deviceSet; }
+    bool IsDeviceSet()      { return g_deviceSet; }
+    bool IsFGSupported()     { return g_fgSupported.load(std::memory_order_acquire); }
+    bool IsReflexSupported() { return g_reflexSupported.load(std::memory_order_acquire); }
 
     sl::FrameToken* BeginFrame()
     {
@@ -201,6 +214,8 @@ namespace SLCore
         if (!IsInited()) return;
         g_inited.store(false);
         g_deviceSet = false;
+        g_fgSupported.store(false);
+        g_reflexSupported.store(false);
         g_renderToken.store(nullptr);
         sl::Result r = slShutdown();
         Logf("SLCore", r == sl::Result::eOk ? 0 : 1, "slShutdown -> %s", ResultStr(r));

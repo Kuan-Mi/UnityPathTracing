@@ -602,12 +602,14 @@ namespace PathTracing
                 renderer.EnqueuePass(_nrdDlssBeforePass);
             }
 
-            // Latch the SL present side to this frame's token (minted on the main thread at
-            // frame top). Runs at BeforeRendering, ahead of the FG passes + present. Needed only
-            // by the DLSS-G present path (FG present markers + DLSS-G depth/mvec tagging), whose
-            // present hook has no data channel of its own. DLSS-RR-via-SL no longer needs this —
-            // it now carries the token directly in SLDlssrrFrameData.
-            if (eyeIndex == 0 && setting.FGViaSL)
+            // Latch the SL present side to this frame's token (minted on the main thread at frame
+            // top) and emit the render-begin PCL marker. The native present hook reads this latch
+            // and has no data channel of its own. It feeds BOTH the Reflex/PCL present markers
+            // (which run on every adapter, even without Frame Generation) and, when FG is active,
+            // the DLSS-G depth/mvec tagging — so enqueue it every frame whenever SL is live in the
+            // player (token is non-Zero only in play mode), independent of FG/RR. DLSS-RR-via-SL
+            // does NOT depend on this latch; it carries its token directly in SLDlssrrFrameData.
+            if (eyeIndex == 0)
             {
                 var slBeginFunc = SLDLRR.SLStreamlineFG.GetBeginEventFunc();
                 var slTokenPtr  = SLDLRR.SLStreamlineFG.CurrentFrameTokenPtr;
