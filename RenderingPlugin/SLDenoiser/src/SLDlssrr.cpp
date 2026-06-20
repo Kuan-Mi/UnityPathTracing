@@ -130,14 +130,13 @@ namespace SLDlssrr
 
         sl::ViewportHandle viewport{ (uint32_t)data->instanceId };
 
-        // --- frame token (shared, owned by SLCore) ---
-        // All SL features must tag against the SAME per-frame token (see SLCore.h). Evaluate
-        // runs on the render thread, so prefer the render-latched token for the frame being
-        // rendered, then the main-thread sim token. If neither exists yet — e.g. the editor
-        // edit-mode game view, where the main-thread Reflex tick is intentionally not run —
-        // mint one here (advances the index, no sleep) so DLSS-RR still works standalone.
-        sl::FrameToken* token = SLCore::CurrentFrameToken();
-        if (!token) token = SLCore::SimFrameToken();
+        // --- frame token (passed in from C#) ---
+        // All SL features must tag against the SAME per-frame token (see SLCore.h). C# supplies
+        // this frame's token (the one SL_FrameBegin minted and forwarded to the present latch),
+        // so evaluate tags against the same token as DLSS-G. It is null only in the editor
+        // edit-mode game view, where the main-thread frame tick is intentionally not run — mint
+        // one here (advances the index, no sleep) so DLSS-RR still works standalone.
+        sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data->frameToken);
         if (!token) token = SLCore::BeginFrame();
         if (!token) { Logf(1, "no frame token (slGetNewFrameToken failed)"); return; }
 

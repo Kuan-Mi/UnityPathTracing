@@ -46,27 +46,26 @@ namespace SLCore
     // the Reflex sleep, the PCL sim->render->present markers) by FrameToken. The latency
     // math only works if a frame's calls all carry the SAME token. A token is therefore
     // minted EXACTLY ONCE per frame and that one pointer is shared across threads — matching
-    // the donut/RTXPT pattern (mint in SimStart, reuse through present); re-minting per
-    // index is NOT relied upon.
+    // the donut/RTXPT pattern (mint in SimStart, reuse through present).
     //
-    //   * Main / simulation thread (top of frame, before input): BeginFrame() mints + caches
-    //     the token and returns it. SLReflex sleeps + marks eSimulationStart/eSimulationEnd.
-    //   * The SAME pointer is forwarded to the render thread via IssuePluginEventAndData;
-    //     SetRenderFrame() caches it as the "render" token, which DLSS-RR evaluate, DLSS-G
-    //     tagging and the present-side PCL markers read via CurrentFrameToken(). Carrying it
-    //     through the ordered render event keeps the render/present side pinned to the frame
-    //     it is actually rendering even when the main thread has already advanced.
+    // The plugin is otherwise STATELESS about the token: C# holds the minted pointer (the
+    // return of BeginFrame, surfaced as SL_FrameBegin) and passes it back into every call
+    // that has a data channel — the Reflex sim markers (SL_MarkSimulationEnd arg) and DLSS-RR
+    // evaluate (SLDlssrrFrameData::frameToken). The ONE exception is the DLSS-G present path:
+    //   * SetRenderFrame() latches the C#-forwarded token (frame-begin render event) so the
+    //     DXGI Present hook — which Streamline/DXGI call with NO parameter we control — and
+    //     DLSS-G's render-thread tagging (same frame's valid-until-present tags) can read it
+    //     via CurrentFrameToken(). This single latch is irreducible: the present thread has
+    //     no other way to learn the frame's token.
 
-    // Main thread, top of frame. Mint + cache the frame token. Returns it, or nullptr if SL
-    // is not initialized / the mint failed.
+    // Main thread, top of frame. Mint and return a fresh frame token (no caching), or nullptr
+    // if SL is not initialized / the mint failed.
     sl::FrameToken* BeginFrame();
-    // The token cached by the last BeginFrame (main-thread sim markers + sleep). May be null.
-    sl::FrameToken* SimFrameToken();
 
-    // Render thread. Cache the token forwarded from the main thread (frame-begin event data).
-    // nullptr is ignored (leaves the previous render token in place).
+    // Render thread. Latch the token forwarded from the main thread (frame-begin event data)
+    // for the DLSS-G render-tag + present PCL markers. nullptr is ignored (keeps the previous).
     void            SetRenderFrame(sl::FrameToken* token);
-    // The render-side token (frame currently being rendered/presented). Null before the first
-    // SetRenderFrame.
+    // The latched render/present token (frame currently being rendered/presented). Null before
+    // the first SetRenderFrame. Used ONLY by the DLSS-G present path (see above).
     sl::FrameToken* CurrentFrameToken();
 }

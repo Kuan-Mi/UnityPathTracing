@@ -602,11 +602,12 @@ namespace PathTracing
                 renderer.EnqueuePass(_nrdDlssBeforePass);
             }
 
-            // Pin the SL render/present side to this frame's token (minted on the main thread
-            // at frame top). Runs at BeforeRendering, ahead of the RR/FG passes + present.
-            // Once per frame (token is global); needed whenever an SL render-thread consumer
-            // (RR-via-SL evaluate or FG present markers) is active.
-            if (eyeIndex == 0 && (setting.FGViaSL || (setting.RR && setting.RRViaSL)))
+            // Latch the SL present side to this frame's token (minted on the main thread at
+            // frame top). Runs at BeforeRendering, ahead of the FG passes + present. Needed only
+            // by the DLSS-G present path (FG present markers + DLSS-G depth/mvec tagging), whose
+            // present hook has no data channel of its own. DLSS-RR-via-SL no longer needs this —
+            // it now carries the token directly in SLDlssrrFrameData.
+            if (eyeIndex == 0 && setting.FGViaSL)
             {
                 var slBeginFunc = SLDLRR.SLStreamlineFG.GetBeginEventFunc();
                 var slTokenPtr  = SLDLRR.SLStreamlineFG.CurrentFrameTokenPtr;

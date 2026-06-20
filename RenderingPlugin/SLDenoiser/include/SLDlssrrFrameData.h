@@ -19,6 +19,11 @@
 
 struct SLDlssrrFrameData
 {
+    // --- shared per-frame Streamline token (sl::FrameToken*, minted by SL_FrameBegin) ---
+    // Passed in from C# so the plugin stays stateless. nullptr in the editor edit-mode game
+    // view (no main-thread Reflex tick) — DLSS-RR mints its own token in that case.
+    void* frameToken;
+
     // --- tagged resources (native ID3D12Resource*) ---
     ID3D12Resource* inputTex;           // noisy ray-traced color (render res)
     ID3D12Resource* outputTex;          // denoised/upscaled color (output res)

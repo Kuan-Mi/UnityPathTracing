@@ -291,33 +291,42 @@ extern "C"
     typedef void* SLFrameTokenHandle;
     SLFrameTokenHandle UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_FrameBegin()
     {
+        // Still mint the per-frame token in the editor — DLSS-RR (evaluate-only, editor + player)
+        // forwards it to the render thread for tagging. The Reflex sleep/markers are player-only:
+        // Reflex's CPU pacing is meaningless without the FG present path and is skipped in the
+        // editor (Unity.exe), matching the DLSS-G present-hook gating in UnityPluginLoad.
         sl::FrameToken* token = SLCore::BeginFrame();
-        if (token) SLReflex::OnFrameBegin(*token);
+        if (token && s_IsPlayer) SLReflex::OnFrameBegin(*token);
         return token;
     }
 
     // SL_MarkSimulationEnd: main thread, after game logic (before rendering). eSimulationEnd.
-    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_MarkSimulationEnd()
+    // frameToken is this frame's token from SL_FrameBegin (C# holds it — the plugin caches no
+    // sim token). Player-only (Reflex/PCL); see SL_FrameBegin.
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_MarkSimulationEnd(void* frameToken)
     {
-        sl::FrameToken* token = SLCore::SimFrameToken();
-        if (token) SLReflex::MarkSimulationEnd(*token);
+        if (!s_IsPlayer || !frameToken) return;
+        SLReflex::MarkSimulationEnd(*reinterpret_cast<sl::FrameToken*>(frameToken));
     }
 
     // ---- Reflex (low latency) ----
     // mode: 0 = Off, 1 = On (Low Latency), 2 = On + Boost. fpsCapUs: 0 = uncapped.
-    // Independent of frame generation — safe to use with FG off and in the editor.
+    // Player-only: tied to the DLSS-G present path, so it's a no-op in the editor (Unity.exe).
     void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_SetReflexMode(int mode, unsigned fpsCapUs)
     {
+        if (!s_IsPlayer) return; // Reflex is player-only (see SL_FrameBegin).
         SLReflex::SetMode(mode, fpsCapUs);
     }
 
     int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_GetReflexMode()
     {
+        if (!s_IsPlayer) return 0; // Off in the editor — Reflex never runs there.
         return SLReflex::GetMode();
     }
 
     int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_IsReflexLowLatencyAvailable()
     {
+        if (!s_IsPlayer) return 0; // Reflex is player-only (see SL_FrameBegin).
         return SLReflex::IsLowLatencyAvailable() ? 1 : 0;
     }
 }

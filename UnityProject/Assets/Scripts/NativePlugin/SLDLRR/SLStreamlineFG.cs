@@ -29,7 +29,9 @@ namespace SLDLRR
         [DllImport(DllName)] private static extern void   SL_SetFrameGeneration(int enable);
         [DllImport(DllName)] private static extern int    SL_IsFrameGenerationOn();
 
-        // Reflex low latency (independent of frame generation; works with FG off + in editor).
+        // Reflex low latency (independent of frame generation, but PLAYER-ONLY): the native side
+        // no-ops these in the editor (Unity.exe), since Reflex pacing is meaningless without the
+        // standalone present path. GetReflexMode returns 0 (Off) and availability returns false there.
         [DllImport(DllName)] private static extern void   SL_SetReflexMode(int mode, uint fpsCapUs);
         [DllImport(DllName)] private static extern int    SL_GetReflexMode();
         [DllImport(DllName)] private static extern int    SL_IsReflexLowLatencyAvailable();
@@ -38,7 +40,7 @@ namespace SLDLRR
         // SL_FrameBegin must run at the very top of the frame, before input; it returns the
         // frame token pointer to forward to the render-thread begin event as its data.
         [DllImport(DllName)] private static extern IntPtr SL_FrameBegin();
-        [DllImport(DllName)] private static extern void   SL_MarkSimulationEnd();
+        [DllImport(DllName)] private static extern void   SL_MarkSimulationEnd(IntPtr frameToken);
 
         /// <summary>Reflex low-latency mode. Mirrors sl::ReflexMode.</summary>
         public enum ReflexMode { Off = 0, On = 1, OnPlusBoost = 2 }
@@ -114,6 +116,7 @@ namespace SLDLRR
         /// gives the lowest latency (at a small FPS cost). Independent of FG, so it also
         /// lowers latency with FG off. <paramref name="fpsCapUs"/> is an optional FPS cap in
         /// microseconds (0 = uncapped); works even when mode is Off.
+        /// PLAYER-ONLY: a no-op in the editor (the native side gates Reflex on Unity.exe).
         /// </summary>
         public static void SetReflexMode(ReflexMode mode, uint fpsCapUs = 0)
         {
@@ -260,8 +263,9 @@ namespace SLDLRR
         {
             if (!_available) return;
             if (IsPreviewOnlyContext(cameras)) return;
+            if (_frameToken == IntPtr.Zero) return; // editor edit-mode: no main-thread frame tick
 
-            try { SL_MarkSimulationEnd(); }
+            try { SL_MarkSimulationEnd(_frameToken); }
             catch (DllNotFoundException) { _available = false; }
         }
 

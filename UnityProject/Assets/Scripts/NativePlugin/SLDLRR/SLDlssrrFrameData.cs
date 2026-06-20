@@ -18,6 +18,10 @@ namespace SLDLRR
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct SLDlssrrFrameData
     {
+        // shared per-frame Streamline token (sl::FrameToken*, from SL_FrameBegin); Zero in the
+        // editor edit-mode game view, where the native side mints its own.
+        public IntPtr frameToken;
+
         // tagged resources (native ID3D12Resource*)
         public IntPtr inputTex;
         public IntPtr outputTex;

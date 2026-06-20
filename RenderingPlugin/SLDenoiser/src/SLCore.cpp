@@ -21,11 +21,10 @@ namespace
     std::atomic<bool> g_inited{ false };
     bool              g_deviceSet = false;
 
-    // Shared per-frame token (see SLCore.h). BeginFrame runs on the main thread; the sim token
-    // it mints is read on the main thread (Reflex sleep + sim markers) and forwarded to the
-    // render thread, where SetRenderFrame caches it as the render token read on the render AND
-    // present threads (tagging + present markers). Both atomic.
-    std::atomic<sl::FrameToken*> g_simToken{ nullptr };
+    // Render/present token latch (see SLCore.h). BeginFrame mints on the main thread and returns
+    // the pointer to C# (no caching); C# forwards it to the render thread, where SetRenderFrame
+    // latches it here for the DLSS-G render-tag + present PCL markers (the present hook has no
+    // data channel of its own). Atomic: written on the render thread, read on the present thread.
     std::atomic<sl::FrameToken*> g_renderToken{ nullptr };
 
     // Directory containing THIS module (SLDenoiser.dll). In a player build Unity copies
@@ -179,7 +178,7 @@ namespace SLCore
     {
         if (!IsInited()) return nullptr;
         // nullptr index = SL auto-increments its internal frame counter (matches donut's
-        // SimStart). One mint per frame; the pointer is reused everywhere for this frame.
+        // SimStart). Mint and hand the pointer back to the caller; SLCore does not cache it.
         sl::FrameToken* token = nullptr;
         sl::Result r = slGetNewFrameToken(token, nullptr);
         if (r != sl::Result::eOk || !token)
@@ -187,11 +186,8 @@ namespace SLCore
             Logf("SLCore", 1, "slGetNewFrameToken -> %s", ResultStr(r));
             return nullptr;
         }
-        g_simToken.store(token, std::memory_order_release);
         return token;
     }
-
-    sl::FrameToken* SimFrameToken() { return g_simToken.load(std::memory_order_acquire); }
 
     void SetRenderFrame(sl::FrameToken* token)
     {
@@ -205,7 +201,6 @@ namespace SLCore
         if (!IsInited()) return;
         g_inited.store(false);
         g_deviceSet = false;
-        g_simToken.store(nullptr);
         g_renderToken.store(nullptr);
         sl::Result r = slShutdown();
         Logf("SLCore", r == sl::Result::eOk ? 0 : 1, "slShutdown -> %s", ResultStr(r));

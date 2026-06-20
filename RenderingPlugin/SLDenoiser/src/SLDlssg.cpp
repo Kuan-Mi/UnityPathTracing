@@ -431,7 +431,7 @@ namespace SLDlssg
         sl::FrameToken* token = SLCore::CurrentFrameToken();
         if (!token)
         {
-            Logf(1, "ConsumeFrameInputs: no frame token yet (SLCore::BeginFrame not run).");
+            Logf(1, "ConsumeFrameInputs: no render token latched yet (frame-begin event not run).");
             return;
         }
         const uint32_t idx = (uint32_t)(*token);
