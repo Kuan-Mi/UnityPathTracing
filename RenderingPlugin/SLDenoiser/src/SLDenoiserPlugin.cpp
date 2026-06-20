@@ -197,6 +197,13 @@ namespace
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
         SLCore::SetRenderFrame(token);
+
+        // Adopt Unity's live swapchain so SL's presentCommon() runs (one-shot; the creation hooks
+        // load too late to intercept it). GetSwapChain() is valid only on the render/submission
+        // thread and only in the player (null in the editor), which is exactly here.
+        if (s_D3D12)
+            SLDlssg::EnsureSwapChainAdopted(s_D3D12->GetSwapChain());
+
         // Start of CPU render submission for this frame — emit eRenderSubmitStart here (Reflex/
         // PCL), not bunched at present. Universal (PCL works on every adapter, FG or not).
         if (token) SLDlssg::MarkRenderSubmitStart(*token);
@@ -226,14 +233,14 @@ extern "C"
         if (s_IsPlayer)
         {
             // Player: install the present-path hooks before Unity creates its device/queues/
-            // swapchain. Queue hook FIRST (the FG present queue must be SL-proxied). These hooks
-            // self-gate on adapter capability at device-creation time: with Frame Generation they
-            // proxy the queue+swapchain for FG; without it (e.g. 30-series) they leave the device
-            // native and only hook Present for the Reflex/PCL markers.
+            // swapchain. Queue hook FIRST (the present queue must be SL-proxied). The proxy
+            // device/queue/swapchain are SL's common interposer (required so presentCommon() runs
+            // every frame under manual hooking) and are installed on every adapter; Frame
+            // Generation is only enabled as a *mode* on top when the adapter supports it.
             SLDlssg::InstallDeviceQueueHook();
             InstallFactoryHook();
-            LogBridge(0, "[NR/SLDlssg] Player detected: present-path hooks installed (DLSS-G when "
-                         "supported, else Reflex/PCL on the native swapchain).");
+            LogBridge(0, "[NR/SLDlssg] Player detected: present-path hooks installed (Reflex/PCL on "
+                         "every adapter; DLSS-G frame generation enabled only when supported).");
         }
         else
         {

@@ -6,11 +6,13 @@
 //   * Inputs are REAL path-tracer depth + motion vectors + camera constants (no dummies,
 //     no HUDLessColor — SL interpolates the presented backbuffer for now).
 //
-// This file owns the FG present path AND the render/present-side PCL markers. The PCL markers
-// are Reflex (not FG): on an adapter WITHOUT Frame Generation (e.g. 30-series) the swapchain is
-// NOT proxied — the present hook is installed on Unity's native swapchain so Reflex/PCL still
-// gets its markers. The FG-specific work (queue/swapchain proxy, slDLSSGSetOptions, DLSSGState)
-// is gated on SLCore::IsFGSupported().
+// This file owns the SL present path AND the render/present-side PCL markers. The present path
+// (proxy device/queue/swapchain + the Present hook) is SL's COMMON interposer and is installed
+// on every adapter — it must be, because under eUseManualHooking the SL common plugin's
+// presentCommon() only runs when presentation goes through an SL-upgraded swapchain. The PCL
+// markers are Reflex (not FG) and likewise run on every adapter. Only the Frame-Generation MODE
+// (slDLSSGSetOptions / DLSSGState / GetCurrentBackBufferIndex) is gated on SLCore::IsFGSupported(),
+// so on a 30-series card you get Reflex/PCL + presentCommon with FG simply never enabled.
 //
 // Frame timeline (token shared by index — see SLCore.h):
 //   * MAIN thread, top of frame: SLCore::BeginFrame mints the frame token; SLReflex does
@@ -63,6 +65,12 @@ namespace
     bool                   g_featuresEnabledOnPresent = false;
     IDXGISwapChain1*       g_proxySwapchain = nullptr;
     ComPtr<IDXGISwapChain3> g_proxySC3;
+    // When true, Unity holds its NATIVE swapchain (we adopted it post-creation via GetSwapChain)
+    // and the Present hook must route the call through g_proxySwapchain so SL's presentCommon()
+    // runs. When false (legacy factory-hook path) Unity already holds the proxy, so the hook's
+    // saved original IS the proxy's Present and we call it directly. See EnsureSwapChainAdopted.
+    bool                   g_routeViaProxy = false;
+    bool                   g_swapchainAdoptTried = false;
 
     constexpr UINT kPresentVTIdx  = 8;
     constexpr UINT kPresent1VTIdx = 22;
@@ -190,19 +198,34 @@ namespace
         if (SLCore::IsFGSupported() && (p <= 3 || (p & 0x7F) == 0)) LogDlssgState();
     }
 
+    // Reentrancy guard: when we route through the proxy (g_routeViaProxy), proxy->Present calls
+    // the NATIVE swapchain's Present, which is THIS hooked vtable — so the second entry must go
+    // straight to the real present (g_slOrigPresent*) to avoid infinite recursion.
+    thread_local bool t_inPresent = false;
+
     HRESULT STDMETHODCALLTYPE Hooked_SLPresent1(
         IDXGISwapChain1* This, UINT sync, UINT flags, const DXGI_PRESENT_PARAMETERS* pp)
     {
+        if (t_inPresent) return g_slOrigPresent1(This, sync, flags, pp);
+        t_inPresent = true;
         EmitPresentMarkersPre();
-        HRESULT hr = g_slOrigPresent1(This, sync, flags, pp);
+        HRESULT hr = (g_routeViaProxy && g_proxySwapchain)
+                   ? g_proxySwapchain->Present1(sync, flags, pp)  // runs presentCommon()
+                   : g_slOrigPresent1(This, sync, flags, pp);
         PostPresentMarker();
+        t_inPresent = false;
         return hr;
     }
     HRESULT STDMETHODCALLTYPE Hooked_SLPresent(IDXGISwapChain* This, UINT sync, UINT flags)
     {
+        if (t_inPresent) return g_slOrigPresent(This, sync, flags);
+        t_inPresent = true;
         EmitPresentMarkersPre();
-        HRESULT hr = g_slOrigPresent(This, sync, flags);
+        HRESULT hr = (g_routeViaProxy && g_proxySwapchain)
+                   ? g_proxySwapchain->Present(sync, flags)       // runs presentCommon()
+                   : g_slOrigPresent(This, sync, flags);
         PostPresentMarker();
+        t_inPresent = false;
         return hr;
     }
 
@@ -258,24 +281,17 @@ namespace
             g_device = This;
             SLCore::SetDevice(This);
 
-            // Only proxy the device/queues when DLSS-G is actually supported on this adapter.
-            // On a card without Frame Generation (e.g. 30-series) we leave the queues native and
-            // run Reflex/PCL on the native swapchain instead (see AdoptSwapChain).
-            if (SLCore::IsFGSupported())
-            {
-                ID3D12Device* dev = This;
-                sl::Result ru = slUpgradeInterface(reinterpret_cast<void**>(&dev));
-                if (ru == sl::Result::eOk && dev && dev != This)
-                    g_proxyDevice.Attach(dev);
-                Logf(ru == sl::Result::eOk ? 0 : 2,
-                     "CreateCommandQueue hook: slUpgradeInterface(device) -> %s%s",
-                     R(ru), g_proxyDevice ? " (proxy device cached)" : "");
-            }
-            else
-            {
-                Logf(0, "CreateCommandQueue hook: DLSS-G unsupported on this adapter; "
-                        "queues left native (Reflex/PCL only, no Frame Generation).");
-            }
+            // Upgrade the device so Unity's queues are SL-proxied. This is part of SL's common
+            // interposer (needed so the proxy-factory swapchain — and thus presentCommon — works);
+            // it is NOT Frame-Generation-specific and is done on every adapter. FG support only
+            // gates whether we later enable the DLSS-G *mode* (see EmitPresentMarkersPre).
+            ID3D12Device* dev = This;
+            sl::Result ru = slUpgradeInterface(reinterpret_cast<void**>(&dev));
+            if (ru == sl::Result::eOk && dev && dev != This)
+                g_proxyDevice.Attach(dev);
+            Logf(ru == sl::Result::eOk ? 0 : 2,
+                 "CreateCommandQueue hook: slUpgradeInterface(device) -> %s%s",
+                 R(ru), g_proxyDevice ? " (proxy device cached)" : "");
         }
 
         if (g_proxyDevice)
@@ -363,21 +379,13 @@ namespace SLDlssg
         (*ppSwapChain)->GetDesc1(&desc);
         g_w = desc.Width; g_h = desc.Height;
 
-        if (!SLCore::IsFGSupported())
-        {
-            // No Frame Generation on this adapter (e.g. 30-series). Do NOT proxy the swapchain;
-            // just hook Unity's native swapchain Present so Reflex/PCL still emits its render/
-            // present markers. PCL is device-level (works on any swapchain). alreadyProxy is
-            // always false here because the queue proxy was not installed.
-            g_proxySwapchain = *ppSwapChain;
-            (*ppSwapChain)->QueryInterface(IID_PPV_ARGS(&g_proxySC3));
-            InstallPresentHookOnProxy(*ppSwapChain);
-            g_adopted = true;
-            Logf(0, "Native swapchain present-hooked (%ux%u) for Reflex/PCL markers; "
-                    "Frame Generation unavailable on this adapter.", g_w, g_h);
-            return;
-        }
-
+        // ALWAYS route presentation through the SL proxy swapchain — even on an adapter without
+        // Frame Generation. Under eUseManualHooking the SL common plugin's presentCommon() (its
+        // per-frame bookkeeping + garbage collection) only runs when the present goes through an
+        // SL-upgraded swapchain (ProgrammingGuideManualHooking §2.0). The proxy is part of SL's
+        // common interposer, NOT FG; Frame Generation is merely a *mode* we enable on top of it
+        // (and only when IsFGSupported()). Skipping the upgrade breaks presentCommon and SL logs
+        // "presentCommon() was not observed", which also starves DLSS-RR evaluate of bookkeeping.
         if (!alreadyProxy)
         {
             void* iface = *ppSwapChain;
@@ -397,6 +405,44 @@ namespace SLDlssg
         InstallPresentHookOnProxy(*ppSwapChain);
         g_adopted = true;
         Logf(0, "Swapchain adopted (%ux%u); DLSS-G ready. Toggle with SL_SetFrameGeneration.", g_w, g_h);
+    }
+
+    void EnsureSwapChainAdopted(IDXGISwapChain* unitySwapChain)
+    {
+        // Primary adoption path for Unity. The factory/queue creation hooks never fire here
+        // because Unity creates its device + swapchain BEFORE any native plugin loads (even
+        // load-on-startup), so there is nothing to intercept. Instead we adopt the LIVE swapchain
+        // handed to us by IUnityGraphicsD3D12::GetSwapChain(): upgrade it to an SL proxy and hook
+        // its native Present, then route presentation through the proxy so the SL common plugin's
+        // presentCommon() runs every frame (required under eUseManualHooking — without it SL logs
+        // "presentCommon() was not observed" and DLSS-RR/-G resource bookkeeping never GCs).
+        if (g_adopted || g_swapchainAdoptTried) return;
+        if (!unitySwapChain || !SLCore::IsInited() || !SLCore::IsDeviceSet()) return; // retry next frame
+        g_swapchainAdoptTried = true;
+
+        void* iface = unitySwapChain;
+        sl::Result r = slUpgradeInterface(&iface);
+        if (r != sl::Result::eOk || !iface)
+        {
+            Logf(2, "EnsureSwapChainAdopted: slUpgradeInterface(swapchain) -> %s; presentCommon "
+                    "will NOT run (Reflex sleep still works, but no SL GC).", R(r));
+            return;
+        }
+        g_proxySwapchain = reinterpret_cast<IDXGISwapChain1*>(iface);
+        g_proxySwapchain->QueryInterface(IID_PPV_ARGS(&g_proxySC3));
+
+        // Patch the NATIVE swapchain's Present vtable (Unity keeps presenting through its own
+        // pointer); the hook routes through the proxy created above.
+        InstallPresentHookOnProxy(reinterpret_cast<IDXGISwapChain1*>(unitySwapChain));
+        g_routeViaProxy = true;
+        g_adopted = true;
+
+        DXGI_SWAP_CHAIN_DESC1 desc{};
+        g_proxySwapchain->GetDesc1(&desc);
+        g_w = desc.Width; g_h = desc.Height;
+        Logf(0, "Adopted live Unity swapchain via GetSwapChain (%ux%u); present routed through SL "
+                "proxy (presentCommon active). Frame Generation %s on this adapter.", g_w, g_h,
+                SLCore::IsFGSupported() ? "available" : "unavailable");
     }
 
     IUnknown* NativeIfProxy(IUnknown* maybeProxy)
@@ -508,6 +554,7 @@ namespace SLDlssg
     {
         g_fgDesired.store(-1); g_fgApplied.store(false); g_featuresEnabledOnPresent = false;
         g_haveRealInputs = false; g_inputs = {}; g_adopted = false;
+        g_routeViaProxy = false; g_swapchainAdoptTried = false;
         g_appliedFrameIdx = 0xFFFFFFFFu;
         g_proxySwapchain = nullptr; g_proxySC3.Reset();
         g_device.Reset();

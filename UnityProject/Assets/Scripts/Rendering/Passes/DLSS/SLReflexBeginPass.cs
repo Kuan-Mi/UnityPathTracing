@@ -13,9 +13,9 @@ namespace PathTracing
     /// PCL markers + DLSS-G tagging use the same token as the main-thread Reflex sleep / sim
     /// markers) and emits the eRenderSubmitStart PCL marker at this point (render begin).
     ///
-    /// This is needed for Reflex/PCL on EVERY adapter, not just Frame Generation — the present
-    /// markers run on the native swapchain when FG is unavailable. (DLSS-RR-via-SL does not need
-    /// this latch; it carries its token directly in its frame-data struct.)
+    /// This is needed for Reflex/PCL on EVERY adapter, not just Frame Generation — the SL proxy
+    /// present path (and its PCL markers) runs even when FG is unavailable. (DLSS-RR-via-SL does
+    /// not need this latch; it carries its token directly in its frame-data struct.)
     ///
     /// Must run BEFORE the RR pass, the FG-inputs pass and present — enqueue it at
     /// <see cref="RenderPassEvent.BeforeRendering"/> (earlier than those, which sit at

@@ -54,15 +54,8 @@ copy /Y "%OUT_DIR%\ShaderCompilerPlugin.pdb"  "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\D3D12HeapHook.dll"         "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\D3D12HeapHook.pdb"         "%UNITY_PLUGINS%\" >nul
 
-:: StreamlineProbePlugin — standalone diagnostic DLL (DLSS-G via Streamline 2.11.1).
-:: Disabled by default in Unity; enable "Load on startup" on this DLL to test.
-:: NOTE: SwapChainHookPlugin (raw-NGX route) is no longer deployed; its source is
-:: kept in RenderingPlugin\SwapChainHookPlugin for reference. Enable at most one
-:: FG diagnostic at a time so they don't both init NGX.
-copy /Y "%OUT_DIR%\StreamlineProbePlugin.dll" "%UNITY_PLUGINS%\" >nul
-copy /Y "%OUT_DIR%\StreamlineProbePlugin.pdb" "%UNITY_PLUGINS%\" >nul
 
-:: Streamline runtime (development build) — must sit beside StreamlineProbePlugin.dll
+:: Streamline runtime (development build)
 :: so SL can init and locate its DLSS-G plugin.
 set SL_BIN=Other\streamline-sdk-v2.11.1\bin\x64\development
 copy /Y "%SL_BIN%\sl.interposer.dll"      "%UNITY_PLUGINS%\" >nul
@@ -73,16 +66,11 @@ copy /Y "%SL_BIN%\sl.pcl.dll"             "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssg.dll"        "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\WinPixEventRuntime.dll" "%UNITY_PLUGINS%\" >nul
 
-:: SLDenoiser — standalone DLSS Ray Reconstruction via Streamline (A/B vs the NRI
-:: Denoiser path). Loaded on demand by SLDlssrr.cs. MUST be mutually exclusive with the
-:: StreamlineProbePlugin (DLSS-G) at runtime — one slInit per process.
 copy /Y "%OUT_DIR%\SLDenoiser.dll"        "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\SLDenoiser.pdb"        "%UNITY_PLUGINS%\" >nul
 :: DLSS-RR Streamline plugin + model (sl.interposer/common/pcl already copied above).
 copy /Y "%SL_BIN%\sl.dlss_d.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssd.dll"        "%UNITY_PLUGINS%\" >nul
-:: DLSS-G plugin + Reflex + model (also used by the StreamlineProbePlugin section above;
-:: repeated here so SLDenoiser FG works even if that section is removed). Player-only.
 copy /Y "%SL_BIN%\sl.dlss_g.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\sl.reflex.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssg.dll"        "%UNITY_PLUGINS%\" >nul
@@ -122,7 +110,6 @@ echo    OMMBakerPlugin.dll
 echo    omm-lib.dll
 echo    ShaderCompilerPlugin.dll
 echo    D3D12HeapHook.dll
-echo    StreamlineProbePlugin.dll  ^(diagnostic; enable "Load on startup" to test^)
 echo    sl.*.dll + nvngx_dlssg.dll ^(Streamline 2.11.1 runtime for the probe^)
 echo    dxcompiler.dll
 echo    dxil.dll
