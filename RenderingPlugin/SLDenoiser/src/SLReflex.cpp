@@ -39,14 +39,21 @@ namespace
     std::atomic<uint32_t>              g_pclPingMsg{ 0 };       // 0 until acquired from slPCLGetState
     HWND                               g_pingHwnd    = nullptr;
     WNDPROC                            g_origWndProc = nullptr;
+    std::atomic<uint64_t>              g_wndMsgSeen{ 0 };       // any msg through our subclass (liveness)
+    std::atomic<uint64_t>              g_pclPingSeen{ 0 };      // PCL ping messages we answered
 
     LRESULT CALLBACK PclWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
+        g_wndMsgSeen.fetch_add(1, std::memory_order_relaxed);
         const uint32_t ping = g_pclPingMsg.load(std::memory_order_acquire);
         if (ping != 0 && msg == ping)
         {
             const sl::FrameToken* t = g_lastToken.load(std::memory_order_acquire);
             if (t) slPCLSetMarker(sl::PCLMarker::ePCLatencyPing, *t);
+            const uint64_t n = g_pclPingSeen.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (n <= 3)
+                Logf(0, "PCL ping #%llu answered -> ePCLatencyPing (token=%p).",
+                     (unsigned long long)n, (const void*)t);
         }
         return CallWindowProcW(g_origWndProc, hwnd, msg, wp, lp);
     }
@@ -136,6 +143,23 @@ namespace SLReflex
             }
         }
 
+        // Diagnostic (every ~256 frames): warn only while the PCL ping chain is BROKEN. SL posts
+        // the ping (answered in PclWndProc -> "PCL ping #N answered") only while a latency consumer
+        // actively captures AND the game window is foreground (PCLStatsPingThreadProc). Once any
+        // ping arrives we stay silent — success is already logged by the first few pings.
+        if (g_origWndProc && g_pclPingSeen.load(std::memory_order_relaxed) == 0)
+        {
+            static uint64_t s_diag = 0;
+            if (((++s_diag) & 0xFF) == 0)
+            {
+                const uint64_t msgs = g_wndMsgSeen.load(std::memory_order_relaxed);
+                Logf(1, "PCL diag: no latency pings yet (wndproc msgs=%llu, pingMsg=0x%x). %s",
+                     (unsigned long long)msgs, g_pclPingMsg.load(std::memory_order_acquire),
+                     msgs == 0 ? "Our WndProc gets NO messages -> subclass was bumped (Unity re-set the proc)."
+                               : "WndProc alive but no ping -> start an ACTIVE latency capture (FrameView/PresentMon/ReflexTest) and keep the game window FOCUSED.");
+            }
+        }
+
         // slReflexSetOptions + slReflexSleep + the PCL markers must ALWAYS be issued (even
         // when Reflex is Off) — PCL uses them to measure latency, and the driver gates the
         // actual sleep on the mode. See the guide's NOTEs in §4.0.
@@ -177,6 +201,8 @@ namespace SLReflex
         g_pingHwnd    = nullptr;
         g_pclPingMsg.store(0, std::memory_order_release);
         g_lastToken.store(nullptr, std::memory_order_release);
+        g_wndMsgSeen.store(0, std::memory_order_release);
+        g_pclPingSeen.store(0, std::memory_order_release);
 
         g_modeApplied.store(-1, std::memory_order_release);
         g_fpsCapApplied.store(0xFFFFFFFFu, std::memory_order_release);
