@@ -65,6 +65,10 @@ copy /Y "%SL_BIN%\sl.reflex.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\sl.pcl.dll"             "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssg.dll"        "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\WinPixEventRuntime.dll" "%UNITY_PLUGINS%\" >nul
+:: sl.imgui = Streamline's in-engine debug overlay (Reflex/DLSS-G/common HUD, toggle Ctrl+Shift+Home).
+:: Loads only with the development SL binaries (above); silently absent in production. The driver's
+:: ReflexTestEnable HUD does NOT draw through the SL proxy swapchain, so this is the in-build HUD.
+copy /Y "%SL_BIN%\sl.imgui.dll"           "%UNITY_PLUGINS%\" >nul
 
 copy /Y "%OUT_DIR%\SLDenoiser.dll"        "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\SLDenoiser.pdb"        "%UNITY_PLUGINS%\" >nul
@@ -111,6 +115,7 @@ echo    omm-lib.dll
 echo    ShaderCompilerPlugin.dll
 echo    D3D12HeapHook.dll
 echo    sl.*.dll + nvngx_dlssg.dll ^(Streamline 2.11.1 runtime for the probe^)
+echo    sl.imgui.dll ^(SL debug overlay, toggle Ctrl+Shift+Home^)
 echo    dxcompiler.dll
 echo    dxil.dll
 echo  Assets Plugins:  %UNITY_ASSETS_PLUGINS%\
