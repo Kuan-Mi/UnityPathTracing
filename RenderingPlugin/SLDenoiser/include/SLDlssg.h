@@ -14,7 +14,6 @@
 #pragma once
 
 struct IUnknown;
-struct IDXGISwapChain;
 struct IDXGISwapChain1;
 struct IDXGIOutput;
 struct DXGI_SWAP_CHAIN_DESC1;
@@ -60,12 +59,6 @@ namespace SLDlssg
         IDXGIOutput* out, IDXGISwapChain1** ppSwapChain);
     void AdoptSwapChain(IDXGISwapChain1** ppSwapChain, IUnknown* presentQueue, bool alreadyProxy);
     IUnknown* NativeIfProxy(IUnknown* maybeProxy);
-
-    // Adopt Unity's LIVE swapchain (from IUnityGraphicsD3D12::GetSwapChain) so SL's presentCommon()
-    // runs under manual hooking. Call every frame on the render thread; it self-guards (one-shot)
-    // and is a no-op once adopted or in the editor (GetSwapChain returns null there). This is the
-    // path that actually fires in Unity — the factory/queue creation hooks load too late.
-    void EnsureSwapChainAdopted(IDXGISwapChain* unitySwapChain);
 
     // Tag real depth/mvec + set constants for the shared frame token (render thread, after
     // SLCore::BeginFrame). The frame token + Reflex sleep are owned by SLCore/SLReflex now.

@@ -197,13 +197,6 @@ namespace
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
         SLCore::SetRenderFrame(token);
-
-        // Adopt Unity's live swapchain so SL's presentCommon() runs (one-shot; the creation hooks
-        // load too late to intercept it). GetSwapChain() is valid only on the render/submission
-        // thread and only in the player (null in the editor), which is exactly here.
-        if (s_D3D12)
-            SLDlssg::EnsureSwapChainAdopted(s_D3D12->GetSwapChain());
-
         // Start of CPU render submission for this frame — emit eRenderSubmitStart here (Reflex/
         // PCL), not bunched at present. Universal (PCL works on every adapter, FG or not).
         if (token) SLDlssg::MarkRenderSubmitStart(*token);

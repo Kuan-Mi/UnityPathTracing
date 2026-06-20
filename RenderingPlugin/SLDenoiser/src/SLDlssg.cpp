@@ -65,12 +65,6 @@ namespace
     bool                   g_featuresEnabledOnPresent = false;
     IDXGISwapChain1*       g_proxySwapchain = nullptr;
     ComPtr<IDXGISwapChain3> g_proxySC3;
-    // When true, Unity holds its NATIVE swapchain (we adopted it post-creation via GetSwapChain)
-    // and the Present hook must route the call through g_proxySwapchain so SL's presentCommon()
-    // runs. When false (legacy factory-hook path) Unity already holds the proxy, so the hook's
-    // saved original IS the proxy's Present and we call it directly. See EnsureSwapChainAdopted.
-    bool                   g_routeViaProxy = false;
-    bool                   g_swapchainAdoptTried = false;
 
     constexpr UINT kPresentVTIdx  = 8;
     constexpr UINT kPresent1VTIdx = 22;
@@ -198,34 +192,19 @@ namespace
         if (SLCore::IsFGSupported() && (p <= 3 || (p & 0x7F) == 0)) LogDlssgState();
     }
 
-    // Reentrancy guard: when we route through the proxy (g_routeViaProxy), proxy->Present calls
-    // the NATIVE swapchain's Present, which is THIS hooked vtable — so the second entry must go
-    // straight to the real present (g_slOrigPresent*) to avoid infinite recursion.
-    thread_local bool t_inPresent = false;
-
     HRESULT STDMETHODCALLTYPE Hooked_SLPresent1(
         IDXGISwapChain1* This, UINT sync, UINT flags, const DXGI_PRESENT_PARAMETERS* pp)
     {
-        if (t_inPresent) return g_slOrigPresent1(This, sync, flags, pp);
-        t_inPresent = true;
         EmitPresentMarkersPre();
-        HRESULT hr = (g_routeViaProxy && g_proxySwapchain)
-                   ? g_proxySwapchain->Present1(sync, flags, pp)  // runs presentCommon()
-                   : g_slOrigPresent1(This, sync, flags, pp);
+        HRESULT hr = g_slOrigPresent1(This, sync, flags, pp);
         PostPresentMarker();
-        t_inPresent = false;
         return hr;
     }
     HRESULT STDMETHODCALLTYPE Hooked_SLPresent(IDXGISwapChain* This, UINT sync, UINT flags)
     {
-        if (t_inPresent) return g_slOrigPresent(This, sync, flags);
-        t_inPresent = true;
         EmitPresentMarkersPre();
-        HRESULT hr = (g_routeViaProxy && g_proxySwapchain)
-                   ? g_proxySwapchain->Present(sync, flags)       // runs presentCommon()
-                   : g_slOrigPresent(This, sync, flags);
+        HRESULT hr = g_slOrigPresent(This, sync, flags);
         PostPresentMarker();
-        t_inPresent = false;
         return hr;
     }
 
@@ -407,44 +386,6 @@ namespace SLDlssg
         Logf(0, "Swapchain adopted (%ux%u); DLSS-G ready. Toggle with SL_SetFrameGeneration.", g_w, g_h);
     }
 
-    void EnsureSwapChainAdopted(IDXGISwapChain* unitySwapChain)
-    {
-        // Primary adoption path for Unity. The factory/queue creation hooks never fire here
-        // because Unity creates its device + swapchain BEFORE any native plugin loads (even
-        // load-on-startup), so there is nothing to intercept. Instead we adopt the LIVE swapchain
-        // handed to us by IUnityGraphicsD3D12::GetSwapChain(): upgrade it to an SL proxy and hook
-        // its native Present, then route presentation through the proxy so the SL common plugin's
-        // presentCommon() runs every frame (required under eUseManualHooking — without it SL logs
-        // "presentCommon() was not observed" and DLSS-RR/-G resource bookkeeping never GCs).
-        if (g_adopted || g_swapchainAdoptTried) return;
-        if (!unitySwapChain || !SLCore::IsInited() || !SLCore::IsDeviceSet()) return; // retry next frame
-        g_swapchainAdoptTried = true;
-
-        void* iface = unitySwapChain;
-        sl::Result r = slUpgradeInterface(&iface);
-        if (r != sl::Result::eOk || !iface)
-        {
-            Logf(2, "EnsureSwapChainAdopted: slUpgradeInterface(swapchain) -> %s; presentCommon "
-                    "will NOT run (Reflex sleep still works, but no SL GC).", R(r));
-            return;
-        }
-        g_proxySwapchain = reinterpret_cast<IDXGISwapChain1*>(iface);
-        g_proxySwapchain->QueryInterface(IID_PPV_ARGS(&g_proxySC3));
-
-        // Patch the NATIVE swapchain's Present vtable (Unity keeps presenting through its own
-        // pointer); the hook routes through the proxy created above.
-        InstallPresentHookOnProxy(reinterpret_cast<IDXGISwapChain1*>(unitySwapChain));
-        g_routeViaProxy = true;
-        g_adopted = true;
-
-        DXGI_SWAP_CHAIN_DESC1 desc{};
-        g_proxySwapchain->GetDesc1(&desc);
-        g_w = desc.Width; g_h = desc.Height;
-        Logf(0, "Adopted live Unity swapchain via GetSwapChain (%ux%u); present routed through SL "
-                "proxy (presentCommon active). Frame Generation %s on this adapter.", g_w, g_h,
-                SLCore::IsFGSupported() ? "available" : "unavailable");
-    }
-
     IUnknown* NativeIfProxy(IUnknown* maybeProxy)
     {
         if (!maybeProxy) return maybeProxy;
@@ -554,7 +495,6 @@ namespace SLDlssg
     {
         g_fgDesired.store(-1); g_fgApplied.store(false); g_featuresEnabledOnPresent = false;
         g_haveRealInputs = false; g_inputs = {}; g_adopted = false;
-        g_routeViaProxy = false; g_swapchainAdoptTried = false;
         g_appliedFrameIdx = 0xFFFFFFFFu;
         g_proxySwapchain = nullptr; g_proxySC3.Reset();
         g_device.Reset();
