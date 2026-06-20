@@ -41,6 +41,7 @@
 
 #include "SLCore.h" // shared slInit/slSetD3DDevice/slShutdown + logging/result helpers
 #include "SLDlssg.h"
+#include "SLReflex.h" // InstallPclPing (PCL latency-ping WndProc) once we have the game HWND
 
 using Microsoft::WRL::ComPtr;
 
@@ -383,6 +384,15 @@ namespace SLDlssg
 
         InstallPresentHookOnProxy(*ppSwapChain);
         g_adopted = true;
+
+        // Now that we hold the game window, wire the PCL latency-ping so FrameView/ReflexTest can
+        // measure PC latency (otherwise "PCL: NA"). Player-only path, so safe to do here.
+        HWND hwnd = nullptr;
+        if (g_proxySwapchain && SUCCEEDED(g_proxySwapchain->GetHwnd(&hwnd)) && hwnd)
+            SLReflex::InstallPclPing(hwnd);
+        else
+            Logf(1, "AdoptSwapChain: GetHwnd failed; PCL latency-ping not installed (PCL stays NA).");
+
         Logf(0, "Swapchain adopted (%ux%u); DLSS-G ready. Toggle with SL_SetFrameGeneration.", g_w, g_h);
     }
 

@@ -28,6 +28,29 @@ namespace
     std::atomic<uint32_t> g_lastSleptIndex{ 0xFFFFFFFFu };
     std::atomic<uint32_t> g_lastSimEndIndex{ 0xFFFFFFFFu };
 
+    // --- PCL latency ping (so FrameView / ReflexTest can MEASURE PC latency) ---
+    // FrameView shows "PCL: NA" unless the app answers the PCL stats ping: a registered window
+    // message (PCLState::statsWindowMessage) the driver/tool posts to the game window. We
+    // subclass the window's WndProc and turn that message into an ePCLatencyPing marker for the
+    // current frame token, which anchors "input -> displayed" in the latency report. This is the
+    // 7th PCL marker (we already emit Simulation/RenderSubmit/Present start+end). See
+    // ProgrammingGuidePCL.md §3.0. WndProc + token caching both run on Unity's main thread.
+    std::atomic<const sl::FrameToken*> g_lastToken{ nullptr };
+    std::atomic<uint32_t>              g_pclPingMsg{ 0 };       // 0 until acquired from slPCLGetState
+    HWND                               g_pingHwnd    = nullptr;
+    WNDPROC                            g_origWndProc = nullptr;
+
+    LRESULT CALLBACK PclWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+    {
+        const uint32_t ping = g_pclPingMsg.load(std::memory_order_acquire);
+        if (ping != 0 && msg == ping)
+        {
+            const sl::FrameToken* t = g_lastToken.load(std::memory_order_acquire);
+            if (t) slPCLSetMarker(sl::PCLMarker::ePCLatencyPing, *t);
+        }
+        return CallWindowProcW(g_origWndProc, hwnd, msg, wp, lp);
+    }
+
     sl::ReflexMode MapMode(int m)
     {
         switch (m)
@@ -74,6 +97,17 @@ namespace SLReflex
 
     int GetMode() { return g_modeApplied.load(std::memory_order_acquire); }
 
+    void InstallPclPing(void* hwndV)
+    {
+        HWND hwnd = reinterpret_cast<HWND>(hwndV);
+        if (!hwnd || g_origWndProc) return; // idempotent (subclass once)
+        g_pingHwnd    = hwnd;
+        g_origWndProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&PclWndProc)));
+        if (!g_origWndProc) { g_pingHwnd = nullptr; Logf(2, "InstallPclPing: SetWindowLongPtrW failed."); return; }
+        Logf(0, "InstallPclPing: subclassed game window %p for PCL latency-ping.", (void*)hwnd);
+    }
+
     bool IsLowLatencyAvailable()
     {
         if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return false;
@@ -86,6 +120,21 @@ namespace SLReflex
     void OnFrameBegin(const sl::FrameToken& token)
     {
         if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+
+        // Cache this frame's token for the PCL ping WndProc (same thread). And acquire the PCL
+        // stats window-message id once it becomes available (it can be 0 until a latency consumer
+        // such as FrameView/ReflexTest attaches), so the ping handler knows which message to answer.
+        g_lastToken.store(&token, std::memory_order_release);
+        if (g_pclPingMsg.load(std::memory_order_acquire) == 0)
+        {
+            sl::PCLState ps{};
+            if (slPCLGetState(ps) == sl::Result::eOk && ps.statsWindowMessage != 0)
+            {
+                g_pclPingMsg.store(ps.statsWindowMessage, std::memory_order_release);
+                Logf(0, "PCL stats ping acquired (statsWindowMessage=0x%x); PC latency now measurable.",
+                     ps.statsWindowMessage);
+            }
+        }
 
         // slReflexSetOptions + slReflexSleep + the PCL markers must ALWAYS be issued (even
         // when Reflex is Off) — PCL uses them to measure latency, and the driver gates the
@@ -120,6 +169,15 @@ namespace SLReflex
 
     void Shutdown()
     {
+        // Restore the original WndProc BEFORE the DLL can unload — otherwise Unity would call
+        // into freed code on the next window message and crash.
+        if (g_origWndProc && g_pingHwnd)
+            SetWindowLongPtrW(g_pingHwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(g_origWndProc));
+        g_origWndProc = nullptr;
+        g_pingHwnd    = nullptr;
+        g_pclPingMsg.store(0, std::memory_order_release);
+        g_lastToken.store(nullptr, std::memory_order_release);
+
         g_modeApplied.store(-1, std::memory_order_release);
         g_fpsCapApplied.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastSleptIndex.store(0xFFFFFFFFu, std::memory_order_release);

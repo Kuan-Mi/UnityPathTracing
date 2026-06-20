@@ -38,5 +38,11 @@ namespace SLReflex
     // slPCLSetMarker(eSimulationEnd). Idempotent per token.
     void MarkSimulationEnd(const sl::FrameToken& token);
 
+    // Subclass the game window's WndProc so the PCL stats ping (a registered window message)
+    // is answered with an ePCLatencyPing marker — required for FrameView/ReflexTest to MEASURE
+    // PC latency (otherwise the overlay shows "PCL: NA"). hwnd is a Win32 HWND passed as void*
+    // to keep <windows.h> out of this header. Player-only, idempotent; restored on Shutdown.
+    void InstallPclPing(void* hwnd);
+
     void Shutdown();
 }
