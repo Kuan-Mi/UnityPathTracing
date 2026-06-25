@@ -144,6 +144,52 @@ namespace SLDLRR
             catch (DllNotFoundException) { _available = false; return false; }
         }
 
+        // ---- Debug key toggle (A/B the slReflexSleep cost against FPS without recompiling) ----
+        // F8 toggles Reflex On (Low Latency) <-> Off; the native default is On, so the first press
+        // turns it Off for an immediate comparison. F9 bumps to On + Boost (the QA checklist notes
+        // Boost is expected to cost some FPS for lowest latency). Player-only in effect: the native
+        // side no-ops Reflex in the editor. Polled by a runtime-spawned MonoBehaviour (correct input
+        // timing + exactly once per frame, unlike the multi-context render callbacks).
+        public  static KeyCode ReflexToggleKey = KeyCode.F8;
+        public  static KeyCode ReflexBoostKey  = KeyCode.F9;
+        private static bool    _reflexOn        = true; // mirror the native default (On / eLowLatency)
+
+        private static void ToggleReflex()
+        {
+            _reflexOn = !_reflexOn;
+            SetReflexMode(_reflexOn ? ReflexMode.On : ReflexMode.Off);
+            Debug.Log($"[SLStreamlineFG] Reflex {(_reflexOn ? "ON (Low Latency)" : "OFF")} ({ReflexToggleKey}).");
+        }
+
+        private static void SetReflexBoost()
+        {
+            _reflexOn = true;
+            SetReflexMode(ReflexMode.OnPlusBoost);
+            Debug.Log($"[SLStreamlineFG] Reflex ON + Boost ({ReflexBoostKey}).");
+        }
+
+        private sealed class ReflexKeyPoller : MonoBehaviour
+        {
+            private void Update()
+            {
+                if (Input.GetKeyDown(ReflexToggleKey)) ToggleReflex();
+                if (Input.GetKeyDown(ReflexBoostKey))  SetReflexBoost();
+            }
+        }
+
+        private static ReflexKeyPoller _keyPoller;
+
+        private static void EnsureKeyPoller()
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying) return;
+#endif
+            if (_keyPoller != null) return;
+            var go = new GameObject("SLReflexKeyToggle") { hideFlags = HideFlags.HideAndDontSave };
+            UnityEngine.Object.DontDestroyOnLoad(go);
+            _keyPoller = go.AddComponent<ReflexKeyPoller>();
+        }
+
         // ---- Per-frame inputs ring (kept here so the unsafe ptr math stays in this assembly) ----
         private const int                  RingCount = 3;
         private static NativeArray<DlssgInputs> _ring;
@@ -205,6 +251,7 @@ namespace SLDLRR
             RenderPipelineManager.beginContextRendering += OnBeginContextRendering;
 
             InstallPlayerLoop();
+            EnsureKeyPoller();
 
             Application.quitting -= Teardown;
             Application.quitting += Teardown;
@@ -228,6 +275,24 @@ namespace SLDLRR
             loop.subSystemList = list.ToArray();
             PlayerLoop.SetPlayerLoop(loop);
             _playerLoopInstalled = true;
+            DumpPlayerLoop("after install");
+        }
+
+        // DIAG: log the top-level PlayerLoop order so we can confirm SLReflexFrameBegin actually
+        // runs at index 0 at runtime. Other features (Input System, etc.) can call SetPlayerLoop
+        // after us and reorder/drop our node — re-dumping a few frames in catches that.
+        private static void DumpPlayerLoop(string when)
+        {
+            var subs = PlayerLoop.GetCurrentPlayerLoop().subSystemList;
+            var sb = new System.Text.StringBuilder();
+            sb.Append("[SLStreamlineFG] PlayerLoop top-level order (").Append(when).Append("):");
+            for (int i = 0; i < subs.Length; i++)
+            {
+                var t = subs[i].type;
+                sb.Append("\n  [").Append(i).Append("] ").Append(t != null ? t.Name : "<null>");
+                if (t == typeof(SLReflexFrameBegin)) sb.Append("   <-- SLReflexFrameBegin");
+            }
+            Debug.Log(sb.ToString());
         }
 
         private static void RemovePlayerLoop()
@@ -246,12 +311,18 @@ namespace SLDLRR
         // MAIN thread, top of frame. slReflexSleep + eSimulationStart for the new frame.
         // Edit mode is intentionally skipped — we don't want Reflex pacing the editor's loop
         // when not playing (DLSS-RR mints its own token natively in that case).
+        private static int _frameCount;
+
         private static void OnPlayerLoopFrameBegin()
         {
             if (!_available) return;
 #if UNITY_EDITOR
             if (!Application.isPlaying) return;
 #endif
+            // DIAG: re-dump the live PlayerLoop a few seconds in, to confirm our node is still
+            // index 0 and wasn't bumped by another SetPlayerLoop caller after install.
+            if (++_frameCount == 120) DumpPlayerLoop("runtime frame 120");
+
             try { _frameToken = SL_FrameBegin(); }
             catch (DllNotFoundException) { _available = false; }
         }

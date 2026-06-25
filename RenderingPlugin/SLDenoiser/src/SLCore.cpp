@@ -204,7 +204,19 @@ namespace SLCore
         // nullptr index = SL auto-increments its internal frame counter (matches donut's
         // SimStart). Mint and hand the pointer back to the caller; SLCore does not cache it.
         sl::FrameToken* token = nullptr;
+
+        // DIAG: time slGetNewFrameToken in isolation. It shares the "SLReflexFrameBegin" marker
+        // with slReflexSleep, so a stall here can masquerade as a Reflex cost. Log when it blocks
+        // (>1ms), plus the first few frames and every 256th.
+        LARGE_INTEGER freq, t0, t1; QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&t0);
         sl::Result r = slGetNewFrameToken(token, nullptr);
+        QueryPerformanceCounter(&t1);
+        const double ms = double(t1.QuadPart - t0.QuadPart) * 1000.0 / double(freq.QuadPart);
+        static uint64_t s_n = 0; const uint64_t n = ++s_n;
+        if (ms > 1.0 || n <= 4 || (n & 0xFF) == 0)
+            Logf("SLCore", ms > 1.0 ? 1 : 0, "slGetNewFrameToken took %.2f ms (frame #%llu)",
+                 ms, (unsigned long long)n);
+
         if (r != sl::Result::eOk || !token)
         {
             Logf("SLCore", 1, "slGetNewFrameToken -> %s", ResultStr(r));

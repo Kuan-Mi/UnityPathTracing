@@ -111,7 +111,7 @@ MonoBehaviour:
     usePrevFrame: 1
     boost: 0
     SR: 0
-    RR: 1
+    RR: 0
     RRViaSL: 1
     FGViaSL: 1
     upscalerMode: 0

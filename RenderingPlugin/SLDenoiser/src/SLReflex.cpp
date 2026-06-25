@@ -172,14 +172,19 @@ namespace SLReflex
         // slReflexSleep is the latency-critical call: it paces the CPU so it does not run
         // unbounded ahead of the GPU (shallower render queue = lower latency). Placed at
         // the earliest frame tick so the sleep front-loads the frame.
+        // DIAG: time the sleep in isolation (separately from slGetNewFrameToken, which SLCore
+        // logs) so we can attribute the "SLReflexFrameBegin" 10ms marker to the right call.
+        LARGE_INTEGER freq, t0, t1; QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&t0);
         sl::Result rs = slReflexSleep(token);
+        QueryPerformanceCounter(&t1);
+        const double sleepMs = double(t1.QuadPart - t0.QuadPart) * 1000.0 / double(freq.QuadPart);
         slPCLSetMarker(sl::PCLMarker::eSimulationStart, token);
 
         static uint64_t s_frames = 0;
         const uint64_t f = ++s_frames;
-        if (f <= 4 || (f & 0xFF) == 0 || rs != sl::Result::eOk)
-            Logf(rs != sl::Result::eOk ? 1 : 0, "frame #%llu: slReflexSleep -> %s",
-                 (unsigned long long)f, R(rs));
+        if (f <= 4 || (f & 0xFF) == 0 || rs != sl::Result::eOk || sleepMs > 1.0)
+            Logf(rs != sl::Result::eOk ? 1 : 0, "frame #%llu: slReflexSleep -> %s (%.2f ms, mode=%d)",
+                 (unsigned long long)f, R(rs), sleepMs, g_modeApplied.load(std::memory_order_acquire));
     }
 
     void MarkSimulationEnd(const sl::FrameToken& token)
