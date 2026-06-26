@@ -8,7 +8,6 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
-#include <deque>
 #include <mutex>
 #include <string>
 
@@ -26,35 +25,38 @@ namespace
     std::atomic<bool> g_fgSupported{ false };
     std::atomic<bool> g_reflexSupported{ false };
 
-    // Present-marker FIFO (see SLCore.h). GetNewFrameToken pushes a frame's token at mint (main
-    // thread, frame top); the present hook pops the oldest so each present pairs with the frame on
-    // screen. push (main thread) / pop (present thread) are mutex-guarded — both are once-per-frame,
-    // so contention is nil. Mint is the single once-per-frame tick, so mint order == frame order ==
-    // flip-model present order; no enqueue-side dedup is needed. The cap is pure overflow protection
-    // so a present/mint count drift can't accumulate a growing, fixed offset; it must exceed the
-    // mint->present pipeline distance (main-thread-ahead + render-ahead, ~2-5) to avoid false drops.
+    // Present-marker association by BACK-BUFFER INDEX (see SLCore.h). The DXGI Present hook has no
+    // data channel for the frame token, so the render thread records each frame's token into the
+    // slot for the back buffer it rendered into (RegisterPresentToken), and the present hook resolves
+    // the token for the back buffer it is about to flip (ResolvePresentToken via
+    // GetCurrentBackBufferIndex). Keying on the physical back buffer is SELF-HEALING: a frame that is
+    // minted/rendered but never presented (e.g. occluded during an alt-tab) simply has its slot
+    // overwritten when the index cycles back — it can never accumulate a permanent FIFO-style offset
+    // the way a count-coupled queue does. Register (render thread) / resolve (present thread) are
+    // mutex-guarded; both are once-per-frame so contention is nil.
     //
-    // Each entry carries the frame index captured at mint alongside the pointer: SL recycles
-    // FrameTokens in a ring, so if a token lingers past the ring (only happens under drift) the
-    // pointer's current index won't match and we can detect the aliasing instead of mis-tagging.
-    struct PresentEntry { sl::FrameToken* token; uint32_t index; };
-    std::mutex                   g_presentQueueMutex;
-    std::deque<PresentEntry>     g_presentQueue;
-    constexpr size_t             kMaxPresentQueue = 8;
+    // Each slot carries the frame index captured at register: SL recycles FrameTokens in a ring, so
+    // if a slot's token was recycled to a newer frame the index won't match and we skip rather than
+    // mis-tag. valid==false means the slot was never written (pre-roll) or already consumed.
+    struct PresentSlot { sl::FrameToken* token; uint32_t index; bool valid; };
+    constexpr uint32_t           kMaxBackBuffers = 8;   // flip swapchains use 2-4; 8 is headroom
+    std::mutex                   g_presentSlotMutex;
+    PresentSlot                  g_presentSlots[kMaxBackBuffers] = {};
+    uint32_t                     g_presentAliasCount = 0; // token recycled before its present (rate-limited log)
 
-    // Player-only gate: the present hook (the FIFO's consumer) is installed only in the player, so
-    // the editor must NOT enqueue at mint — nothing would ever dequeue it and the FIFO would fill
-    // and drop every frame. The plugin sets this true when it installs the present-path hooks;
-    // default false so the editor skips the enqueue entirely.
-    std::atomic<bool>            g_presentFifoEnabled{ false };
-
-    // Drift instrumentation (all guarded by g_presentQueueMutex). The FIFO only stays correct if
-    // enqueue:dequeue is 1:1; any persistent imbalance surfaces as one of these. Logged rate-
-    // limited (first hit + every 64th) at error level so a corrupted latency plot is explained.
-    bool      g_presentSeenEnqueue = false; // false until the first enqueue (warm-up vs real drift)
-    uint32_t  g_presentDropCount   = 0;     // oldest dropped on overflow (present lagging submit)
-    uint32_t  g_presentEmptyCount  = 0;     // empty on present (present ran ahead of submit)
-    uint32_t  g_presentAliasCount  = 0;     // token recycled before its present consumed it
+    // Per-present diagnostic (back buffer + resolved token) — off by default; it logs once per
+    // present on the latency-critical present thread. Enable with SLDENOISER_PRESENT_LOG=1 in the
+    // environment before launch. Read once and cached.
+    bool PresentDebugLogEnabled()
+    {
+        static const bool enabled = []
+        {
+            char buf[8] = {};
+            DWORD n = GetEnvironmentVariableA("SLDENOISER_PRESENT_LOG", buf, sizeof(buf));
+            return n > 0 && n < sizeof(buf) && buf[0] != '0';
+        }();
+        return enabled;
+    }
 
     // Directory containing THIS module (SLDenoiser.dll). In a player build Unity copies
     // native plugins — and the SL runtime DLLs deployed beside us (sl.dlss_g.dll,
@@ -237,66 +239,49 @@ namespace SLCore
             Logf("SLCore", 1, "slGetNewFrameToken -> %s", ResultStr(r));
             return nullptr;
         }
-
-        // Register this frame for the present-marker FIFO at mint. GetNewFrameToken is the single
-        // once-per-frame tick (main thread, frame top), so mint order == frame order == flip-model
-        // present order — each present pairs with the right frame, no dedup needed. Push under the
-        // mutex; the present hook pops on the present thread. Player-only: skip when there is no
-        // present hook to dequeue (editor), else the FIFO fills and drops every frame.
-        if (g_presentFifoEnabled.load(std::memory_order_acquire))
-        {
-            const uint32_t idx = (uint32_t)(*token);
-            std::lock_guard<std::mutex> lk(g_presentQueueMutex);
-            g_presentQueue.push_back({ token, idx });
-            g_presentSeenEnqueue = true;
-            // Overflow = present falling behind mint (queue deeper than the mint->present pipeline
-            // distance). Keeping the newest entries IS the correct resync (no permanent stale
-            // offset), but the dropped frames lose their present markers — flag, don't swallow.
-            while (g_presentQueue.size() > kMaxPresentQueue)
-            {
-                g_presentQueue.pop_front();
-                if (++g_presentDropCount == 1 || g_presentDropCount % 64 == 0)
-                    Logf("SLCore", 2,
-                         "present FIFO overflow (depth>%zu): present lagging mint; dropped oldest, "
-                         "resynced to newest (drops=%u).", kMaxPresentQueue, g_presentDropCount);
-            }
-        }
         return token;
     }
 
-    void SetPresentFifoEnabled(bool enabled)
+    void RegisterPresentToken(sl::FrameToken* token, uint32_t backBufferIndex)
     {
-        g_presentFifoEnabled.store(enabled, std::memory_order_release);
+        if (!token || backBufferIndex >= kMaxBackBuffers) return;
+        // Render thread, after this frame's render commands are submitted: record its token in the
+        // slot for the back buffer it rendered into. The next Present flips that back buffer, so the
+        // present hook will resolve this exact token for it.
+        const uint32_t idx = (uint32_t)(*token);
+        std::lock_guard<std::mutex> lk(g_presentSlotMutex);
+        g_presentSlots[backBufferIndex] = { token, idx, true };
     }
 
-    sl::FrameToken* DequeuePresentToken()
+    sl::FrameToken* ResolvePresentToken(uint32_t backBufferIndex)
     {
-        std::lock_guard<std::mutex> lk(g_presentQueueMutex);
-        if (g_presentQueue.empty())
+        if (backBufferIndex >= kMaxBackBuffers) return nullptr;
+        std::lock_guard<std::mutex> lk(g_presentSlotMutex);
+        const PresentSlot s = g_presentSlots[backBufferIndex];
+        g_presentSlots[backBufferIndex].valid = false;   // consume: one present per registered frame
+
+        // Per-present diagnostic (gated): back buffer + resolved frame index, or <none> on a
+        // pre-roll / unconsumed-slot miss.
+        if (PresentDebugLogEnabled())
         {
-            // Empty before the first enqueue is normal pre-roll. Empty AFTER we've started feeding
-            // it means the present thread ran ahead of submit — skip this present's markers
-            // (nullptr) rather than tag a wrong frame, but flag the drift.
-            if (g_presentSeenEnqueue && (++g_presentEmptyCount == 1 || g_presentEmptyCount % 64 == 0))
-                Logf("SLCore", 2,
-                     "present FIFO empty on present: present ran ahead of submit; markers skipped "
-                     "(empties=%u).", g_presentEmptyCount);
-            return nullptr;
+            if (s.valid && s.token)
+                Logf("SLCore", 0, "present bb=%u token idx=%u", backBufferIndex, (uint32_t)(*s.token));
+            else
+                Logf("SLCore", 0, "present bb=%u token=<none registered>", backBufferIndex);
         }
-        const PresentEntry e = g_presentQueue.front();
-        g_presentQueue.pop_front();
-        // Lifetime guard: the FrameToken object lives in SL's ring (the memory stays valid), but if
-        // it has been recycled to a newer frame its index no longer matches what we enqueued.
-        // Tagging present with a recycled token corrupts the per-frame latency pairing, so skip.
-        if ((uint32_t)(*e.token) != e.index)
+
+        if (!s.valid || !s.token) return nullptr;        // pre-roll, already consumed, or no token
+        // Lifetime guard: the FrameToken lives in SL's ring (memory stays valid) but may have been
+        // recycled to a newer frame; if its current index no longer matches, skip to avoid mis-tag.
+        if ((uint32_t)(*s.token) != s.index)
         {
             if (++g_presentAliasCount == 1 || g_presentAliasCount % 64 == 0)
                 Logf("SLCore", 2,
-                     "present token recycled (enqueued idx=%u, now=%u): markers skipped to avoid "
-                     "mis-pairing (aliased=%u).", e.index, (uint32_t)(*e.token), g_presentAliasCount);
+                     "present token recycled (registered idx=%u, now=%u): markers skipped to avoid "
+                     "mis-pairing (aliased=%u).", s.index, (uint32_t)(*s.token), g_presentAliasCount);
             return nullptr;
         }
-        return e.token;
+        return s.token;
     }
 
     void Shutdown()
@@ -307,12 +292,9 @@ namespace SLCore
         g_fgSupported.store(false);
         g_reflexSupported.store(false);
         {
-            std::lock_guard<std::mutex> lk(g_presentQueueMutex);
-            g_presentQueue.clear();
-            g_presentSeenEnqueue = false;
-            g_presentDropCount   = 0;
-            g_presentEmptyCount  = 0;
-            g_presentAliasCount  = 0;
+            std::lock_guard<std::mutex> lk(g_presentSlotMutex);
+            for (auto& s : g_presentSlots) s = {};
+            g_presentAliasCount = 0;
         }
         sl::Result r = slShutdown();
         Logf("SLCore", r == sl::Result::eOk ? 0 : 1, "slShutdown -> %s", ResultStr(r));

@@ -211,15 +211,16 @@ namespace
         SLDlssg::OnSwapChainAdopted(desc.Width, desc.Height);
     }
 
-    // Pop the frame token for the frame being presented ONCE per present and use it for both the
-    // start and end PCL markers — popping per-marker would consume two tokens for one present and
-    // mis-pair them. Null (FIFO empty: pre-roll or a present/submit drift) simply skips this
-    // present's markers rather than tagging the wrong frame.
+    // Resolve the frame token for the back buffer being presented (read BEFORE g_origPresent, while
+    // GetCurrentBackBufferIndex still points at the buffer about to flip) and use it for both the
+    // start and end PCL markers — resolving per-marker would consume the slot twice for one present.
+    // Null (slot never registered, e.g. pre-roll, or a recycled token) simply skips this present's
+    // markers rather than tagging the wrong frame.
     HRESULT STDMETHODCALLTYPE Hooked_SLPresent1(
         IDXGISwapChain1* This, UINT sync, UINT flags, const DXGI_PRESENT_PARAMETERS* pp)
     {
         SLDlssg::OnPresentPre(g_proxySC3.Get());
-        sl::FrameToken* token = SLCore::DequeuePresentToken();
+        sl::FrameToken* token = SLCore::ResolvePresentToken(SLHooks::CurrentBackBufferIndex());
         if (token) SLReflex::MarkPresentStart(*token);
         HRESULT hr = g_origPresent1(This, sync, flags, pp);
         if (token) SLReflex::MarkPresentEnd(*token);
@@ -230,7 +231,7 @@ namespace
     HRESULT STDMETHODCALLTYPE Hooked_SLPresent(IDXGISwapChain* This, UINT sync, UINT flags)
     {
         SLDlssg::OnPresentPre(g_proxySC3.Get());
-        sl::FrameToken* token = SLCore::DequeuePresentToken();
+        sl::FrameToken* token = SLCore::ResolvePresentToken(SLHooks::CurrentBackBufferIndex());
         if (token) SLReflex::MarkPresentStart(*token);
         HRESULT hr = g_origPresent(This, sync, flags);
         if (token) SLReflex::MarkPresentEnd(*token);
@@ -380,6 +381,11 @@ void SLHooks::InstallPresentPathHooks()
 bool SLHooks::IsQueueProxyActive()
 {
     return g_proxyDevice != nullptr;
+}
+
+uint32_t SLHooks::CurrentBackBufferIndex()
+{
+    return g_proxySC3 ? g_proxySC3->GetCurrentBackBufferIndex() : 0xFFFFFFFFu;
 }
 
 void SLHooks::Shutdown()

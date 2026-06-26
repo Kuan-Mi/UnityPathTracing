@@ -105,12 +105,17 @@ namespace
     }
 
     // Render-thread submit-end event: data is the FrameToken* for the frame whose command-stream
-    // work is complete. Emits eRenderSubmitEnd before the present hook emits ePresentStart. The
-    // present-marker FIFO is fed at mint (SLCore::GetNewFrameToken), not here.
+    // work is complete. Emits eRenderSubmitEnd before the present hook emits ePresentStart, then
+    // records this frame's token in the present slot for the back buffer it rendered into — the
+    // next Present flips that buffer, so the present hook resolves this exact token for it.
+    // Player-only: the present hook (the resolver) only exists in the player.
     void UNITY_INTERFACE_API OnRenderSubmitEnd(int /*eventId*/, void* data)
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
-        if (token) SLReflex::MarkRenderSubmitEnd(*token);
+        if (!token) return;
+        SLReflex::MarkRenderSubmitEnd(*token);
+        if (s_IsPlayer)
+            SLCore::RegisterPresentToken(token, SLHooks::CurrentBackBufferIndex());
     }
 
     // DLSS-G per-frame inputs (render thread): tag depth/mvec + set constants.
@@ -142,9 +147,6 @@ extern "C"
             // every frame under manual hooking) and are installed on every adapter; Frame
             // Generation is only enabled as a *mode* on top when the adapter supports it.
             SLHooks::InstallPresentPathHooks();
-            // The present hook is the FIFO's only consumer; enable mint-time enqueue now that it
-            // exists. In the editor this stays disabled, so GetNewFrameToken skips the enqueue.
-            SLCore::SetPresentFifoEnabled(true);
             LogBridge(0, "[NR/SLDlssg] Player detected: present-path hooks installed (Reflex/PCL on "
                          "every adapter; DLSS-G frame generation enabled only when supported).");
         }
