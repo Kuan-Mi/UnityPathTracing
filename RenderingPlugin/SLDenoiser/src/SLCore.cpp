@@ -24,7 +24,7 @@ namespace
     std::atomic<bool> g_fgSupported{ false };
     std::atomic<bool> g_reflexSupported{ false };
 
-    // Render/present token latch (see SLCore.h). BeginFrame mints on the main thread and returns
+    // Render/present token latch (see SLCore.h). GetNewFrameToken mints on the main thread and returns
     // the pointer to C# (no caching); C# forwards it to the render thread, where SetRenderFrame
     // latches it here for the DLSS-G render-tag + present PCL markers (the present hook has no
     // data channel of its own). Atomic: written on the render thread, read on the present thread.
@@ -198,7 +198,7 @@ namespace SLCore
     bool IsFGSupported()     { return g_fgSupported.load(std::memory_order_acquire); }
     bool IsReflexSupported() { return g_reflexSupported.load(std::memory_order_acquire); }
 
-    sl::FrameToken* BeginFrame()
+    sl::FrameToken* GetNewFrameToken()
     {
         if (!IsInited()) return nullptr;
         // nullptr index = SL auto-increments its internal frame counter (matches donut's

@@ -27,6 +27,8 @@ namespace
     std::atomic<uint32_t> g_lastSleptIndex{ 0xFFFFFFFFu };
     std::atomic<uint32_t> g_lastSimStartIndex{ 0xFFFFFFFFu };
     std::atomic<uint32_t> g_lastSimEndIndex{ 0xFFFFFFFFu };
+    std::atomic<uint32_t> g_lastRenderSubmitStartIndex{ 0xFFFFFFFFu };
+    std::atomic<uint32_t> g_lastRenderSubmitEndIndex{ 0xFFFFFFFFu };
 
     // --- PCL latency ping (so FrameView / ReflexTest can MEASURE PC latency) ---
     // FrameView shows "PCL: NA" unless the app answers the PCL stats ping: a registered window
@@ -162,7 +164,11 @@ namespace SLReflex
 
         const uint32_t idx  = (uint32_t)token;
         const uint32_t prev = g_lastSleptIndex.exchange(idx, std::memory_order_acq_rel);
-        if (prev == idx) return; // already slept this frame
+        if (prev == idx)
+        {
+            Logf(1, "duplicate slReflexSleep ignored for frame token %u.", idx);
+            return;
+        }
 
         // slReflexSleep is the latency-critical call: it paces the CPU so it does not run
         // unbounded ahead of the GPU (shallower render queue = lower latency). Placed at
@@ -175,7 +181,11 @@ namespace SLReflex
         if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
         const uint32_t idx  = (uint32_t)token;
         const uint32_t prev = g_lastSimStartIndex.exchange(idx, std::memory_order_acq_rel);
-        if (prev == idx) return;
+        if (prev == idx)
+        {
+            Logf(1, "duplicate eSimulationStart ignored for frame token %u.", idx);
+            return;
+        }
         slPCLSetMarker(sl::PCLMarker::eSimulationStart, token);
     }
 
@@ -184,8 +194,38 @@ namespace SLReflex
         if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
         const uint32_t idx  = (uint32_t)token;
         const uint32_t prev = g_lastSimEndIndex.exchange(idx, std::memory_order_acq_rel);
-        if (prev == idx) return;
+        if (prev == idx)
+        {
+            Logf(1, "duplicate eSimulationEnd ignored for frame token %u.", idx);
+            return;
+        }
         slPCLSetMarker(sl::PCLMarker::eSimulationEnd, token);
+    }
+
+    void MarkRenderSubmitStart(const sl::FrameToken& token)
+    {
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+        const uint32_t idx  = (uint32_t)token;
+        const uint32_t prev = g_lastRenderSubmitStartIndex.exchange(idx, std::memory_order_acq_rel);
+        if (prev == idx)
+        {
+            Logf(1, "duplicate eRenderSubmitStart ignored for frame token %u.", idx);
+            return;
+        }
+        slPCLSetMarker(sl::PCLMarker::eRenderSubmitStart, token);
+    }
+
+    void MarkRenderSubmitEnd(const sl::FrameToken& token)
+    {
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+        const uint32_t idx  = (uint32_t)token;
+        const uint32_t prev = g_lastRenderSubmitEndIndex.exchange(idx, std::memory_order_acq_rel);
+        if (prev == idx)
+        {
+            Logf(1, "duplicate eRenderSubmitEnd ignored for frame token %u.", idx);
+            return;
+        }
+        slPCLSetMarker(sl::PCLMarker::eRenderSubmitEnd, token);
     }
 
     unsigned ConsumePclPingCount()
@@ -224,6 +264,8 @@ namespace SLReflex
         g_lastSleptIndex.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastSimStartIndex.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastSimEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
+        g_lastRenderSubmitStartIndex.store(0xFFFFFFFFu, std::memory_order_release);
+        g_lastRenderSubmitEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
         // slShutdown is owned by SLCore.
     }
 }

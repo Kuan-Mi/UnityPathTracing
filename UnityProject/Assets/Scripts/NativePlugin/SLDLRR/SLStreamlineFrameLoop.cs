@@ -8,6 +8,7 @@ namespace SLDLRR
     public static class SLStreamlineFrameLoop
     {
         private static IntPtr _beginFunc;
+        private static IntPtr _endFunc;
         private static IntPtr _frameToken;
         private static bool _playerLoopInstalled;
 
@@ -23,6 +24,15 @@ namespace SLDLRR
             try { _beginFunc = SLNative.GetSLFGBeginFrameFunc(); }
             catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
             return _beginFunc;
+        }
+
+        public static IntPtr GetEndEventFunc()
+        {
+            if (!SLNative.Available) return IntPtr.Zero;
+            if (_endFunc != IntPtr.Zero) return _endFunc;
+            try { _endFunc = SLNative.GetSLFGEndFrameFunc(); }
+            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            return _endFunc;
         }
 
 #if UNITY_EDITOR

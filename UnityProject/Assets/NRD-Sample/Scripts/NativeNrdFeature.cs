@@ -79,6 +79,7 @@ namespace PathTracing
         private SLDlssrrPass            _slDlssrrPass;
         private SLDlssgInputsPass       _slDlssgInputsPass;
         private SLReflexBeginPass       _slReflexBeginPass;
+        private SLReflexEndPass         _slReflexEndPass;
         private bool                    _slFgLastEnabled;
         private DlssSRPass              _dlsssrPass;
         private NisPass                 _nisPass;
@@ -171,6 +172,7 @@ namespace PathTracing
             _slDlssgInputsPass       ??= new SLDlssgInputsPass { renderPassEvent                                                                  = renderPassEvent };
             // Token latch must precede the RR/FG passes + present, so it sits at BeforeRendering.
             _slReflexBeginPass       ??= new SLReflexBeginPass { renderPassEvent                                                                  = RenderPassEvent.BeforeRendering };
+            _slReflexEndPass         ??= new SLReflexEndPass { renderPassEvent                                                                    = RenderPassEvent.AfterRendering };
             _dlsssrPass              ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
             _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
@@ -910,6 +912,17 @@ namespace PathTracing
                 renderer.EnqueuePass(_outputBlitPass);
 
                 renderer.EnqueuePass(_depthBarrierFixPass);
+            }
+
+            if (eyeIndex == 0)
+            {
+                var slEndFunc  = SLDLRR.SLStreamlineFrameLoop.GetEndEventFunc();
+                var slTokenPtr = SLDLRR.SLStreamlineFrameLoop.CurrentFrameTokenPtr;
+                if (slEndFunc != IntPtr.Zero && slTokenPtr != IntPtr.Zero)
+                {
+                    _slReflexEndPass.Setup(slEndFunc, slTokenPtr);
+                    renderer.EnqueuePass(_slReflexEndPass);
+                }
             }
 
             // DLSS-G frame generation: feed the real path-traced color/depth/motion + camera

@@ -15,14 +15,14 @@
 // so on a 30-series card you get Reflex/PCL + presentCommon with FG simply never enabled.
 //
 // Frame timeline (token shared by index — see SLCore.h):
-//   * MAIN thread, top of frame: SLCore::BeginFrame mints the frame token; C# then calls
+//   * MAIN thread, top of frame: SLCore::GetNewFrameToken mints the frame token; C# then calls
 //     SLReflex sleep and eSimulationStart separately. End of game logic: SLReflex eSimulationEnd.
-//   * RENDER thread frame-begin event (data == the FrameToken*): SLCore::SetRenderFrame
-//     latches the token, then MarkRenderSubmitStart() emits eRenderSubmitStart (render begin).
+//   * RENDER thread frame-begin/end events (data == the FrameToken*): SLCore::SetRenderFrame
+//     latches the token, then SLReflex emits eRenderSubmitStart/End.
 //   * RENDER thread: ConsumeFrameInputs() (FG only) tags depth/mvec + sets constants on the
 //     render token (SLCore::CurrentFrameToken).
-//   * PRESENT thread (native or SL proxy swapchain hook): eRenderSubmitEnd + ePresentStart
-//     before Present, ePresentEnd after — all on the render token.
+//   * PRESENT thread (native or SL proxy swapchain hook): ePresentStart before Present,
+//     ePresentEnd after — all on the render token.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -172,15 +172,12 @@ namespace
 
         // PCL timeline (Reflex — independent of FG). The frame's markers are emitted in order:
         //   eSimulationStart/End ....... MAIN thread (SLReflex), top + end of game logic
-        //   eRenderSubmitStart ......... RENDER thread frame begin (MarkRenderSubmitStart)
-        //   eRenderSubmitEnd/PresentStart  HERE — render submission done, about to present
+        //   eRenderSubmitStart/End ..... RENDER thread begin/end events
+        //   ePresentStart .............. HERE — about to enter Present
         //   ePresentEnd ................ PostPresentMarker, right after Present returns
-        // (Previously RenderSubmitStart was emitted here too, collapsing the render-submit
-        //  window to ~0 and skewing the Reflex latency report; it now sits at render begin.)
         sl::FrameToken* token = SLCore::CurrentFrameToken();
         if (!token) return;
         if (SLCore::IsFGSupported() && g_proxySC3) g_proxySC3->GetCurrentBackBufferIndex();
-        slPCLSetMarker(sl::PCLMarker::eRenderSubmitEnd, *token);
         slPCLSetMarker(sl::PCLMarker::ePresentStart,    *token);
     }
 
@@ -474,15 +471,6 @@ namespace SLDlssg
         if (g_appliedFrameIdx == idx) return;
         ApplyRealInputs(g_inputs, *token);
         g_appliedFrameIdx = idx;
-    }
-
-    void MarkRenderSubmitStart(const sl::FrameToken& token)
-    {
-        // RENDER thread, frame begin (BeforeRendering): start of this frame's CPU render
-        // submission. Pairs with eRenderSubmitEnd at present. PCL is supported on every GPU, so
-        // this fires for Reflex regardless of Frame Generation support.
-        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
-        slPCLSetMarker(sl::PCLMarker::eRenderSubmitStart, token);
     }
 
     void SetFrameGeneration(bool enable)

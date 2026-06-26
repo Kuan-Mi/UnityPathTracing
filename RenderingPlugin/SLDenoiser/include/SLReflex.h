@@ -42,6 +42,10 @@ namespace SLReflex
     // slPCLSetMarker(eSimulationEnd). Idempotent per token.
     void MarkSimulationEnd(const sl::FrameToken& token);
 
+    // Render thread. CPU render command submission window for this frame.
+    void MarkRenderSubmitStart(const sl::FrameToken& token);
+    void MarkRenderSubmitEnd(const sl::FrameToken& token);
+
     // Subclass the game window's WndProc so the PCL stats ping (a registered window message)
     // can be observed. The WndProc only queues ping arrivals; C# consumes that queue at the
     // next main-thread frame begin and explicitly marks the frame token that will sample input.

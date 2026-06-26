@@ -197,9 +197,17 @@ namespace
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
         SLCore::SetRenderFrame(token);
-        // Start of CPU render submission for this frame — emit eRenderSubmitStart here (Reflex/
-        // PCL), not bunched at present. Universal (PCL works on every adapter, FG or not).
-        if (token) SLDlssg::MarkRenderSubmitStart(*token);
+        // Start of CPU render submission for this frame. Universal (PCL works on every adapter,
+        // FG or not).
+        if (token) SLReflex::MarkRenderSubmitStart(*token);
+    }
+
+    // Render-thread frame-end event: data is the FrameToken* for the frame whose command-stream
+    // work is complete. Emits eRenderSubmitEnd before the present hook emits ePresentStart.
+    void UNITY_INTERFACE_API OnFGEndFrame(int /*eventId*/, void* data)
+    {
+        sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
+        if (token) SLReflex::MarkRenderSubmitEnd(*token);
     }
 
     // DLSS-G per-frame inputs (render thread): tag depth/mvec + set constants.
@@ -277,6 +285,9 @@ extern "C"
     UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
     GetSLFGBeginFrameFunc() { return OnFGBeginFrame; }
 
+    UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+    GetSLFGEndFrameFunc() { return OnFGEndFrame; }
+
     // Issue per frame: cmd.IssuePluginEventAndData(GetSLFGFrameInputsFunc(), 0, ptrToFrameInputs).
     UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
     GetSLFGFrameInputsFunc() { return OnFGFrameInputs; }
@@ -300,7 +311,7 @@ extern "C"
     {
         // Still mint the per-frame token in the editor — DLSS-RR (evaluate-only, editor + player)
         // forwards it to the render thread for tagging.
-        return SLCore::BeginFrame();
+        return SLCore::GetNewFrameToken();
     }
 
     // SL_ReflexSleep: main thread, top of frame BEFORE input. Applies Reflex options and calls
