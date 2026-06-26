@@ -8,7 +8,7 @@ namespace PathTracing
     /// <summary>
     /// Pins the SLDenoiser render/present side to the frame currently being rendered, by
     /// forwarding this frame's Streamline FrameToken (minted on the main thread at the top of
-    /// the frame by <see cref="SLDLRR.SLStreamlineFG"/>) to the render thread via
+    /// the frame by <see cref="SLDLRR.SLStreamlineFrameLoop"/>) to the render thread via
     /// <c>IssuePluginEventAndData</c>. The native begin event latches it (so the present-thread
     /// PCL markers + DLSS-G tagging use the same token as the main-thread Reflex sleep / sim
     /// markers) and emits the eRenderSubmitStart PCL marker at this point (render begin).
@@ -20,7 +20,7 @@ namespace PathTracing
     /// Must run BEFORE the RR pass, the FG-inputs pass and present — enqueue it at
     /// <see cref="RenderPassEvent.BeforeRendering"/> (earlier than those, which sit at
     /// BeforeRenderingPostProcessing). Mirror of <see cref="SLDlssgInputsPass"/>; replaces the
-    /// out-of-graph CommandBuffer that SLStreamlineFG used to execute at beginContextRendering.
+    /// legacy out-of-graph CommandBuffer path that used to execute at beginContextRendering.
     /// </summary>
     public class SLReflexBeginPass : ScriptableRenderPass
     {

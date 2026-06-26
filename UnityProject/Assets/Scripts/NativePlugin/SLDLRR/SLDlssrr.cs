@@ -135,7 +135,7 @@ namespace SLDLRR
             {
                 // This frame's shared SL token (minted on the main thread by SL_FrameBegin and
                 // forwarded to the present latch). Zero in editor edit-mode → native self-mints.
-                frameToken          = SLStreamlineFG.CurrentFrameTokenPtr,
+                frameToken          = SLStreamlineFrameLoop.CurrentFrameTokenPtr,
 
                 inputTex            = res.input.NativePtr,
                 outputTex           = res.output.NativePtr,

@@ -611,8 +611,8 @@ namespace PathTracing
             // does NOT depend on this latch; it carries its token directly in SLDlssrrFrameData.
             if (eyeIndex == 0)
             {
-                var slBeginFunc = SLDLRR.SLStreamlineFG.GetBeginEventFunc();
-                var slTokenPtr  = SLDLRR.SLStreamlineFG.CurrentFrameTokenPtr;
+                var slBeginFunc = SLDLRR.SLStreamlineFrameLoop.GetBeginEventFunc();
+                var slTokenPtr  = SLDLRR.SLStreamlineFrameLoop.CurrentFrameTokenPtr;
                 if (slBeginFunc != IntPtr.Zero && slTokenPtr != IntPtr.Zero)
                 {
                     _slReflexBeginPass.Setup(slBeginFunc, slTokenPtr);
@@ -815,18 +815,18 @@ namespace PathTracing
 
             // DLSS-G Frame Generation via Streamline (SLDenoiser). Player-only: in the editor
             // the swapchain is never adopted so BeginFrame/inputs are no-ops. The Reflex/begin
-            // tick is driven separately by SLStreamlineFG at beginContextRendering.
+            // tick is driven separately by SLStreamlineFrameLoop's main-thread PlayerLoop hook.
             if (eyeIndex == 0)
             {
                 if (setting.FGViaSL != _slFgLastEnabled)
                 {
-                    SLDLRR.SLStreamlineFG.SetFrameGeneration(setting.FGViaSL);
+                    SLDLRR.SLDlssg.SetFrameGeneration(setting.FGViaSL);
                     _slFgLastEnabled = setting.FGViaSL;
                 }
 
                 if (setting.FGViaSL)
                 {
-                    var fgEventFunc = SLDLRR.SLStreamlineFG.GetFrameInputsEventFunc();
+                    var fgEventFunc = SLDLRR.SLDlssg.GetFrameInputsEventFunc();
                     if (fgEventFunc != IntPtr.Zero)
                     {
                         var viewToWorld   = frameState.worldToView.inverse;
@@ -840,12 +840,12 @@ namespace PathTracing
                         float rW     = math.max(1, frameState.renderResolution.x);
                         float rH     = math.max(1, frameState.renderResolution.y);
 
-                        var fg = new SLDLRR.SLStreamlineFG.DlssgInputs
+                        var fg = new SLDLRR.SLDlssg.FrameInputs
                         {
                             depth                = pool.ViewZ.NativePtr,
                             motionVectors        = pool.Mv.NativePtr,
-                            depthState           = SLDLRR.SLStreamlineFG.D3D12_STATE_UNORDERED_ACCESS,
-                            mvecState            = SLDLRR.SLStreamlineFG.D3D12_STATE_UNORDERED_ACCESS,
+                            depthState           = SLDLRR.SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
+                            mvecState            = SLDLRR.SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
                             mvecDepthW           = (uint)frameState.renderResolution.x,
                             mvecDepthH           = (uint)frameState.renderResolution.y,
                             colorW               = (uint)outputResolution.x,
@@ -872,7 +872,7 @@ namespace PathTracing
                             reset                = 0,
                         };
 
-                        var fgPtr = SLDLRR.SLStreamlineFG.GetInteropDataPtr(fg, curFrame);
+                        var fgPtr = SLDLRR.SLDlssg.GetInteropDataPtr(fg, curFrame);
                         _slDlssgInputsPass.Setup(fgEventFunc, fgPtr);
                         renderer.EnqueuePass(_slDlssgInputsPass);
                     }

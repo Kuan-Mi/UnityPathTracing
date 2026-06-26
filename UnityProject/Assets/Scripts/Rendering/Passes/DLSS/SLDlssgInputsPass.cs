@@ -8,7 +8,7 @@ namespace PathTracing
     /// <summary>
     /// Pushes this frame's DLSS-G inputs (native depth/mvec pointers + camera constants) to
     /// the SLDenoiser plugin via <c>IssuePluginEventAndData</c>, on the render thread in
-    /// command-stream order, reusing the frame token <c>SLStreamlineFG</c>'s begin tick minted
+    /// command-stream order, reusing the frame token <c>SLStreamlineFrameLoop</c>'s begin tick minted
     /// earlier this frame. Mirror of <see cref="NrdDlssgInputsPass"/> (which targets the legacy
     /// StreamlineProbePlugin). The data pointer must stay valid until the render thread runs the
     /// event — back it with a persistent ring buffer in the feature.
