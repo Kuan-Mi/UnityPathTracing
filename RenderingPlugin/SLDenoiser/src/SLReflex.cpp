@@ -31,16 +31,16 @@ namespace
     // --- PCL latency ping (so FrameView / ReflexTest can MEASURE PC latency) ---
     // FrameView shows "PCL: NA" unless the app answers the PCL stats ping: a registered window
     // message (PCLState::statsWindowMessage) the driver/tool posts to the game window. We
-    // subclass the window's WndProc and turn that message into an ePCLatencyPing marker for the
-    // current frame token, which anchors "input -> displayed" in the latency report. This is the
-    // 7th PCL marker (we already emit Simulation/RenderSubmit/Present start+end). See
-    // ProgrammingGuidePCL.md §3.0. WndProc + token caching both run on Unity's main thread.
-    std::atomic<const sl::FrameToken*> g_lastToken{ nullptr };
+    // subclass the window's WndProc and queue that message until C# can choose the frame token
+    // that will consume the simulated input. C# consumes that queue at the next main-thread
+    // frame begin and emits ePCLatencyPing on that token. This is the 7th PCL marker (we already
+    // emit Simulation/RenderSubmit/Present start+end). See ProgrammingGuidePCL.md §3.0.
     std::atomic<uint32_t>              g_pclPingMsg{ 0 };       // 0 until acquired from slPCLGetState
     HWND                               g_pingHwnd    = nullptr;
     WNDPROC                            g_origWndProc = nullptr;
     std::atomic<uint64_t>              g_wndMsgSeen{ 0 };       // any msg through our subclass (liveness)
-    std::atomic<uint64_t>              g_pclPingSeen{ 0 };      // PCL ping messages we answered
+    std::atomic<uint64_t>              g_pclPingQueued{ 0 };    // PCL ping messages waiting for C#
+    std::atomic<uint64_t>              g_pclPingMarked{ 0 };    // PCL ping markers emitted
 
     LRESULT CALLBACK PclWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
@@ -48,12 +48,9 @@ namespace
         const uint32_t ping = g_pclPingMsg.load(std::memory_order_acquire);
         if (ping != 0 && msg == ping)
         {
-            const sl::FrameToken* t = g_lastToken.load(std::memory_order_acquire);
-            if (t) slPCLSetMarker(sl::PCLMarker::ePCLatencyPing, *t);
-            const uint64_t n = g_pclPingSeen.fetch_add(1, std::memory_order_relaxed) + 1;
+            const uint64_t n = g_pclPingQueued.fetch_add(1, std::memory_order_release) + 1;
             if (n <= 3)
-                Logf(0, "PCL ping #%llu answered -> ePCLatencyPing (token=%p).",
-                     (unsigned long long)n, (const void*)t);
+                Logf(0, "PCL ping #%llu queued for main-thread token ownership.", (unsigned long long)n);
         }
         return CallWindowProcW(g_origWndProc, hwnd, msg, wp, lp);
     }
@@ -128,10 +125,9 @@ namespace SLReflex
     {
         if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
 
-        // Cache this frame's token for the PCL ping WndProc (same thread). And acquire the PCL
-        // stats window-message id once it becomes available (it can be 0 until a latency consumer
-        // such as FrameView/ReflexTest attaches), so the ping handler knows which message to answer.
-        g_lastToken.store(&token, std::memory_order_release);
+        // Acquire the PCL stats window-message id once it becomes available (it can be 0 until a
+        // latency consumer such as FrameView/ReflexTest attaches), so the ping handler knows which
+        // message to queue for the main-thread owner.
         if (g_pclPingMsg.load(std::memory_order_acquire) == 0)
         {
             sl::PCLState ps{};
@@ -144,10 +140,10 @@ namespace SLReflex
         }
 
         // Diagnostic (every ~256 frames): warn only while the PCL ping chain is BROKEN. SL posts
-        // the ping (answered in PclWndProc -> "PCL ping #N answered") only while a latency consumer
+        // the ping (queued in PclWndProc, marked from C#) only while a latency consumer
         // actively captures AND the game window is foreground (PCLStatsPingThreadProc). Once any
         // ping arrives we stay silent — success is already logged by the first few pings.
-        if (g_origWndProc && g_pclPingSeen.load(std::memory_order_relaxed) == 0)
+        if (g_origWndProc && g_pclPingMarked.load(std::memory_order_relaxed) == 0)
         {
             static uint64_t s_diag = 0;
             if (((++s_diag) & 0xFF) == 0)
@@ -196,6 +192,24 @@ namespace SLReflex
         slPCLSetMarker(sl::PCLMarker::eSimulationEnd, token);
     }
 
+    unsigned ConsumePclPingCount()
+    {
+        const uint64_t n = g_pclPingQueued.exchange(0, std::memory_order_acq_rel);
+        return n > 0xFFFFFFFFull ? 0xFFFFFFFFu : (unsigned)n;
+    }
+
+    void MarkPclLatencyPing(const sl::FrameToken& token, unsigned count)
+    {
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet() || count == 0) return;
+        for (unsigned i = 0; i < count; ++i)
+            slPCLSetMarker(sl::PCLMarker::ePCLatencyPing, token);
+
+        const uint64_t n = g_pclPingMarked.fetch_add(count, std::memory_order_relaxed) + count;
+        if (n <= 3)
+            Logf(0, "PCL ping marker(s) emitted on C#-owned token=%p (count=%u, total=%llu).",
+                 (const void*)&token, count, (unsigned long long)n);
+    }
+
     void Shutdown()
     {
         // Restore the original WndProc BEFORE the DLL can unload — otherwise Unity would call
@@ -205,9 +219,9 @@ namespace SLReflex
         g_origWndProc = nullptr;
         g_pingHwnd    = nullptr;
         g_pclPingMsg.store(0, std::memory_order_release);
-        g_lastToken.store(nullptr, std::memory_order_release);
         g_wndMsgSeen.store(0, std::memory_order_release);
-        g_pclPingSeen.store(0, std::memory_order_release);
+        g_pclPingQueued.store(0, std::memory_order_release);
+        g_pclPingMarked.store(0, std::memory_order_release);
 
         g_modeApplied.store(-1, std::memory_order_release);
         g_fpsCapApplied.store(0xFFFFFFFFu, std::memory_order_release);

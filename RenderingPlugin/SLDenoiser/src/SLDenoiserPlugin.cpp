@@ -317,6 +317,21 @@ extern "C"
         SLReflex::MarkSimulationEnd(*reinterpret_cast<sl::FrameToken*>(frameToken));
     }
 
+    // SL_ConsumePclPingCount: main thread, after SL_FrameBegin minted the token for the
+    // frame that is about to sample input. Returns how many PCL stats pings the WndProc saw
+    // since the previous consume; C# owns the token attribution and calls SL_MarkPclLatencyPing.
+    unsigned UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_ConsumePclPingCount()
+    {
+        if (!s_IsPlayer) return 0;
+        return SLReflex::ConsumePclPingCount();
+    }
+
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_MarkPclLatencyPing(void* frameToken, unsigned count)
+    {
+        if (!s_IsPlayer || !frameToken || count == 0) return;
+        SLReflex::MarkPclLatencyPing(*reinterpret_cast<sl::FrameToken*>(frameToken), count);
+    }
+
     // ---- Reflex (low latency) ----
     // mode: 0 = Off, 1 = On (Low Latency), 2 = On + Boost. fpsCapUs: 0 = uncapped.
     // Player-only: tied to the DLSS-G present path, so it's a no-op in the editor (Unity.exe).

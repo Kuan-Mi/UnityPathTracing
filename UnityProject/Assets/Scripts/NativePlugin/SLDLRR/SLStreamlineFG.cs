@@ -41,6 +41,8 @@ namespace SLDLRR
         // frame token pointer to forward to the render-thread begin event as its data.
         [DllImport(DllName)] private static extern IntPtr SL_FrameBegin();
         [DllImport(DllName)] private static extern void   SL_MarkSimulationEnd(IntPtr frameToken);
+        [DllImport(DllName)] private static extern uint   SL_ConsumePclPingCount();
+        [DllImport(DllName)] private static extern void   SL_MarkPclLatencyPing(IntPtr frameToken, uint count);
 
         /// <summary>Reflex low-latency mode. Mirrors sl::ReflexMode.</summary>
         public enum ReflexMode { Off = 0, On = 1, OnPlusBoost = 2 }
@@ -235,6 +237,12 @@ namespace SLDLRR
         /// <summary>This frame's Streamline FrameToken (minted on the main thread); Zero if none yet.</summary>
         public static IntPtr CurrentFrameTokenPtr => _frameToken;
 
+        /// <summary>True when this frame consumed one or more PCL stats pings.</summary>
+        public static bool LastFrameHadPclPing { get; private set; }
+
+        /// <summary>Number of PCL stats pings attributed to this frame's token.</summary>
+        public static uint LastFramePclPingCount { get; private set; }
+
         // Marker type identifying our injected PlayerLoop system.
         private struct SLReflexFrameBegin { }
         private static bool _playerLoopInstalled;
@@ -261,13 +269,21 @@ namespace SLDLRR
 #endif
         }
 
-        // Inserts SL_FrameBegin at the very front of the PlayerLoop (before input/sim).
+        // Inserts SL_FrameBegin as a top-level phase after Initialization and before EarlyUpdate.
         private static void InstallPlayerLoop()
         {
             var loop = PlayerLoop.GetCurrentPlayerLoop();
             var list = new List<PlayerLoopSystem>(loop.subSystemList);
             list.RemoveAll(s => s.type == typeof(SLReflexFrameBegin));
-            list.Insert(0, new PlayerLoopSystem
+
+            int insertIndex = list.FindIndex(s => s.type == typeof(UnityEngine.PlayerLoop.EarlyUpdate));
+            if (insertIndex < 0)
+            {
+                int initializationIndex = list.FindIndex(s => s.type == typeof(UnityEngine.PlayerLoop.Initialization));
+                insertIndex = initializationIndex >= 0 ? initializationIndex + 1 : 0;
+            }
+
+            list.Insert(insertIndex, new PlayerLoopSystem
             {
                 type           = typeof(SLReflexFrameBegin),
                 updateDelegate = OnPlayerLoopFrameBegin,
@@ -275,24 +291,6 @@ namespace SLDLRR
             loop.subSystemList = list.ToArray();
             PlayerLoop.SetPlayerLoop(loop);
             _playerLoopInstalled = true;
-            DumpPlayerLoop("after install");
-        }
-
-        // DIAG: log the top-level PlayerLoop order so we can confirm SLReflexFrameBegin actually
-        // runs at index 0 at runtime. Other features (Input System, etc.) can call SetPlayerLoop
-        // after us and reorder/drop our node — re-dumping a few frames in catches that.
-        private static void DumpPlayerLoop(string when)
-        {
-            var subs = PlayerLoop.GetCurrentPlayerLoop().subSystemList;
-            var sb = new System.Text.StringBuilder();
-            sb.Append("[SLStreamlineFG] PlayerLoop top-level order (").Append(when).Append("):");
-            for (int i = 0; i < subs.Length; i++)
-            {
-                var t = subs[i].type;
-                sb.Append("\n  [").Append(i).Append("] ").Append(t != null ? t.Name : "<null>");
-                if (t == typeof(SLReflexFrameBegin)) sb.Append("   <-- SLReflexFrameBegin");
-            }
-            Debug.Log(sb.ToString());
         }
 
         private static void RemovePlayerLoop()
@@ -319,11 +317,14 @@ namespace SLDLRR
 #if UNITY_EDITOR
             if (!Application.isPlaying) return;
 #endif
-            // DIAG: re-dump the live PlayerLoop a few seconds in, to confirm our node is still
-            // index 0 and wasn't bumped by another SetPlayerLoop caller after install.
-            if (++_frameCount == 120) DumpPlayerLoop("runtime frame 120");
-
-            try { _frameToken = SL_FrameBegin(); }
+            try
+            {
+                _frameToken = SL_FrameBegin();
+                LastFramePclPingCount = SL_ConsumePclPingCount();
+                LastFrameHadPclPing = LastFramePclPingCount != 0;
+                if (_frameToken != IntPtr.Zero && LastFramePclPingCount != 0)
+                    SL_MarkPclLatencyPing(_frameToken, LastFramePclPingCount);
+            }
             catch (DllNotFoundException) { _available = false; }
         }
 

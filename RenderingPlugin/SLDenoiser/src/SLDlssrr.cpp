@@ -137,8 +137,7 @@ namespace SLDlssrr
         // edit-mode game view, where the main-thread frame tick is intentionally not run — mint
         // one here (advances the index, no sleep) so DLSS-RR still works standalone.
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data->frameToken);
-        if (!token) token = SLCore::BeginFrame();
-        if (!token) { Logf(1, "no frame token (slGetNewFrameToken failed)"); return; }
+        if (!token) { Logf(1, "no frame token"); return; }
 
         // --- options (only when changed) ---
         {

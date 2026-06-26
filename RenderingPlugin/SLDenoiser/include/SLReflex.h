@@ -39,10 +39,18 @@ namespace SLReflex
     void MarkSimulationEnd(const sl::FrameToken& token);
 
     // Subclass the game window's WndProc so the PCL stats ping (a registered window message)
-    // is answered with an ePCLatencyPing marker — required for FrameView/ReflexTest to MEASURE
-    // PC latency (otherwise the overlay shows "PCL: NA"). hwnd is a Win32 HWND passed as void*
-    // to keep <windows.h> out of this header. Player-only, idempotent; restored on Shutdown.
+    // can be observed. The WndProc only queues ping arrivals; C# consumes that queue at the
+    // next main-thread frame begin and explicitly marks the frame token that will sample input.
+    // This avoids guessing token ownership from the WndProc. hwnd is a Win32 HWND passed as
+    // void* to keep <windows.h> out of this header. Player-only, idempotent; restored on Shutdown.
     void InstallPclPing(void* hwnd);
+
+    // Main thread. Return and clear the number of PCL stats pings observed by the WndProc since
+    // the previous consume. C# uses this to decide whether the current frame owns the ping.
+    unsigned ConsumePclPingCount();
+
+    // Main thread. Emit ePCLatencyPing on the frame that C# determined will consume the ping.
+    void MarkPclLatencyPing(const sl::FrameToken& token, unsigned count = 1);
 
     void Shutdown();
 }
