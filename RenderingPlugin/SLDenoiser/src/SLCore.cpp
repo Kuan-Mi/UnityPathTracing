@@ -44,20 +44,6 @@ namespace
     PresentSlot                  g_presentSlots[kMaxBackBuffers] = {};
     uint32_t                     g_presentAliasCount = 0; // token recycled before its present (rate-limited log)
 
-    // Per-present diagnostic (back buffer + resolved token) — off by default; it logs once per
-    // present on the latency-critical present thread. Enable with SLDENOISER_PRESENT_LOG=1 in the
-    // environment before launch. Read once and cached.
-    bool PresentDebugLogEnabled()
-    {
-        static const bool enabled = []
-        {
-            char buf[8] = {};
-            DWORD n = GetEnvironmentVariableA("SLDENOISER_PRESENT_LOG", buf, sizeof(buf));
-            return n > 0 && n < sizeof(buf) && buf[0] != '0';
-        }();
-        return enabled;
-    }
-
     // Directory containing THIS module (SLDenoiser.dll). In a player build Unity copies
     // native plugins — and the SL runtime DLLs deployed beside us (sl.dlss_g.dll,
     // nvngx_dlssg.dll, sl.dlss_d.dll, …) — into <build>_Data\Plugins\x86_64\, NOT next to
@@ -260,15 +246,10 @@ namespace SLCore
         const PresentSlot s = g_presentSlots[backBufferIndex];
         g_presentSlots[backBufferIndex].valid = false;   // consume: one present per registered frame
 
-        // Per-present diagnostic (gated): back buffer + resolved frame index, or <none> on a
-        // pre-roll / unconsumed-slot miss.
-        if (PresentDebugLogEnabled())
-        {
-            if (s.valid && s.token)
-                Logf("SLCore", 0, "present bb=%u token idx=%u", backBufferIndex, (uint32_t)(*s.token));
-            else
-                Logf("SLCore", 0, "present bb=%u token=<none registered>", backBufferIndex);
-        }
+        // Per-present diagnostic (uncomment to debug): back buffer + resolved frame index (idx
+        // 0xFFFFFFFF = pre-roll / unconsumed-slot miss).
+        // Logf("SLCore", 0, "present bb=%u token idx=%u", backBufferIndex,
+        //      (s.valid && s.token) ? (uint32_t)(*s.token) : 0xFFFFFFFFu);
 
         if (!s.valid || !s.token) return nullptr;        // pre-roll, already consumed, or no token
         // Lifetime guard: the FrameToken lives in SL's ring (memory stays valid) but may have been
