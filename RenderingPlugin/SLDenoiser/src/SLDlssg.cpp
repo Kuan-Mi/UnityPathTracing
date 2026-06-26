@@ -6,13 +6,11 @@
 //   * Inputs are REAL path-tracer depth + motion vectors + camera constants (no dummies,
 //     no HUDLessColor — SL interpolates the presented backbuffer for now).
 //
-// This file owns the SL present path AND the render/present-side PCL markers. The present path
-// (proxy device/queue/swapchain + the Present hook) is SL's COMMON interposer and is installed
-// on every adapter — it must be, because under eUseManualHooking the SL common plugin's
-// presentCommon() only runs when presentation goes through an SL-upgraded swapchain. The PCL
-// markers are Reflex (not FG) and likewise run on every adapter. Only the Frame-Generation MODE
-// (slDLSSGSetOptions / DLSSGState / GetCurrentBackBufferIndex) is gated on SLCore::IsFGSupported(),
-// so on a 30-series card you get Reflex/PCL + presentCommon with FG simply never enabled.
+// The SL present path (proxy device/queue/swapchain + the Present hook) is SL's COMMON
+// interposer and is installed on every adapter by SLHooks — it must be, because under
+// eUseManualHooking the SL common plugin's presentCommon() only runs when presentation goes
+// through an SL-upgraded swapchain. This file owns DLSS-G mode/input work and the pre-present
+// backbuffer query required by FG. PCL marker emission belongs to SLReflex.cpp.
 //
 // Frame timeline (token shared by index — see SLCore.h):
 //   * MAIN thread, top of frame: SLCore::GetNewFrameToken mints the frame token; C# then calls
@@ -21,8 +19,8 @@
 //     latches the token, then SLReflex emits eRenderSubmitStart/End.
 //   * RENDER thread: ConsumeFrameInputs() (FG only) tags depth/mvec + sets constants on the
 //     render token (SLCore::CurrentFrameToken).
-//   * PRESENT thread (native or SL proxy swapchain hook): ePresentStart before Present,
-//     ePresentEnd after — all on the render token.
+//   * PRESENT thread (native or SL proxy swapchain hook): SLHooks marks ePresentStart/End
+//     around Present; this file only prepares DLSS-G state before Present.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -35,13 +33,11 @@
 #include "sl.h"
 #include "sl_consts.h"
 #include "sl_dlss_g.h"
-#include "sl_pcl.h"
 // Reflex (slReflexSetOptions/slReflexSleep) now lives in SLReflex.cpp; the frame token in
-// SLCore. This file only owns the FG present path + the present-side PCL markers.
+// SLCore. SLHooks owns the actual DXGI Present hook.
 
 #include "SLCore.h" // shared slInit/slSetD3DDevice/slShutdown + logging/result helpers
 #include "SLDlssg.h"
-#include "SLReflex.h" // InstallPclPing (PCL latency-ping WndProc) once we have the game HWND
 
 using Microsoft::WRL::ComPtr;
 
@@ -131,28 +127,18 @@ namespace
             ApplyDlssgMode(desired != 0);
     }
 
-    void EmitPresentMarkersPre(IDXGISwapChain3* proxySwapchain)
+    void PrepareDlssgForPresent(IDXGISwapChain3* proxySwapchain)
     {
         // DLSS-G mode application is FG-only; skip it entirely on a Reflex-only adapter.
         if (SLCore::IsFGSupported())
             EnsureFeaturesOnPresentThread();
 
-        // PCL timeline (Reflex — independent of FG). The frame's markers are emitted in order:
-        //   eSimulationStart/End ....... MAIN thread (SLReflex), top + end of game logic
-        //   eRenderSubmitStart/End ..... RENDER thread begin/end events
-        //   ePresentStart .............. HERE — about to enter Present
-        //   ePresentEnd ................ PostPresentMarker, right after Present returns
-        sl::FrameToken* token = SLCore::CurrentFrameToken();
-        if (!token) return;
         if (SLCore::IsFGSupported() && proxySwapchain) proxySwapchain->GetCurrentBackBufferIndex();
-        slPCLSetMarker(sl::PCLMarker::ePresentStart,    *token);
     }
 
-    void PostPresentMarker()
+    void PostPresentDlssgState()
     {
-        sl::FrameToken* token = SLCore::CurrentFrameToken();
-        if (!token) return;
-        slPCLSetMarker(sl::PCLMarker::ePresentEnd, *token);
+        if (!SLCore::CurrentFrameToken()) return;
         const uint64_t p = ++g_presentCount;
         if (SLCore::IsFGSupported() && (p <= 3 || (p & 0x7F) == 0) && g_isDlssgModeOn) LogDlssgState();
     }
@@ -233,12 +219,12 @@ namespace SLDlssg
 
     void OnPresentPre(IDXGISwapChain3* proxySwapchain)
     {
-        EmitPresentMarkersPre(proxySwapchain);
+        PrepareDlssgForPresent(proxySwapchain);
     }
 
     void OnPresentPost()
     {
-        PostPresentMarker();
+        PostPresentDlssgState();
     }
 
     void OnSwapChainAdopted(unsigned width, unsigned height)

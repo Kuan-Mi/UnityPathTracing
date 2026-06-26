@@ -1,4 +1,4 @@
-// SLReflex.cpp — see SLReflex.h. Reflex Low Latency + PCL eSimulationStart via Streamline.
+// SLReflex.cpp - see SLReflex.h. Reflex Low Latency + all PCL markers via Streamline.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -29,6 +29,8 @@ namespace
     std::atomic<uint32_t> g_lastSimEndIndex{ 0xFFFFFFFFu };
     std::atomic<uint32_t> g_lastRenderSubmitStartIndex{ 0xFFFFFFFFu };
     std::atomic<uint32_t> g_lastRenderSubmitEndIndex{ 0xFFFFFFFFu };
+    std::atomic<uint32_t> g_lastPresentStartIndex{ 0xFFFFFFFFu };
+    std::atomic<uint32_t> g_lastPresentEndIndex{ 0xFFFFFFFFu };
 
     // --- PCL latency ping (so FrameView / ReflexTest can MEASURE PC latency) ---
     // FrameView shows "PCL: NA" unless the app answers the PCL stats ping: a registered window
@@ -204,6 +206,32 @@ namespace SLReflex
         slPCLSetMarker(sl::PCLMarker::eRenderSubmitEnd, token);
     }
 
+    void MarkPresentStart(const sl::FrameToken& token)
+    {
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+        const uint32_t idx  = (uint32_t)token;
+        const uint32_t prev = g_lastPresentStartIndex.exchange(idx, std::memory_order_acq_rel);
+        if (prev == idx)
+        {
+            Logf(1, "duplicate ePresentStart ignored for frame token %u.", idx);
+            return;
+        }
+        slPCLSetMarker(sl::PCLMarker::ePresentStart, token);
+    }
+
+    void MarkPresentEnd(const sl::FrameToken& token)
+    {
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+        const uint32_t idx  = (uint32_t)token;
+        const uint32_t prev = g_lastPresentEndIndex.exchange(idx, std::memory_order_acq_rel);
+        if (prev == idx)
+        {
+            Logf(1, "duplicate ePresentEnd ignored for frame token %u.", idx);
+            return;
+        }
+        slPCLSetMarker(sl::PCLMarker::ePresentEnd, token);
+    }
+
     unsigned ConsumePclPingCount()
     {
         const uint64_t n = g_pclPingQueued.exchange(0, std::memory_order_acq_rel);
@@ -235,6 +263,8 @@ namespace SLReflex
         g_lastSimEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastRenderSubmitStartIndex.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastRenderSubmitEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
+        g_lastPresentStartIndex.store(0xFFFFFFFFu, std::memory_order_release);
+        g_lastPresentEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
         // slShutdown is owned by SLCore.
     }
 }

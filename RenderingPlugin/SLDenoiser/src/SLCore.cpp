@@ -185,7 +185,7 @@ namespace SLCore
         // Cache per-adapter capability. DLSS-G needs Ada+ (40-series); Reflex needs Maxwell+
         // (900-series). On a 30-series card DLSS_G is unsupported but Reflex is: the SL proxy
         // present path still runs (Reflex/PCL + presentCommon) and only the DLSS-G mode is gated
-        // off (see SLDlssg::EmitPresentMarkersPre).
+        // off.
         auto supported = [&](sl::Feature f) { return slIsFeatureSupported(f, ai) == sl::Result::eOk; };
         const bool rrOk = supported(sl::kFeatureDLSS_RR);
         g_fgSupported.store(supported(sl::kFeatureDLSS_G),  std::memory_order_release);

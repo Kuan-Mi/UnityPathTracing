@@ -1,16 +1,16 @@
 // SLReflex.h
-// Reflex Low Latency + PCL simulation marker via Streamline, hosted in the SLDenoiser
+// Reflex Low Latency + PCL markers via Streamline, hosted in the SLDenoiser
 // plugin alongside DLSS-RR and DLSS-G.
 //
 // Reflex is INDEPENDENT of DLSS-G (see ProgrammingGuideReflex.md §NOTE: "the sub-features
 // are distinct without any cross-dependencies"). Unlike DLSS-G it needs NO proxy swapchain,
-// queue, or factory — only slReflexSetOptions + slReflexSleep + slPCLSetMarker against the
+// queue, or factory — only slReflexSetOptions + slReflexSleep + PCL markers against the
 // shared frame token. That makes it editor-safe and usable with frame generation OFF.
 //
 // slInit/slSetD3DDevice/slShutdown + the shared per-frame token live in SLCore. The Reflex
-// sleep + eSimulationStart marker are issued as separate main-thread frame-begin calls; the
-// remaining sim->render->present PCL markers are emitted by SLDlssg's present hook when
-// frame generation owns the present path.
+// sleep + eSimulationStart marker are issued as separate main-thread frame-begin calls.
+// All PCL marker calls live in SLReflex.cpp; render events and Present hooks call these
+// semantic marker helpers rather than calling slPCLSetMarker directly.
 #pragma once
 
 namespace sl { struct FrameToken; }
@@ -34,17 +34,21 @@ namespace SLReflex
     // thread) to actually reduce latency. Idempotent per token (won't double-sleep).
     void Sleep(const sl::FrameToken& token);
 
-    // MAIN thread, immediately after the top-of-frame sleep: slPCLSetMarker(eSimulationStart).
+    // MAIN thread, immediately after the top-of-frame sleep: eSimulationStart.
     // Split from Sleep so the exported API names describe the exact operation.
     void MarkSimulationStart(const sl::FrameToken& token);
 
     // MAIN thread, end of game logic (simulation done, rendering about to begin):
-    // slPCLSetMarker(eSimulationEnd). Idempotent per token.
+    // eSimulationEnd. Idempotent per token.
     void MarkSimulationEnd(const sl::FrameToken& token);
 
     // Render thread. CPU render command submission window for this frame.
     void MarkRenderSubmitStart(const sl::FrameToken& token);
     void MarkRenderSubmitEnd(const sl::FrameToken& token);
+
+    // Present thread. Native/SL proxy swapchain Present window for this frame.
+    void MarkPresentStart(const sl::FrameToken& token);
+    void MarkPresentEnd(const sl::FrameToken& token);
 
     // Subclass the game window's WndProc so the PCL stats ping (a registered window message)
     // can be observed. The WndProc only queues ping arrivals; C# consumes that queue at the

@@ -165,6 +165,20 @@ namespace
         if (!ok) g_presentHooked.store(false);
     }
 
+    void EmitPresentEndMarker()
+    {
+        sl::FrameToken* token = SLCore::CurrentFrameToken();
+        if (!token) return;
+        SLReflex::MarkPresentEnd(*token);
+    }
+
+    void EmitPresentStartMarker()
+    {
+        sl::FrameToken* token = SLCore::CurrentFrameToken();
+        if (!token) return;
+        SLReflex::MarkPresentStart(*token);
+    }
+
     void AdoptSwapChain(IDXGISwapChain1** ppSwapChain, IUnknown* presentQueue, bool alreadyProxy)
     {
         if (!ppSwapChain || !*ppSwapChain) return;
@@ -215,7 +229,9 @@ namespace
         IDXGISwapChain1* This, UINT sync, UINT flags, const DXGI_PRESENT_PARAMETERS* pp)
     {
         SLDlssg::OnPresentPre(g_proxySC3.Get());
+        EmitPresentStartMarker();
         HRESULT hr = g_origPresent1(This, sync, flags, pp);
+        EmitPresentEndMarker();
         SLDlssg::OnPresentPost();
         return hr;
     }
@@ -223,7 +239,9 @@ namespace
     HRESULT STDMETHODCALLTYPE Hooked_SLPresent(IDXGISwapChain* This, UINT sync, UINT flags)
     {
         SLDlssg::OnPresentPre(g_proxySC3.Get());
+        EmitPresentStartMarker();
         HRESULT hr = g_origPresent(This, sync, flags);
+        EmitPresentEndMarker();
         SLDlssg::OnPresentPost();
         return hr;
     }
