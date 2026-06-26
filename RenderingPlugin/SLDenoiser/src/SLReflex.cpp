@@ -149,19 +149,20 @@ namespace SLReflex
 
         if (!report) return true;
 
-        auto delta = [](uint64_t end, uint64_t start) -> uint64_t
-        {
-            return end >= start ? end - start : 0;
-        };
-
         outStats.frameID = report->frameID;
-        outStats.totalGameToRenderLatencyUs = delta(report->gpuRenderEndTime, report->inputSampleTime);
-        outStats.simDeltaUs = delta(report->simEndTime, report->simStartTime);
-        outStats.renderDeltaUs = delta(report->renderSubmitEndTime, report->renderSubmitStartTime);
-        outStats.presentDeltaUs = delta(report->presentEndTime, report->presentStartTime);
-        outStats.driverDeltaUs = delta(report->driverEndTime, report->driverStartTime);
-        outStats.osRenderQueueDeltaUs = delta(report->osRenderQueueEndTime, report->osRenderQueueStartTime);
-        outStats.gpuRenderDeltaUs = delta(report->gpuRenderEndTime, report->gpuRenderStartTime);
+        outStats.inputSampleTime = report->inputSampleTime;
+        outStats.simStartTime = report->simStartTime;
+        outStats.simEndTime = report->simEndTime;
+        outStats.renderSubmitStartTime = report->renderSubmitStartTime;
+        outStats.renderSubmitEndTime = report->renderSubmitEndTime;
+        outStats.presentStartTime = report->presentStartTime;
+        outStats.presentEndTime = report->presentEndTime;
+        outStats.driverStartTime = report->driverStartTime;
+        outStats.driverEndTime = report->driverEndTime;
+        outStats.osRenderQueueStartTime = report->osRenderQueueStartTime;
+        outStats.osRenderQueueEndTime = report->osRenderQueueEndTime;
+        outStats.gpuRenderStartTime = report->gpuRenderStartTime;
+        outStats.gpuRenderEndTime = report->gpuRenderEndTime;
         outStats.gpuActiveRenderTimeUs = report->gpuActiveRenderTimeUs;
         outStats.gpuFrameTimeUs = report->gpuFrameTimeUs;
         return true;

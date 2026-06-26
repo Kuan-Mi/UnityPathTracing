@@ -27,13 +27,19 @@ namespace SLReflex
         uint32_t statsWindowMessage = 0;
 
         uint64_t frameID = 0;
-        uint64_t totalGameToRenderLatencyUs = 0;
-        uint64_t simDeltaUs = 0;
-        uint64_t renderDeltaUs = 0;
-        uint64_t presentDeltaUs = 0;
-        uint64_t driverDeltaUs = 0;
-        uint64_t osRenderQueueDeltaUs = 0;
-        uint64_t gpuRenderDeltaUs = 0;
+        uint64_t inputSampleTime = 0;
+        uint64_t simStartTime = 0;
+        uint64_t simEndTime = 0;
+        uint64_t renderSubmitStartTime = 0;
+        uint64_t renderSubmitEndTime = 0;
+        uint64_t presentStartTime = 0;
+        uint64_t presentEndTime = 0;
+        uint64_t driverStartTime = 0;
+        uint64_t driverEndTime = 0;
+        uint64_t osRenderQueueStartTime = 0;
+        uint64_t osRenderQueueEndTime = 0;
+        uint64_t gpuRenderStartTime = 0;
+        uint64_t gpuRenderEndTime = 0;
         uint32_t gpuActiveRenderTimeUs = 0;
         uint32_t gpuFrameTimeUs = 0;
     };

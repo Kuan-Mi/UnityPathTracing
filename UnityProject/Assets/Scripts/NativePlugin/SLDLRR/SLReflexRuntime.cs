@@ -16,13 +16,19 @@ namespace SLDLRR
             public readonly uint statsWindowMessage;
 
             public readonly ulong frameID;
-            public readonly ulong totalGameToRenderLatencyUs;
-            public readonly ulong simDeltaUs;
-            public readonly ulong renderDeltaUs;
-            public readonly ulong presentDeltaUs;
-            public readonly ulong driverDeltaUs;
-            public readonly ulong osRenderQueueDeltaUs;
-            public readonly ulong gpuRenderDeltaUs;
+            public readonly ulong inputSampleTime;
+            public readonly ulong simStartTime;
+            public readonly ulong simEndTime;
+            public readonly ulong renderSubmitStartTime;
+            public readonly ulong renderSubmitEndTime;
+            public readonly ulong presentStartTime;
+            public readonly ulong presentEndTime;
+            public readonly ulong driverStartTime;
+            public readonly ulong driverEndTime;
+            public readonly ulong osRenderQueueStartTime;
+            public readonly ulong osRenderQueueEndTime;
+            public readonly ulong gpuRenderStartTime;
+            public readonly ulong gpuRenderEndTime;
             public readonly uint gpuActiveRenderTimeUs;
             public readonly uint gpuFrameTimeUs;
 
@@ -33,13 +39,19 @@ namespace SLDLRR
                 flashIndicatorDriverControlled = native.flashIndicatorDriverControlled != 0;
                 statsWindowMessage = native.statsWindowMessage;
                 frameID = native.frameID;
-                totalGameToRenderLatencyUs = native.totalGameToRenderLatencyUs;
-                simDeltaUs = native.simDeltaUs;
-                renderDeltaUs = native.renderDeltaUs;
-                presentDeltaUs = native.presentDeltaUs;
-                driverDeltaUs = native.driverDeltaUs;
-                osRenderQueueDeltaUs = native.osRenderQueueDeltaUs;
-                gpuRenderDeltaUs = native.gpuRenderDeltaUs;
+                inputSampleTime = native.inputSampleTime;
+                simStartTime = native.simStartTime;
+                simEndTime = native.simEndTime;
+                renderSubmitStartTime = native.renderSubmitStartTime;
+                renderSubmitEndTime = native.renderSubmitEndTime;
+                presentStartTime = native.presentStartTime;
+                presentEndTime = native.presentEndTime;
+                driverStartTime = native.driverStartTime;
+                driverEndTime = native.driverEndTime;
+                osRenderQueueStartTime = native.osRenderQueueStartTime;
+                osRenderQueueEndTime = native.osRenderQueueEndTime;
+                gpuRenderStartTime = native.gpuRenderStartTime;
+                gpuRenderEndTime = native.gpuRenderEndTime;
                 gpuActiveRenderTimeUs = native.gpuActiveRenderTimeUs;
                 gpuFrameTimeUs = native.gpuFrameTimeUs;
             }

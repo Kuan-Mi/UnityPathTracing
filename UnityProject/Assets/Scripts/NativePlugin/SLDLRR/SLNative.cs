@@ -16,13 +16,19 @@ namespace SLDLRR
             public uint statsWindowMessage;
 
             public ulong frameID;
-            public ulong totalGameToRenderLatencyUs;
-            public ulong simDeltaUs;
-            public ulong renderDeltaUs;
-            public ulong presentDeltaUs;
-            public ulong driverDeltaUs;
-            public ulong osRenderQueueDeltaUs;
-            public ulong gpuRenderDeltaUs;
+            public ulong inputSampleTime;
+            public ulong simStartTime;
+            public ulong simEndTime;
+            public ulong renderSubmitStartTime;
+            public ulong renderSubmitEndTime;
+            public ulong presentStartTime;
+            public ulong presentEndTime;
+            public ulong driverStartTime;
+            public ulong driverEndTime;
+            public ulong osRenderQueueStartTime;
+            public ulong osRenderQueueEndTime;
+            public ulong gpuRenderStartTime;
+            public ulong gpuRenderEndTime;
             public uint gpuActiveRenderTimeUs;
             public uint gpuFrameTimeUs;
         }

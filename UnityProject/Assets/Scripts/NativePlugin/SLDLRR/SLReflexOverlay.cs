@@ -16,6 +16,7 @@ namespace SLDLRR
         private bool _windowInited;
         private GUIStyle _mono;
         private GUIStyle _header;
+        private GUIStyle _small;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -52,7 +53,7 @@ namespace SLDLRR
 
             if (!_windowInited)
             {
-                _windowRect = new Rect(24, 80, 370, 310);
+                _windowRect = new Rect(24, 80, 560, 520);
                 _windowInited = true;
             }
 
@@ -105,7 +106,16 @@ namespace SLDLRR
             if (showStatsReport)
             {
                 GUILayout.Space(4);
-                GUILayout.Label(BuildStatsText(hasStats, stats), _mono);
+                if (hasStats && stats.frameID != 0)
+                {
+                    DrawTimeline(stats);
+                    GUILayout.Space(6);
+                    GUILayout.Label(BuildStatsText(hasStats, stats, GetTimelineOrigin(stats)), _mono);
+                }
+                else
+                {
+                    GUILayout.Label("Latency Report Unavailable", _mono);
+                }
             }
 
             GUI.DragWindow(new Rect(0, 0, _windowRect.width, 20));
@@ -119,7 +129,7 @@ namespace SLDLRR
             SLReflexRuntime.SetMode((SLReflexRuntime.Mode)Mathf.Clamp(reflexMode, 0, 2), capUs);
         }
 
-        private static string BuildStatsText(bool hasStats, SLReflexRuntime.Stats stats)
+        private static string BuildStatsText(bool hasStats, SLReflexRuntime.Stats stats, ulong origin)
         {
             if (!hasStats)
                 return "Latency Report Unavailable";
@@ -128,16 +138,162 @@ namespace SLDLRR
                 return "Latency Report Unavailable";
 
             return
-                $"frameID: {stats.frameID}\n" +
-                $"totalGameToRenderLatencyUs: {stats.totalGameToRenderLatencyUs}\n" +
-                $"simDeltaUs: {stats.simDeltaUs}\n" +
-                $"renderDeltaUs: {stats.renderDeltaUs}\n" +
-                $"presentDeltaUs: {stats.presentDeltaUs}\n" +
-                $"driverDeltaUs: {stats.driverDeltaUs}\n" +
-                $"osRenderQueueDeltaUs: {stats.osRenderQueueDeltaUs}\n" +
-                $"gpuRenderDeltaUs: {stats.gpuRenderDeltaUs}\n" +
-                $"gpuActiveRenderTimeUs: {stats.gpuActiveRenderTimeUs}\n" +
-                $"gpuFrameTimeUs: {stats.gpuFrameTimeUs}";
+                FormatStatsHeader() +
+                FormatStatsRow("frameID", stats.frameID, origin, false) +
+                FormatStatsRow("inputSampleTime", stats.inputSampleTime, origin, true) +
+                FormatStatsRow("simStartTime", stats.simStartTime, origin, true) +
+                FormatStatsRow("simEndTime", stats.simEndTime, origin, true) +
+                FormatStatsRow("renderSubmitStartTime", stats.renderSubmitStartTime, origin, true) +
+                FormatStatsRow("renderSubmitEndTime", stats.renderSubmitEndTime, origin, true) +
+                FormatStatsRow("presentStartTime", stats.presentStartTime, origin, true) +
+                FormatStatsRow("presentEndTime", stats.presentEndTime, origin, true) +
+                FormatStatsRow("driverStartTime", stats.driverStartTime, origin, true) +
+                FormatStatsRow("driverEndTime", stats.driverEndTime, origin, true) +
+                FormatStatsRow("osRenderQueueStartTime", stats.osRenderQueueStartTime, origin, true) +
+                FormatStatsRow("osRenderQueueEndTime", stats.osRenderQueueEndTime, origin, true) +
+                FormatStatsRow("gpuRenderStartTime", stats.gpuRenderStartTime, origin, true) +
+                FormatStatsRow("gpuRenderEndTime", stats.gpuRenderEndTime, origin, true) +
+                FormatStatsRow("gpuActiveRenderTimeUs", stats.gpuActiveRenderTimeUs, origin, false) +
+                FormatStatsRow("gpuFrameTimeUs", stats.gpuFrameTimeUs, origin, false);
+        }
+
+        private static string FormatStatsHeader()
+        {
+            return $"{"name",-28}{"timestamp",20}{"offset",12}\n";
+        }
+
+        private static string FormatStatsRow(string name, ulong value, ulong origin, bool showOffset)
+        {
+            string offset = showOffset && value != 0 ? Delta(value, origin).ToString() : "";
+            return $"{name,-28}{value,20}{offset,12}\n";
+        }
+
+        private static string FormatStatsRow(string name, uint value, ulong origin, bool showOffset)
+        {
+            string offset = showOffset && value != 0 ? Delta(value, origin).ToString() : "";
+            return $"{name,-28}{value,20}{offset,12}\n";
+        }
+
+        private void DrawTimeline(SLReflexRuntime.Stats stats)
+        {
+            Segment[] segments =
+            {
+                new Segment("sim", stats.simStartTime, stats.simEndTime, new Color(0.35f, 0.72f, 1.00f)),
+                new Segment("render", stats.renderSubmitStartTime, stats.renderSubmitEndTime, new Color(0.48f, 0.90f, 0.48f)),
+                new Segment("present", stats.presentStartTime, stats.presentEndTime, new Color(1.00f, 0.78f, 0.30f)),
+                new Segment("driver", stats.driverStartTime, stats.driverEndTime, new Color(1.00f, 0.52f, 0.42f)),
+                new Segment("os queue", stats.osRenderQueueStartTime, stats.osRenderQueueEndTime, new Color(0.74f, 0.55f, 1.00f)),
+                new Segment("gpurender", stats.gpuRenderStartTime, stats.gpuRenderEndTime, new Color(0.42f, 1.00f, 0.86f)),
+            };
+
+            ulong origin = GetTimelineOrigin(stats, segments);
+            ulong end = MaxEnd(segments);
+            ulong total = Delta(end, origin);
+
+            if (total == 0)
+            {
+                GUILayout.Label("Latency Report Unavailable", _mono);
+                return;
+            }
+
+            GUILayout.Label($"Timeline: input sample -> GPU render end ({FormatUs(total)})", _header);
+
+            foreach (var segment in segments)
+                DrawStageRow(segment, origin, total);
+        }
+
+        private static ulong GetTimelineOrigin(SLReflexRuntime.Stats stats)
+        {
+            Segment[] segments =
+            {
+                new Segment("sim", stats.simStartTime, stats.simEndTime, Color.white),
+                new Segment("render", stats.renderSubmitStartTime, stats.renderSubmitEndTime, Color.white),
+                new Segment("present", stats.presentStartTime, stats.presentEndTime, Color.white),
+                new Segment("driver", stats.driverStartTime, stats.driverEndTime, Color.white),
+                new Segment("os queue", stats.osRenderQueueStartTime, stats.osRenderQueueEndTime, Color.white),
+                new Segment("gpurender", stats.gpuRenderStartTime, stats.gpuRenderEndTime, Color.white),
+            };
+
+            return GetTimelineOrigin(stats, segments);
+        }
+
+        private static ulong GetTimelineOrigin(SLReflexRuntime.Stats stats, Segment[] segments)
+        {
+            return stats.inputSampleTime != 0 ? stats.inputSampleTime : MinStart(segments);
+        }
+
+        private void DrawStageRow(Segment segment, ulong originUs, ulong totalUs)
+        {
+            Rect row = GUILayoutUtility.GetRect(520, 18);
+            const float labelW = 118f;
+            const float valueW = 72f;
+            Rect labelRect = new Rect(row.x, row.y, labelW, row.height);
+            Rect barRect = new Rect(row.x + labelW, row.y + 3, row.width - labelW - valueW - 8, row.height - 6);
+            Rect valueRect = new Rect(row.x + row.width - valueW, row.y, valueW, row.height);
+
+            GUI.Label(labelRect, segment.name, _small);
+            DrawBarBackground(barRect);
+            if (segment.IsValid)
+            {
+                DrawSegmentInRect(barRect, Delta(segment.startUs, originUs), segment.DurationUs, totalUs, segment.color);
+                GUI.Label(valueRect, FormatUs(segment.DurationUs), _mono);
+            }
+            else
+            {
+                GUI.Label(valueRect, "N/A", _mono);
+            }
+        }
+
+        private static void DrawBarBackground(Rect rect)
+        {
+            var prev = GUI.color;
+            GUI.color = new Color(0.08f, 0.08f, 0.08f, 0.85f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = prev;
+        }
+
+        private static void DrawSegmentInRect(Rect rect, ulong startUs, ulong durationUs, ulong totalUs, Color color)
+        {
+            if (durationUs == 0 || totalUs == 0) return;
+
+            float x = rect.x + rect.width * ((float)startUs / totalUs);
+            float w = Mathf.Max(1f, rect.width * ((float)durationUs / totalUs));
+            var prev = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(new Rect(x, rect.y, Mathf.Min(w, rect.xMax - x), rect.height), Texture2D.whiteTexture);
+            GUI.color = prev;
+        }
+
+        private static string FormatUs(ulong us)
+        {
+            return us >= 1000 ? $"{us / 1000.0:F2} ms" : $"{us} us";
+        }
+
+        private static ulong Delta(ulong end, ulong start)
+        {
+            return end >= start ? end - start : 0;
+        }
+
+        private static ulong MinStart(Segment[] segments)
+        {
+            ulong min = ulong.MaxValue;
+            foreach (var segment in segments)
+            {
+                if (segment.IsValid && segment.startUs < min)
+                    min = segment.startUs;
+            }
+            return min == ulong.MaxValue ? 0 : min;
+        }
+
+        private static ulong MaxEnd(Segment[] segments)
+        {
+            ulong max = 0;
+            foreach (var segment in segments)
+            {
+                if (segment.IsValid && segment.endUs > max)
+                    max = segment.endUs;
+            }
+            return max;
         }
 
         private void InitStyles()
@@ -155,6 +311,30 @@ namespace SLDLRR
                 fontStyle = FontStyle.Bold,
                 normal = { textColor = Color.white }
             };
+
+            _small ??= new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 11,
+                normal = { textColor = Color.white }
+            };
+        }
+
+        private readonly struct Segment
+        {
+            public readonly string name;
+            public readonly ulong startUs;
+            public readonly ulong endUs;
+            public readonly Color color;
+            public bool IsValid => startUs != 0 && endUs > startUs;
+            public ulong DurationUs => Delta(endUs, startUs);
+
+            public Segment(string name, ulong startUs, ulong endUs, Color color)
+            {
+                this.name = name;
+                this.startUs = startUs;
+                this.endUs = endUs;
+                this.color = color;
+            }
         }
 
         private readonly struct GUIEnabledScope : System.IDisposable
