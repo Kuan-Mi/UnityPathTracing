@@ -19,7 +19,7 @@
 
 struct SLDlssrrFrameData
 {
-    // --- shared per-frame Streamline token (sl::FrameToken*, minted by SL_FrameBegin) ---
+    // --- shared per-frame Streamline token (sl::FrameToken*, minted by SL_GetNewFrameToken) ---
     // Passed in from C# so the plugin stays stateless. nullptr in the editor edit-mode game
     // view (no main-thread Reflex tick) — DLSS-RR mints its own token in that case.
     void* frameToken;

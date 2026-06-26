@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.LowLevel;
-using UnityEngine.Rendering;
 
 namespace SLDLRR
 {
@@ -13,6 +12,7 @@ namespace SLDLRR
         private static bool _playerLoopInstalled;
 
         private struct SLReflexFrameBegin { }
+        private struct SLReflexSimulationEnd { }
 
         public static IntPtr CurrentFrameTokenPtr => _frameToken;
 
@@ -33,8 +33,6 @@ namespace SLDLRR
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Initialize()
         {
-            RenderPipelineManager.beginContextRendering -= OnBeginContextRendering;
-            RenderPipelineManager.beginContextRendering += OnBeginContextRendering;
             SLPclLatencyPing.Register();
 
             InstallPlayerLoop();
@@ -53,6 +51,7 @@ namespace SLDLRR
             var loop = PlayerLoop.GetCurrentPlayerLoop();
             var list = new List<PlayerLoopSystem>(loop.subSystemList);
             list.RemoveAll(s => s.type == typeof(SLReflexFrameBegin));
+            list.RemoveAll(s => s.type == typeof(SLReflexSimulationEnd));
 
             int insertIndex = list.FindIndex(s => s.type == typeof(UnityEngine.PlayerLoop.EarlyUpdate));
             if (insertIndex < 0)
@@ -67,6 +66,20 @@ namespace SLDLRR
                 updateDelegate = OnPlayerLoopFrameBegin,
             });
             loop.subSystemList = list.ToArray();
+
+            var simEndNode = new PlayerLoopSystem
+            {
+                type           = typeof(SLReflexSimulationEnd),
+                updateDelegate = OnPlayerLoopSimulationEnd,
+            };
+
+            RemoveSystem(ref loop, typeof(SLReflexSimulationEnd));
+            InsertAfter(
+                ref loop,
+                typeof(UnityEngine.PlayerLoop.PostLateUpdate),
+                typeof(UnityEngine.PlayerLoop.PostLateUpdate.EndGraphicsJobsAfterScriptLateUpdate),
+                simEndNode);
+
             PlayerLoop.SetPlayerLoop(loop);
             _playerLoopInstalled = true;
         }
@@ -77,10 +90,9 @@ namespace SLDLRR
             var loop = PlayerLoop.GetCurrentPlayerLoop();
             var list = new List<PlayerLoopSystem>(loop.subSystemList);
             if (list.RemoveAll(s => s.type == typeof(SLReflexFrameBegin)) > 0)
-            {
                 loop.subSystemList = list.ToArray();
-                PlayerLoop.SetPlayerLoop(loop);
-            }
+            RemoveSystem(ref loop, typeof(SLReflexSimulationEnd));
+            PlayerLoop.SetPlayerLoop(loop);
             _playerLoopInstalled = false;
         }
 
@@ -93,15 +105,19 @@ namespace SLDLRR
             try
             {
                 SLPclLatencyPing.ResetFrameState();
-                _frameToken = SLNative.SL_FrameBegin();
+                _frameToken = SLNative.SL_GetNewFrameToken();
+                if (_frameToken != IntPtr.Zero)
+                {
+                    SLNative.SL_ReflexSleep(_frameToken);
+                    SLNative.SL_MarkSimulationStart(_frameToken);
+                }
             }
             catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
         }
 
-        private static void OnBeginContextRendering(ScriptableRenderContext context, List<Camera> cameras)
+        private static void OnPlayerLoopSimulationEnd()
         {
             if (!SLNative.Available) return;
-            if (IsPreviewOnlyContext(cameras)) return;
             if (_frameToken == IntPtr.Zero) return;
 
             try { SLNative.SL_MarkSimulationEnd(_frameToken); }
@@ -110,21 +126,57 @@ namespace SLDLRR
 
         private static void Teardown()
         {
-            RenderPipelineManager.beginContextRendering -= OnBeginContextRendering;
             SLPclLatencyPing.Unregister();
             RemovePlayerLoop();
             SLDlssg.Dispose();
         }
 
-        private static bool IsPreviewOnlyContext(List<Camera> cameras)
+        private static bool InsertAfter(ref PlayerLoopSystem root, Type parentType, Type afterType, PlayerLoopSystem node)
         {
-            if (cameras == null || cameras.Count == 0) return false;
-            foreach (var cam in cameras)
+            if (root.subSystemList == null) return false;
+
+            for (int i = 0; i < root.subSystemList.Length; ++i)
             {
-                if (cam == null) continue;
-                if (cam.cameraType != CameraType.Preview) return false;
+                var child = root.subSystemList[i];
+                if (child.type == parentType)
+                {
+                    var children = new List<PlayerLoopSystem>(child.subSystemList ?? Array.Empty<PlayerLoopSystem>());
+                    children.RemoveAll(s => s.type == node.type);
+
+                    int insertIndex = children.FindIndex(s => s.type == afterType);
+                    if (insertIndex < 0) return false;
+
+                    children.Insert(insertIndex + 1, node);
+                    child.subSystemList = children.ToArray();
+                    root.subSystemList[i] = child;
+                    return true;
+                }
             }
-            return true;
+
+            return false;
+        }
+
+        private static bool RemoveSystem(ref PlayerLoopSystem root, Type type)
+        {
+            if (root.subSystemList == null) return false;
+
+            bool removed = false;
+            var children = new List<PlayerLoopSystem>(root.subSystemList);
+            removed |= children.RemoveAll(s => s.type == type) > 0;
+
+            for (int i = 0; i < children.Count; ++i)
+            {
+                var child = children[i];
+                if (RemoveSystem(ref child, type))
+                {
+                    children[i] = child;
+                    removed = true;
+                }
+            }
+
+            if (removed)
+                root.subSystemList = children.ToArray();
+            return removed;
         }
     }
 }

@@ -132,7 +132,7 @@ namespace SLDlssrr
 
         // --- frame token (passed in from C#) ---
         // All SL features must tag against the SAME per-frame token (see SLCore.h). C# supplies
-        // this frame's token (the one SL_FrameBegin minted and forwarded to the present latch),
+        // this frame's token (the one SL_GetNewFrameToken minted and forwarded to the present latch),
         // so evaluate tags against the same token as DLSS-G. It is null only in the editor
         // edit-mode game view, where the main-thread frame tick is intentionally not run — mint
         // one here (advances the index, no sleep) so DLSS-RR still works standalone.

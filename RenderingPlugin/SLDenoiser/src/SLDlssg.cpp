@@ -15,8 +15,8 @@
 // so on a 30-series card you get Reflex/PCL + presentCommon with FG simply never enabled.
 //
 // Frame timeline (token shared by index — see SLCore.h):
-//   * MAIN thread, top of frame: SLCore::BeginFrame mints the frame token; SLReflex does
-//     slReflexSleep + eSimulationStart. End of game logic: SLReflex eSimulationEnd.
+//   * MAIN thread, top of frame: SLCore::BeginFrame mints the frame token; C# then calls
+//     SLReflex sleep and eSimulationStart separately. End of game logic: SLReflex eSimulationEnd.
 //   * RENDER thread frame-begin event (data == the FrameToken*): SLCore::SetRenderFrame
 //     latches the token, then MarkRenderSubmitStart() emits eRenderSubmitStart (render begin).
 //   * RENDER thread: ConsumeFrameInputs() (FG only) tags depth/mvec + sets constants on the

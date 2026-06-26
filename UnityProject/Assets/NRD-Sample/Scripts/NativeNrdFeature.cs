@@ -814,7 +814,7 @@ namespace PathTracing
             }
 
             // DLSS-G Frame Generation via Streamline (SLDenoiser). Player-only: in the editor
-            // the swapchain is never adopted so BeginFrame/inputs are no-ops. The Reflex/begin
+            // the swapchain is never adopted so frame-token/inputs are no-ops. The Reflex/begin
             // tick is driven separately by SLStreamlineFrameLoop's main-thread PlayerLoop hook.
             if (eyeIndex == 0)
             {

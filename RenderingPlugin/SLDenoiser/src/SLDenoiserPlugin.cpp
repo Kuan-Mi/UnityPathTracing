@@ -189,7 +189,7 @@ namespace
     }
 
     // Render-thread frame-begin event: data is the FrameToken* minted on the main thread by
-    // SL_FrameBegin, forwarded verbatim via IssuePluginEventAndData. Pins the render/present
+    // SL_GetNewFrameToken, forwarded verbatim via IssuePluginEventAndData. Pins the render/present
     // side to that exact token so DLSS-G tagging + present markers and DLSS-RR evaluate all
     // use the frame actually being rendered. The latency-critical Reflex sleep is NOT here —
     // it runs on the main thread.
@@ -272,7 +272,7 @@ extern "C"
     }
 
     // ---- DLSS-G (frame generation) ----
-    // Issue at frame begin with the token from SL_FrameBegin as data:
+    // Issue at frame begin with the token from SL_GetNewFrameToken as data:
     //   cmd.IssuePluginEventAndData(GetSLFGBeginFrameFunc(), 0, frameToken).
     UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
     GetSLFGBeginFrameFunc() { return OnFGBeginFrame; }
@@ -291,33 +291,42 @@ extern "C"
         return SLDlssg::IsFrameGenerationOn() ? 1 : 0;
     }
 
-    // ---- Reflex frame loop (called DIRECTLY from the C# main thread, NOT plugin events) ----
-    // SL_FrameBegin: main thread, top of frame BEFORE input. Mints the frame token, applies
-    // Reflex options, slReflexSleep + eSimulationStart. Returns the token pointer (opaque
-    // handle) to forward to the render-thread frame-begin event (OnFGBeginFrame) as its data.
-    // null on failure. (typedef so the EXPORT/API macros sit after the type, like the others.)
+    // ---- Streamline frame token + Reflex simulation markers (main thread, not plugin events) ----
     typedef void* SLFrameTokenHandle;
-    SLFrameTokenHandle UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_FrameBegin()
+
+    // SL_GetNewFrameToken: mint this frame's shared Streamline token. C# forwards this opaque
+    // handle to render-thread events and to every main-thread marker call for the same frame.
+    SLFrameTokenHandle UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_GetNewFrameToken()
     {
         // Still mint the per-frame token in the editor — DLSS-RR (evaluate-only, editor + player)
-        // forwards it to the render thread for tagging. The Reflex sleep/markers are player-only:
-        // Reflex's CPU pacing is meaningless without the FG present path and is skipped in the
-        // editor (Unity.exe), matching the DLSS-G present-hook gating in UnityPluginLoad.
-        sl::FrameToken* token = SLCore::BeginFrame();
-        if (token && s_IsPlayer) SLReflex::OnFrameBegin(*token);
-        return token;
+        // forwards it to the render thread for tagging.
+        return SLCore::BeginFrame();
+    }
+
+    // SL_ReflexSleep: main thread, top of frame BEFORE input. Applies Reflex options and calls
+    // slReflexSleep for this token. Player-only; no-op in the editor.
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_ReflexSleep(void* frameToken)
+    {
+        if (!s_IsPlayer || !frameToken) return;
+        SLReflex::Sleep(*reinterpret_cast<sl::FrameToken*>(frameToken));
+    }
+
+    // SL_MarkSimulationStart: main thread, immediately after Reflex sleep, before input/sim.
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_MarkSimulationStart(void* frameToken)
+    {
+        if (!s_IsPlayer || !frameToken) return;
+        SLReflex::MarkSimulationStart(*reinterpret_cast<sl::FrameToken*>(frameToken));
     }
 
     // SL_MarkSimulationEnd: main thread, after game logic (before rendering). eSimulationEnd.
-    // frameToken is this frame's token from SL_FrameBegin (C# holds it — the plugin caches no
-    // sim token). Player-only (Reflex/PCL); see SL_FrameBegin.
+    // frameToken is this frame's token from SL_GetNewFrameToken. Player-only (Reflex/PCL).
     void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_MarkSimulationEnd(void* frameToken)
     {
         if (!s_IsPlayer || !frameToken) return;
         SLReflex::MarkSimulationEnd(*reinterpret_cast<sl::FrameToken*>(frameToken));
     }
 
-    // SL_ConsumePclPingCount: main thread, after SL_FrameBegin minted the token for the
+    // SL_ConsumePclPingCount: main thread, after SL_GetNewFrameToken minted the token for the
     // frame that is about to sample input. Returns how many PCL stats pings the WndProc saw
     // since the previous consume; C# owns the token attribution and calls SL_MarkPclLatencyPing.
     unsigned UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_ConsumePclPingCount()
@@ -337,7 +346,7 @@ extern "C"
     // Player-only: tied to the DLSS-G present path, so it's a no-op in the editor (Unity.exe).
     void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_SetReflexMode(int mode, unsigned fpsCapUs)
     {
-        if (!s_IsPlayer) return; // Reflex is player-only (see SL_FrameBegin).
+        if (!s_IsPlayer) return; // Reflex is player-only.
         SLReflex::SetMode(mode, fpsCapUs);
     }
 
@@ -349,7 +358,7 @@ extern "C"
 
     int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_IsReflexLowLatencyAvailable()
     {
-        if (!s_IsPlayer) return 0; // Reflex is player-only (see SL_FrameBegin).
+        if (!s_IsPlayer) return 0; // Reflex is player-only.
         return SLReflex::IsLowLatencyAvailable() ? 1 : 0;
     }
 }

@@ -133,7 +133,7 @@ namespace SLDLRR
 
             return new SLDlssrrFrameData
             {
-                // This frame's shared SL token (minted on the main thread by SL_FrameBegin and
+                // This frame's shared SL token (minted on the main thread by SL_GetNewFrameToken and
                 // forwarded to the present latch). Zero in editor edit-mode → native self-mints.
                 frameToken          = SLStreamlineFrameLoop.CurrentFrameTokenPtr,
 

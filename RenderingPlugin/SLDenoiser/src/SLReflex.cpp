@@ -23,9 +23,9 @@ namespace
     std::atomic<int>      g_modeApplied{ -1 };
     std::atomic<unsigned> g_fpsCapApplied{ 0xFFFFFFFFu };
 
-    // Dedupe: the index of the frame we last slept on / marked sim-end, so multiple begin
-    // ticks (or a re-issued SRP context) in one frame don't emit twice.
+    // Dedupe: the index of the frame we last slept on / marked sim-start / marked sim-end.
     std::atomic<uint32_t> g_lastSleptIndex{ 0xFFFFFFFFu };
+    std::atomic<uint32_t> g_lastSimStartIndex{ 0xFFFFFFFFu };
     std::atomic<uint32_t> g_lastSimEndIndex{ 0xFFFFFFFFu };
 
     // --- PCL latency ping (so FrameView / ReflexTest can MEASURE PC latency) ---
@@ -121,7 +121,7 @@ namespace SLReflex
         return st.lowLatencyAvailable;
     }
 
-    void OnFrameBegin(const sl::FrameToken& token)
+    void Sleep(const sl::FrameToken& token)
     {
         if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
 
@@ -156,9 +156,8 @@ namespace SLReflex
             }
         }
 
-        // slReflexSetOptions + slReflexSleep + the PCL markers must ALWAYS be issued (even
-        // when Reflex is Off) — PCL uses them to measure latency, and the driver gates the
-        // actual sleep on the mode. See the guide's NOTEs in §4.0.
+        // slReflexSetOptions + slReflexSleep must ALWAYS be issued (even when Reflex is Off);
+        // the driver gates the actual sleep on the mode. See the guide's NOTEs in §4.0.
         ApplyOptionsIfNeeded();
 
         const uint32_t idx  = (uint32_t)token;
@@ -168,19 +167,16 @@ namespace SLReflex
         // slReflexSleep is the latency-critical call: it paces the CPU so it does not run
         // unbounded ahead of the GPU (shallower render queue = lower latency). Placed at
         // the earliest frame tick so the sleep front-loads the frame.
-        // DIAG: time the sleep in isolation (separately from slGetNewFrameToken, which SLCore
-        // logs) so we can attribute the "SLReflexFrameBegin" 10ms marker to the right call.
-        LARGE_INTEGER freq, t0, t1; QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&t0);
-        sl::Result rs = slReflexSleep(token);
-        QueryPerformanceCounter(&t1);
-        const double sleepMs = double(t1.QuadPart - t0.QuadPart) * 1000.0 / double(freq.QuadPart);
-        slPCLSetMarker(sl::PCLMarker::eSimulationStart, token);
+        slReflexSleep(token);
+    }
 
-        static uint64_t s_frames = 0;
-        const uint64_t f = ++s_frames;
-        if (f <= 4 || (f & 0xFF) == 0 || rs != sl::Result::eOk || sleepMs > 1.0)
-            Logf(rs != sl::Result::eOk ? 1 : 0, "frame #%llu: slReflexSleep -> %s (%.2f ms, mode=%d)",
-                 (unsigned long long)f, R(rs), sleepMs, g_modeApplied.load(std::memory_order_acquire));
+    void MarkSimulationStart(const sl::FrameToken& token)
+    {
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+        const uint32_t idx  = (uint32_t)token;
+        const uint32_t prev = g_lastSimStartIndex.exchange(idx, std::memory_order_acq_rel);
+        if (prev == idx) return;
+        slPCLSetMarker(sl::PCLMarker::eSimulationStart, token);
     }
 
     void MarkSimulationEnd(const sl::FrameToken& token)
@@ -226,6 +222,7 @@ namespace SLReflex
         g_modeApplied.store(-1, std::memory_order_release);
         g_fpsCapApplied.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastSleptIndex.store(0xFFFFFFFFu, std::memory_order_release);
+        g_lastSimStartIndex.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastSimEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
         // slShutdown is owned by SLCore.
     }

@@ -20,7 +20,9 @@ namespace SLDLRR
         [DllImport(DllName)] internal static extern int    SL_GetReflexMode();
         [DllImport(DllName)] internal static extern int    SL_IsReflexLowLatencyAvailable();
 
-        [DllImport(DllName)] internal static extern IntPtr SL_FrameBegin();
+        [DllImport(DllName)] internal static extern IntPtr SL_GetNewFrameToken();
+        [DllImport(DllName)] internal static extern void   SL_ReflexSleep(IntPtr frameToken);
+        [DllImport(DllName)] internal static extern void   SL_MarkSimulationStart(IntPtr frameToken);
         [DllImport(DllName)] internal static extern void   SL_MarkSimulationEnd(IntPtr frameToken);
         [DllImport(DllName)] internal static extern uint   SL_ConsumePclPingCount();
         [DllImport(DllName)] internal static extern void   SL_MarkPclLatencyPing(IntPtr frameToken, uint count);

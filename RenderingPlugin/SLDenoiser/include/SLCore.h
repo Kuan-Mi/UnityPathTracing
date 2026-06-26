@@ -57,8 +57,8 @@ namespace SLCore
     // the donut/RTXPT pattern (mint in SimStart, reuse through present).
     //
     // The plugin is otherwise STATELESS about the token: C# holds the minted pointer (the
-    // return of BeginFrame, surfaced as SL_FrameBegin) and passes it back into every call
-    // that has a data channel — the Reflex sim markers (SL_MarkSimulationEnd arg) and DLSS-RR
+    // return of BeginFrame, surfaced as SL_GetNewFrameToken) and passes it back into every call
+    // that has a data channel — the Reflex sim markers and DLSS-RR
     // evaluate (SLDlssrrFrameData::frameToken). The ONE exception is the DLSS-G present path:
     //   * SetRenderFrame() latches the C#-forwarded token (frame-begin render event) so the
     //     DXGI Present hook — which Streamline/DXGI call with NO parameter we control — and

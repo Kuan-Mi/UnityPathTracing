@@ -8,7 +8,7 @@
 // shared frame token. That makes it editor-safe and usable with frame generation OFF.
 //
 // slInit/slSetD3DDevice/slShutdown + the shared per-frame token live in SLCore. The Reflex
-// sleep + eSimulationStart marker are issued at frame begin (SLCore::BeginFrame); the
+// sleep + eSimulationStart marker are issued as separate main-thread frame-begin calls; the
 // remaining sim->render->present PCL markers are emitted by SLDlssg's present hook when
 // frame generation owns the present path.
 #pragma once
@@ -28,11 +28,15 @@ namespace SLReflex
     // the same regardless; see the guide). False on non-NVIDIA / older hardware.
     bool IsLowLatencyAvailable();
 
-    // Frame begin, MAIN thread, top of frame BEFORE input sampling: apply pending options
-    // (once / on change), then slReflexSleep + eSimulationStart for this frame's token.
+    // MAIN thread, top of frame BEFORE input sampling: apply pending options (once / on
+    // change), then slReflexSleep for this frame's token.
     // slReflexSleep paces the simulation thread, so it MUST run here (not on the render
     // thread) to actually reduce latency. Idempotent per token (won't double-sleep).
-    void OnFrameBegin(const sl::FrameToken& token);
+    void Sleep(const sl::FrameToken& token);
+
+    // MAIN thread, immediately after the top-of-frame sleep: slPCLSetMarker(eSimulationStart).
+    // Split from Sleep so the exported API names describe the exact operation.
+    void MarkSimulationStart(const sl::FrameToken& token);
 
     // MAIN thread, end of game logic (simulation done, rendering about to begin):
     // slPCLSetMarker(eSimulationEnd). Idempotent per token.
