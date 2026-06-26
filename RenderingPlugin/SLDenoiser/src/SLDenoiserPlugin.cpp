@@ -16,8 +16,6 @@
 #include <windows.h>
 #include <d3d12.h>
 #include <dxgi1_5.h>
-#include <atomic>
-#include <wrl/client.h>
 
 #include "IUnityInterface.h"
 #include "IUnityGraphics.h"
@@ -28,11 +26,10 @@
 #include "SLDlssrr.h"
 #include "SLDlssrrFrameData.h"
 #include "SLDlssg.h"
+#include "SLHooks.h"
 #include "SLReflex.h"
 
 namespace sl { struct FrameToken; }
-
-using Microsoft::WRL::ComPtr;
 
 namespace
 {
@@ -66,100 +63,6 @@ namespace
         return _stricmp(exe, "Unity.exe") != 0;
     }
 
-    // --- DXGI factory vtable hook (catch Unity's swapchain creation) — PLAYER ONLY ---
-    constexpr UINT kCreateSwapChainVTIdx        = 10;
-    constexpr UINT kCreateSwapChainForHwndVTIdx = 15;
-
-    using PFN_CreateSwapChain = HRESULT(STDMETHODCALLTYPE*)(
-        IDXGIFactory*, IUnknown*, DXGI_SWAP_CHAIN_DESC*, IDXGISwapChain**);
-    using PFN_CreateSwapChainForHwnd = HRESULT(STDMETHODCALLTYPE*)(
-        IDXGIFactory2*, IUnknown*, HWND, const DXGI_SWAP_CHAIN_DESC1*,
-        const DXGI_SWAP_CHAIN_FULLSCREEN_DESC*, IDXGIOutput*, IDXGISwapChain1**);
-
-    std::atomic<bool>          s_FactoryHooked{ false };
-    PFN_CreateSwapChain        s_OrigCreateSwapChain        = nullptr;
-    PFN_CreateSwapChainForHwnd s_OrigCreateSwapChainForHwnd = nullptr;
-
-    void* PatchSlot(void* objWithVtable, UINT index, void* hook)
-    {
-        void** vtable = *reinterpret_cast<void***>(objWithVtable);
-        void** slot   = vtable + index;
-        DWORD old = 0;
-        if (!VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old)) return nullptr;
-        void* orig = *slot;
-        *slot = hook;
-        VirtualProtect(slot, sizeof(void*), old, &old);
-        return orig;
-    }
-
-    HRESULT STDMETHODCALLTYPE Hooked_CreateSwapChainForHwnd(
-        IDXGIFactory2* This, IUnknown* pDevice, HWND hWnd,
-        const DXGI_SWAP_CHAIN_DESC1* pDesc, const DXGI_SWAP_CHAIN_FULLSCREEN_DESC* pFS,
-        IDXGIOutput* pOut, IDXGISwapChain1** ppSwapChain)
-    {
-        static thread_local bool t_inProxyCreate = false;
-        if (t_inProxyCreate)
-        {
-            IUnknown* nativeQ = SLDlssg::NativeIfProxy(pDevice);
-            return s_OrigCreateSwapChainForHwnd(This, nativeQ, hWnd, pDesc, pFS, pOut, ppSwapChain);
-        }
-
-        LogBridge(0, "[NR/SLDlssg] CreateSwapChainForHwnd intercepted");
-
-        if (SLDlssg::IsQueueProxyActive())
-        {
-            t_inProxyCreate = true;
-            HRESULT hr = SLDlssg::CreateSwapChainViaProxyFactory(pDevice, hWnd, pDesc, pFS, pOut, ppSwapChain);
-            t_inProxyCreate = false;
-            if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
-                SLDlssg::AdoptSwapChain(ppSwapChain, pDevice, /*alreadyProxy=*/true);
-            return hr;
-        }
-
-        HRESULT hr = s_OrigCreateSwapChainForHwnd(This, pDevice, hWnd, pDesc, pFS, pOut, ppSwapChain);
-        if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
-            SLDlssg::AdoptSwapChain(ppSwapChain, pDevice, /*alreadyProxy=*/false);
-        return hr;
-    }
-
-    HRESULT STDMETHODCALLTYPE Hooked_CreateSwapChain(
-        IDXGIFactory* This, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
-    {
-        LogBridge(0, "[NR/SLDlssg] CreateSwapChain intercepted");
-        HRESULT hr = s_OrigCreateSwapChain(This, pDevice, pDesc, ppSwapChain);
-        if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
-        {
-            ComPtr<IDXGISwapChain1> sc1;
-            if (SUCCEEDED((*ppSwapChain)->QueryInterface(IID_PPV_ARGS(&sc1))) && sc1)
-            {
-                IDXGISwapChain1* p = sc1.Get();
-                SLDlssg::AdoptSwapChain(&p, pDevice, /*alreadyProxy=*/false);
-            }
-        }
-        return hr;
-    }
-
-    void InstallFactoryHook()
-    {
-        bool expected = false;
-        if (!s_FactoryHooked.compare_exchange_strong(expected, true)) return;
-
-        ComPtr<IDXGIFactory2> factory;
-        if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory))) || !factory)
-        {
-            LogBridge(2, "[NR/SLDlssg ERR] InstallFactoryHook: CreateDXGIFactory2 failed");
-            s_FactoryHooked.store(false);
-            return;
-        }
-        s_OrigCreateSwapChain = reinterpret_cast<PFN_CreateSwapChain>(
-            PatchSlot(factory.Get(), kCreateSwapChainVTIdx, &Hooked_CreateSwapChain));
-        s_OrigCreateSwapChainForHwnd = reinterpret_cast<PFN_CreateSwapChainForHwnd>(
-            PatchSlot(factory.Get(), kCreateSwapChainForHwndVTIdx, &Hooked_CreateSwapChainForHwnd));
-        const bool ok = s_OrigCreateSwapChain && s_OrigCreateSwapChainForHwnd;
-        LogBridge(ok ? 0 : 2, ok ? "[NR/SLDlssg] Factory hook installed (CreateSwapChain[ForHwnd])"
-                                 : "[NR/SLDlssg ERR] Factory hook PARTIAL/FAILED");
-    }
-
     void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType)
     {
         if (eventType == kUnityGfxDeviceEventInitialize)
@@ -172,6 +75,7 @@ namespace
         else if (eventType == kUnityGfxDeviceEventShutdown)
         {
             SLReflex::Shutdown();
+            SLHooks::Shutdown();
             SLDlssg::Shutdown();
             SLDlssrr::Shutdown();
             SLCore::Shutdown();
@@ -238,8 +142,7 @@ extern "C"
             // device/queue/swapchain are SL's common interposer (required so presentCommon() runs
             // every frame under manual hooking) and are installed on every adapter; Frame
             // Generation is only enabled as a *mode* on top when the adapter supports it.
-            SLDlssg::InstallDeviceQueueHook();
-            InstallFactoryHook();
+            SLHooks::InstallPresentPathHooks();
             LogBridge(0, "[NR/SLDlssg] Player detected: present-path hooks installed (Reflex/PCL on "
                          "every adapter; DLSS-G frame generation enabled only when supported).");
         }
@@ -259,6 +162,8 @@ extern "C"
     {
         if (s_Graphics)
             s_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
+        SLReflex::Shutdown();
+        SLHooks::Shutdown();
         SLDlssg::Shutdown();
         SLDlssrr::Shutdown();
         SLCore::Shutdown();

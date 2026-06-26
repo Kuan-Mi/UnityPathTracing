@@ -13,11 +13,7 @@
 // DLSS_G/Reflex/PCL alongside DLSS_RR). See SLCore.h.
 #pragma once
 
-struct IUnknown;
-struct IDXGISwapChain1;
-struct IDXGIOutput;
-struct DXGI_SWAP_CHAIN_DESC1;
-struct DXGI_SWAP_CHAIN_FULLSCREEN_DESC;
+struct IDXGISwapChain3;
 namespace sl { struct FrameToken; }
 
 namespace SLDlssg
@@ -48,21 +44,14 @@ namespace SLDlssg
         int      reset;
     };
 
-    // Install the ID3D12Device::CreateCommandQueue vtable hook (proxy queue). PLAYER ONLY.
-    // Call at plugin load, before Unity creates its device/queues.
-    void InstallDeviceQueueHook();
-    bool IsQueueProxyActive();
-
-    // SL proxy factory swapchain creation (used by the factory hook in SLDenoiserPlugin.cpp).
-    HRESULT CreateSwapChainViaProxyFactory(IUnknown* queue, HWND hWnd,
-        const DXGI_SWAP_CHAIN_DESC1* desc, const DXGI_SWAP_CHAIN_FULLSCREEN_DESC* fs,
-        IDXGIOutput* out, IDXGISwapChain1** ppSwapChain);
-    void AdoptSwapChain(IDXGISwapChain1** ppSwapChain, IUnknown* presentQueue, bool alreadyProxy);
-    IUnknown* NativeIfProxy(IUnknown* maybeProxy);
-
     // Tag real depth/mvec + set constants for the shared frame token (render thread, after
     // SLCore::GetNewFrameToken). The frame token + Reflex sleep are owned by SLCore/SLReflex now.
     void ConsumeFrameInputs(const FrameInputs& inputs);
+
+    // Called by SLHooks from the SL proxy swapchain Present hook.
+    void OnPresentPre(IDXGISwapChain3* proxySwapchain);
+    void OnPresentPost();
+    void OnSwapChainAdopted(unsigned width, unsigned height);
 
     // Runtime FG on/off (applied on the present thread).
     void SetFrameGeneration(bool enable);
