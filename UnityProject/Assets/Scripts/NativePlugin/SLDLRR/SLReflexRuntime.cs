@@ -8,6 +8,43 @@ namespace SLDLRR
     {
         public enum Mode { Off = 0, On = 1, OnPlusBoost = 2 }
 
+        public readonly struct Stats
+        {
+            public readonly bool lowLatencyAvailable;
+            public readonly bool latencyReportAvailable;
+            public readonly bool flashIndicatorDriverControlled;
+            public readonly uint statsWindowMessage;
+
+            public readonly ulong frameID;
+            public readonly ulong totalGameToRenderLatencyUs;
+            public readonly ulong simDeltaUs;
+            public readonly ulong renderDeltaUs;
+            public readonly ulong presentDeltaUs;
+            public readonly ulong driverDeltaUs;
+            public readonly ulong osRenderQueueDeltaUs;
+            public readonly ulong gpuRenderDeltaUs;
+            public readonly uint gpuActiveRenderTimeUs;
+            public readonly uint gpuFrameTimeUs;
+
+            internal Stats(SLNative.ReflexStats native)
+            {
+                lowLatencyAvailable = native.lowLatencyAvailable != 0;
+                latencyReportAvailable = native.latencyReportAvailable != 0;
+                flashIndicatorDriverControlled = native.flashIndicatorDriverControlled != 0;
+                statsWindowMessage = native.statsWindowMessage;
+                frameID = native.frameID;
+                totalGameToRenderLatencyUs = native.totalGameToRenderLatencyUs;
+                simDeltaUs = native.simDeltaUs;
+                renderDeltaUs = native.renderDeltaUs;
+                presentDeltaUs = native.presentDeltaUs;
+                driverDeltaUs = native.driverDeltaUs;
+                osRenderQueueDeltaUs = native.osRenderQueueDeltaUs;
+                gpuRenderDeltaUs = native.gpuRenderDeltaUs;
+                gpuActiveRenderTimeUs = native.gpuActiveRenderTimeUs;
+                gpuFrameTimeUs = native.gpuFrameTimeUs;
+            }
+        }
+
         public static KeyCode ReflexToggleKey = KeyCode.F8;
         public static KeyCode ReflexBoostKey  = KeyCode.F9;
 
@@ -33,6 +70,23 @@ namespace SLDLRR
             if (!SLNative.Available) return false;
             try { return SLNative.SL_IsReflexLowLatencyAvailable() != 0; }
             catch (DllNotFoundException) { SLNative.MarkUnavailable(); return false; }
+        }
+
+        public static bool TryGetStats(out Stats stats)
+        {
+            stats = default;
+            if (!SLNative.Available) return false;
+            try
+            {
+                bool ok = SLNative.SL_GetReflexStats(out var native) != 0;
+                stats = new Stats(native);
+                return ok;
+            }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+                return false;
+            }
         }
 
         internal static void EnsureKeyPoller()

@@ -43,7 +43,14 @@ namespace SLDLRR
                 LastFramePingCount = SLNative.SL_ConsumePclPingCount();
                 LastFrameHadPing = LastFramePingCount != 0;
                 if (LastFramePingCount != 0)
+                {
+                    Debug.Log($"Mark ping {LastFramePingCount}");
                     SLNative.SL_MarkPclLatencyPing(token, LastFramePingCount);
+                }
+                else
+                {
+                    Debug.Log("No ping");
+                }
             }
             catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
         }

@@ -13,10 +13,31 @@
 // semantic marker helpers rather than calling slPCLSetMarker directly.
 #pragma once
 
+#include <cstdint>
+
 namespace sl { struct FrameToken; }
 
 namespace SLReflex
 {
+    struct Stats
+    {
+        int lowLatencyAvailable = 0;
+        int latencyReportAvailable = 0;
+        int flashIndicatorDriverControlled = 0;
+        uint32_t statsWindowMessage = 0;
+
+        uint64_t frameID = 0;
+        uint64_t totalGameToRenderLatencyUs = 0;
+        uint64_t simDeltaUs = 0;
+        uint64_t renderDeltaUs = 0;
+        uint64_t presentDeltaUs = 0;
+        uint64_t driverDeltaUs = 0;
+        uint64_t osRenderQueueDeltaUs = 0;
+        uint64_t gpuRenderDeltaUs = 0;
+        uint32_t gpuActiveRenderTimeUs = 0;
+        uint32_t gpuFrameTimeUs = 0;
+    };
+
     // Reflex mode: 0 = Off, 1 = Low Latency (On), 2 = Low Latency + Boost (On + Boost).
     // fpsCapUs is an optional FPS cap in microseconds (0 = uncapped); it works even with
     // mode Off. Recorded here and applied (slReflexSetOptions) on the next frame begin; safe
@@ -27,6 +48,7 @@ namespace SLReflex
     // sl::ReflexState::lowLatencyAvailable — for gating Reflex UI only (do everything else
     // the same regardless; see the guide). False on non-NVIDIA / older hardware.
     bool IsLowLatencyAvailable();
+    bool GetStats(Stats& outStats);
 
     // MAIN thread, top of frame BEFORE input sampling: apply pending options (once / on
     // change), then slReflexSleep for this frame's token.

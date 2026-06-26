@@ -285,4 +285,10 @@ extern "C"
         if (!s_IsPlayer) return 0; // Reflex is player-only.
         return SLReflex::IsLowLatencyAvailable() ? 1 : 0;
     }
+
+    int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_GetReflexStats(SLReflex::Stats* stats)
+    {
+        if (!s_IsPlayer || !stats) return 0;
+        return SLReflex::GetStats(*stats) ? 1 : 0;
+    }
 }

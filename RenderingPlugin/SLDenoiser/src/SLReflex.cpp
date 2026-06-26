@@ -3,6 +3,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <atomic>
+#include <cstring>
 
 #include "sl.h"
 #include "sl_reflex.h"
@@ -116,6 +117,54 @@ namespace SLReflex
         sl::Result r = slReflexGetState(st);
         if (r != sl::Result::eOk) { Logf(1, "slReflexGetState -> %s", R(r)); return false; }
         return st.lowLatencyAvailable;
+    }
+
+    bool GetStats(Stats& outStats)
+    {
+        std::memset(&outStats, 0, sizeof(outStats));
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return false;
+
+        sl::ReflexState st{};
+        sl::Result r = slReflexGetState(st);
+        if (r != sl::Result::eOk)
+        {
+            Logf(1, "slReflexGetState(stats) -> %s", R(r));
+            return false;
+        }
+
+        outStats.lowLatencyAvailable = st.lowLatencyAvailable ? 1 : 0;
+        outStats.latencyReportAvailable = st.latencyReportAvailable ? 1 : 0;
+        outStats.flashIndicatorDriverControlled = st.flashIndicatorDriverControlled ? 1 : 0;
+        outStats.statsWindowMessage = st.statsWindowMessage;
+
+        const sl::ReflexReport* report = nullptr;
+        for (int i = sl::kReflexFrameReportCount - 1; i >= 0; --i)
+        {
+            if (st.frameReport[i].frameID != 0 && st.frameReport[i].gpuRenderEndTime != 0)
+            {
+                report = &st.frameReport[i];
+                break;
+            }
+        }
+
+        if (!report) return true;
+
+        auto delta = [](uint64_t end, uint64_t start) -> uint64_t
+        {
+            return end >= start ? end - start : 0;
+        };
+
+        outStats.frameID = report->frameID;
+        outStats.totalGameToRenderLatencyUs = delta(report->gpuRenderEndTime, report->inputSampleTime);
+        outStats.simDeltaUs = delta(report->simEndTime, report->simStartTime);
+        outStats.renderDeltaUs = delta(report->renderSubmitEndTime, report->renderSubmitStartTime);
+        outStats.presentDeltaUs = delta(report->presentEndTime, report->presentStartTime);
+        outStats.driverDeltaUs = delta(report->driverEndTime, report->driverStartTime);
+        outStats.osRenderQueueDeltaUs = delta(report->osRenderQueueEndTime, report->osRenderQueueStartTime);
+        outStats.gpuRenderDeltaUs = delta(report->gpuRenderEndTime, report->gpuRenderStartTime);
+        outStats.gpuActiveRenderTimeUs = report->gpuActiveRenderTimeUs;
+        outStats.gpuFrameTimeUs = report->gpuFrameTimeUs;
+        return true;
     }
 
     void Sleep(const sl::FrameToken& token)
