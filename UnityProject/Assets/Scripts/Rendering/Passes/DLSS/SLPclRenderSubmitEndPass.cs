@@ -5,7 +5,7 @@ using UnityEngine.Rendering.Universal;
 
 namespace PathTracing
 {
-    public class SLReflexEndPass : ScriptableRenderPass
+    public class SLPclRenderSubmitEndPass : ScriptableRenderPass
     {
         private const int EventId = 0;
 
@@ -35,7 +35,7 @@ namespace PathTracing
         {
             if (_eventFunc == IntPtr.Zero || _frameToken == IntPtr.Zero) return;
 
-            using var builder = renderGraph.AddUnsafePass<PassData>("Streamline Reflex End (SL)", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Streamline PCL Render Submit End", out var passData);
 
             passData.EventFunc  = _eventFunc;
             passData.FrameToken = _frameToken;

@@ -7,8 +7,8 @@ namespace SLDLRR
 {
     public static class SLStreamlineFrameLoop
     {
-        private static IntPtr _beginFunc;
-        private static IntPtr _endFunc;
+        private static IntPtr _renderSubmitStartFunc;
+        private static IntPtr _renderSubmitEndFunc;
         private static IntPtr _frameToken;
         private static bool _playerLoopInstalled;
 
@@ -17,22 +17,22 @@ namespace SLDLRR
 
         public static IntPtr CurrentFrameTokenPtr => _frameToken;
 
-        public static IntPtr GetBeginEventFunc()
+        public static IntPtr GetRenderSubmitStartEventFunc()
         {
             if (!SLNative.Available) return IntPtr.Zero;
-            if (_beginFunc != IntPtr.Zero) return _beginFunc;
-            try { _beginFunc = SLNative.GetSLFGBeginFrameFunc(); }
+            if (_renderSubmitStartFunc != IntPtr.Zero) return _renderSubmitStartFunc;
+            try { _renderSubmitStartFunc = SLNative.GetSLRenderSubmitStartEventFunc(); }
             catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
-            return _beginFunc;
+            return _renderSubmitStartFunc;
         }
 
-        public static IntPtr GetEndEventFunc()
+        public static IntPtr GetRenderSubmitEndEventFunc()
         {
             if (!SLNative.Available) return IntPtr.Zero;
-            if (_endFunc != IntPtr.Zero) return _endFunc;
-            try { _endFunc = SLNative.GetSLFGEndFrameFunc(); }
+            if (_renderSubmitEndFunc != IntPtr.Zero) return _renderSubmitEndFunc;
+            try { _renderSubmitEndFunc = SLNative.GetSLRenderSubmitEndEventFunc(); }
             catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
-            return _endFunc;
+            return _renderSubmitEndFunc;
         }
 
 #if UNITY_EDITOR

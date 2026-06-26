@@ -188,12 +188,12 @@ namespace
         SLDlssrr::Dispatch(reinterpret_cast<SLDlssrrFrameData*>(data), state.commandList);
     }
 
-    // Render-thread frame-begin event: data is the FrameToken* minted on the main thread by
+    // Render-thread submit-start event: data is the FrameToken* minted on the main thread by
     // SL_GetNewFrameToken, forwarded verbatim via IssuePluginEventAndData. Pins the render/present
     // side to that exact token so DLSS-G tagging + present markers and DLSS-RR evaluate all
     // use the frame actually being rendered. The latency-critical Reflex sleep is NOT here —
     // it runs on the main thread.
-    void UNITY_INTERFACE_API OnFGBeginFrame(int /*eventId*/, void* data)
+    void UNITY_INTERFACE_API OnRenderSubmitStart(int /*eventId*/, void* data)
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
         SLCore::SetRenderFrame(token);
@@ -202,9 +202,9 @@ namespace
         if (token) SLReflex::MarkRenderSubmitStart(*token);
     }
 
-    // Render-thread frame-end event: data is the FrameToken* for the frame whose command-stream
+    // Render-thread submit-end event: data is the FrameToken* for the frame whose command-stream
     // work is complete. Emits eRenderSubmitEnd before the present hook emits ePresentStart.
-    void UNITY_INTERFACE_API OnFGEndFrame(int /*eventId*/, void* data)
+    void UNITY_INTERFACE_API OnRenderSubmitEnd(int /*eventId*/, void* data)
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
         if (token) SLReflex::MarkRenderSubmitEnd(*token);
@@ -279,15 +279,16 @@ extern "C"
         return SLDlssrr::QueryOptimalRenderSize(outputWidth, outputHeight, mode, outRenderWidth, outRenderHeight);
     }
 
+    // ---- Streamline render-submit PCL markers ----
+    // Issue with the token from SL_GetNewFrameToken as data:
+    //   cmd.IssuePluginEventAndData(GetSLRenderSubmitStartEventFunc(), 0, frameToken).
+    UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+    GetSLRenderSubmitStartEventFunc() { return OnRenderSubmitStart; }
+
+    UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+    GetSLRenderSubmitEndEventFunc() { return OnRenderSubmitEnd; }
+
     // ---- DLSS-G (frame generation) ----
-    // Issue at frame begin with the token from SL_GetNewFrameToken as data:
-    //   cmd.IssuePluginEventAndData(GetSLFGBeginFrameFunc(), 0, frameToken).
-    UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-    GetSLFGBeginFrameFunc() { return OnFGBeginFrame; }
-
-    UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-    GetSLFGEndFrameFunc() { return OnFGEndFrame; }
-
     // Issue per frame: cmd.IssuePluginEventAndData(GetSLFGFrameInputsFunc(), 0, ptrToFrameInputs).
     UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
     GetSLFGFrameInputsFunc() { return OnFGFrameInputs; }

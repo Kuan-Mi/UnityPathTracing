@@ -78,8 +78,8 @@ namespace PathTracing
         private DlssRRPass              _dlssrrPass;
         private SLDlssrrPass            _slDlssrrPass;
         private SLDlssgInputsPass       _slDlssgInputsPass;
-        private SLReflexBeginPass       _slReflexBeginPass;
-        private SLReflexEndPass         _slReflexEndPass;
+        private SLPclRenderSubmitStartPass _slPclRenderSubmitStartPass;
+        private SLPclRenderSubmitEndPass   _slPclRenderSubmitEndPass;
         private bool                    _slFgLastEnabled;
         private DlssSRPass              _dlsssrPass;
         private NisPass                 _nisPass;
@@ -170,9 +170,9 @@ namespace PathTracing
             _dlssrrPass              ??= new DlssRRPass { renderPassEvent                                                                          = renderPassEvent };
             _slDlssrrPass            ??= new SLDlssrrPass { renderPassEvent                                                                        = renderPassEvent };
             _slDlssgInputsPass       ??= new SLDlssgInputsPass { renderPassEvent                                                                  = renderPassEvent };
-            // Token latch must precede the RR/FG passes + present, so it sits at BeforeRendering.
-            _slReflexBeginPass       ??= new SLReflexBeginPass { renderPassEvent                                                                  = RenderPassEvent.BeforeRendering };
-            _slReflexEndPass         ??= new SLReflexEndPass { renderPassEvent                                                                    = RenderPassEvent.AfterRendering };
+            // RenderSubmitStart must precede the RR/FG passes + present, so it sits at BeforeRendering.
+            _slPclRenderSubmitStartPass ??= new SLPclRenderSubmitStartPass { renderPassEvent                                                      = RenderPassEvent.BeforeRendering };
+            _slPclRenderSubmitEndPass   ??= new SLPclRenderSubmitEndPass { renderPassEvent                                                        = RenderPassEvent.AfterRendering };
             _dlsssrPass              ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
             _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
@@ -613,12 +613,12 @@ namespace PathTracing
             // does NOT depend on this latch; it carries its token directly in SLDlssrrFrameData.
             if (eyeIndex == 0)
             {
-                var slBeginFunc = SLDLRR.SLStreamlineFrameLoop.GetBeginEventFunc();
+                var slBeginFunc = SLDLRR.SLStreamlineFrameLoop.GetRenderSubmitStartEventFunc();
                 var slTokenPtr  = SLDLRR.SLStreamlineFrameLoop.CurrentFrameTokenPtr;
                 if (slBeginFunc != IntPtr.Zero && slTokenPtr != IntPtr.Zero)
                 {
-                    _slReflexBeginPass.Setup(slBeginFunc, slTokenPtr);
-                    renderer.EnqueuePass(_slReflexBeginPass);
+                    _slPclRenderSubmitStartPass.Setup(slBeginFunc, slTokenPtr);
+                    renderer.EnqueuePass(_slPclRenderSubmitStartPass);
                 }
             }
 
@@ -916,12 +916,12 @@ namespace PathTracing
 
             if (eyeIndex == 0)
             {
-                var slEndFunc  = SLDLRR.SLStreamlineFrameLoop.GetEndEventFunc();
+                var slEndFunc  = SLDLRR.SLStreamlineFrameLoop.GetRenderSubmitEndEventFunc();
                 var slTokenPtr = SLDLRR.SLStreamlineFrameLoop.CurrentFrameTokenPtr;
                 if (slEndFunc != IntPtr.Zero && slTokenPtr != IntPtr.Zero)
                 {
-                    _slReflexEndPass.Setup(slEndFunc, slTokenPtr);
-                    renderer.EnqueuePass(_slReflexEndPass);
+                    _slPclRenderSubmitEndPass.Setup(slEndFunc, slTokenPtr);
+                    renderer.EnqueuePass(_slPclRenderSubmitEndPass);
                 }
             }
 

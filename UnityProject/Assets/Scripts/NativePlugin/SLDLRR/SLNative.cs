@@ -11,8 +11,8 @@ namespace SLDLRR
 
         internal static void MarkUnavailable() => Available = false;
 
-        [DllImport(DllName)] internal static extern IntPtr GetSLFGBeginFrameFunc();
-        [DllImport(DllName)] internal static extern IntPtr GetSLFGEndFrameFunc();
+        [DllImport(DllName)] internal static extern IntPtr GetSLRenderSubmitStartEventFunc();
+        [DllImport(DllName)] internal static extern IntPtr GetSLRenderSubmitEndEventFunc();
         [DllImport(DllName)] internal static extern IntPtr GetSLFGFrameInputsFunc();
         [DllImport(DllName)] internal static extern void   SL_SetFrameGeneration(int enable);
         [DllImport(DllName)] internal static extern int    SL_IsFrameGenerationOn();

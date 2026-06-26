@@ -22,7 +22,7 @@ namespace PathTracing
     /// BeforeRenderingPostProcessing). Mirror of <see cref="SLDlssgInputsPass"/>; replaces the
     /// legacy out-of-graph CommandBuffer path that used to execute at beginContextRendering.
     /// </summary>
-    public class SLReflexBeginPass : ScriptableRenderPass
+    public class SLPclRenderSubmitStartPass : ScriptableRenderPass
     {
         private const int EventId = 0;
 
@@ -52,7 +52,7 @@ namespace PathTracing
         {
             if (_eventFunc == IntPtr.Zero || _frameToken == IntPtr.Zero) return;
 
-            using var builder = renderGraph.AddUnsafePass<PassData>("Streamline Reflex Begin (SL)", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Streamline PCL Render Submit Start", out var passData);
 
             passData.EventFunc  = _eventFunc;
             passData.FrameToken = _frameToken;
