@@ -111,7 +111,14 @@ namespace
     void UNITY_INTERFACE_API OnRenderSubmitEnd(int /*eventId*/, void* data)
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
-        if (token) SLReflex::MarkRenderSubmitEnd(*token);
+        if (token)
+        {
+            SLReflex::MarkRenderSubmitEnd(*token);
+            // This frame's GPU work is fully submitted; hand its token to the present-marker FIFO
+            // so the DXGI Present hook tags ePresentStart/End with the frame actually presented
+            // (not the latest in-flight render token). See SLCore.h.
+            SLCore::EnqueuePresentToken(token);
+        }
     }
 
     // DLSS-G per-frame inputs (render thread): tag depth/mvec + set constants.

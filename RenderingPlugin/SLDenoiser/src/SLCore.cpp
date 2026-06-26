@@ -8,6 +8,8 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <deque>
+#include <mutex>
 #include <string>
 
 #include "sl.h"
@@ -29,6 +31,16 @@ namespace
     // latches it here for the DLSS-G render-tag + present PCL markers (the present hook has no
     // data channel of its own). Atomic: written on the render thread, read on the present thread.
     std::atomic<sl::FrameToken*> g_renderToken{ nullptr };
+
+    // Present-marker FIFO (see SLCore.h). Render-submit-end pushes a frame's token; the present
+    // hook pops the oldest so each present pairs with the frame on screen. push (render thread) /
+    // pop (present thread) are mutex-guarded — both are once-per-frame, so contention is nil.
+    // The depth at steady state is the legitimate render-ahead (1-3); the cap is pure overflow
+    // protection so a present/submit count drift can't accumulate a growing, fixed offset.
+    std::mutex                   g_presentQueueMutex;
+    std::deque<sl::FrameToken*>  g_presentQueue;
+    std::atomic<uint32_t>        g_lastEnqueuedPresentIdx{ 0xFFFFFFFFu };
+    constexpr size_t             kMaxPresentQueue = 4;
 
     // Directory containing THIS module (SLDenoiser.dll). In a player build Unity copies
     // native plugins — and the SL runtime DLLs deployed beside us (sl.dlss_g.dll,
@@ -221,6 +233,30 @@ namespace SLCore
 
     sl::FrameToken* CurrentFrameToken() { return g_renderToken.load(std::memory_order_acquire); }
 
+    void EnqueuePresentToken(sl::FrameToken* token)
+    {
+        if (!token) return;
+        // Dedup by frame index: multiple cameras (e.g. main + shadow) forward the SAME per-frame
+        // token, but present fires once per frame — enqueue each unique frame exactly once so the
+        // FIFO stays 1:1 with presents. The render thread serializes camera submits, so the
+        // exchange + push is effectively single-threaded against itself.
+        const uint32_t idx = (uint32_t)(*token);
+        if (g_lastEnqueuedPresentIdx.exchange(idx, std::memory_order_acq_rel) == idx) return;
+
+        std::lock_guard<std::mutex> lk(g_presentQueueMutex);
+        g_presentQueue.push_back(token);
+        while (g_presentQueue.size() > kMaxPresentQueue) g_presentQueue.pop_front();
+    }
+
+    sl::FrameToken* DequeuePresentToken()
+    {
+        std::lock_guard<std::mutex> lk(g_presentQueueMutex);
+        if (g_presentQueue.empty()) return nullptr;
+        sl::FrameToken* t = g_presentQueue.front();
+        g_presentQueue.pop_front();
+        return t;
+    }
+
     void Shutdown()
     {
         if (!IsInited()) return;
@@ -229,6 +265,11 @@ namespace SLCore
         g_fgSupported.store(false);
         g_reflexSupported.store(false);
         g_renderToken.store(nullptr);
+        {
+            std::lock_guard<std::mutex> lk(g_presentQueueMutex);
+            g_presentQueue.clear();
+        }
+        g_lastEnqueuedPresentIdx.store(0xFFFFFFFFu, std::memory_order_release);
         sl::Result r = slShutdown();
         Logf("SLCore", r == sl::Result::eOk ? 0 : 1, "slShutdown -> %s", ResultStr(r));
     }
