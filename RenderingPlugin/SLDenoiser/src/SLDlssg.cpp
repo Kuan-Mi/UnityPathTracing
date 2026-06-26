@@ -49,6 +49,11 @@ namespace
 {
     std::atomic<int>       g_fgDesired{ -1 };
     std::atomic<bool>      g_fgApplied{ false };
+    // Whether slDLSSGSetOptions has been pushed at least once. DLSS-G must be configured into a
+    // defined mode (even eOff) before the SL proxy swapchain's presentCommon() drives it; without
+    // this, starting with FG OFF skipped slDLSSGSetOptions entirely (g_fgApplied already == false)
+    // and the unconfigured DLSS-G removed the device on the first present.
+    std::atomic<bool>      g_fgModeInitialized{ false };
 
     UINT                   g_w = 0, g_h = 0;
     bool                   g_adopted = false;
@@ -62,7 +67,10 @@ namespace
     bool                   g_isDlssgModeOn = false;
     void ApplyDlssgMode(bool on)
     {
-        if (g_fgApplied.load() == on) return;
+        // Skip only once DLSS-G has actually been configured at least once AND is already in the
+        // requested mode. The first call must always go through — even for eOff — so DLSS-G is
+        // initialized into a known state before presentCommon() starts driving the proxy swapchain.
+        if (g_fgModeInitialized.load(std::memory_order_acquire) && g_fgApplied.load() == on) return;
         sl::ViewportHandle viewport{ 0 };
         sl::DLSSGOptions opt{};
         opt.mode = on ? sl::DLSSGMode::eOn : sl::DLSSGMode::eOff;
@@ -71,7 +79,11 @@ namespace
         sl::Result r = slDLSSGSetOptions(viewport, opt);
         Logf(r == sl::Result::eOk ? 0 : 2, "slDLSSGSetOptions(mode=%s, gen=1, retain) -> %s",
              on ? "eOn" : "eOff", R(r));
-        if (r == sl::Result::eOk) g_fgApplied.store(on);
+        if (r == sl::Result::eOk)
+        {
+            g_fgApplied.store(on);
+            g_fgModeInitialized.store(true, std::memory_order_release);
+        }
         g_isDlssgModeOn = on;
     }
 
@@ -138,7 +150,6 @@ namespace
 
     void PostPresentDlssgState()
     {
-        if (!SLCore::CurrentFrameToken()) return;
         const uint64_t p = ++g_presentCount;
         if (SLCore::IsFGSupported() && (p <= 3 || (p & 0x7F) == 0) && g_isDlssgModeOn) LogDlssgState();
     }
@@ -253,7 +264,8 @@ namespace SLDlssg
 
     void Shutdown()
     {
-        g_fgDesired.store(-1); g_fgApplied.store(false); g_featuresEnabledOnPresent = false;
+        g_fgDesired.store(-1); g_fgApplied.store(false); g_fgModeInitialized.store(false);
+        g_featuresEnabledOnPresent = false;
         g_haveRealInputs = false; g_inputs = {}; g_adopted = false;
         g_appliedFrameIdx = 0xFFFFFFFFu;
         g_w = 0; g_h = 0;
