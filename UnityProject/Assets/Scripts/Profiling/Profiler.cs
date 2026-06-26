@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.Profiling;
 
 public class GPUProfiler : MonoBehaviour
@@ -73,7 +74,7 @@ public class GPUProfiler : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(toggleKey))
+        if (Keyboard.current?[toggleKey].wasPressedThisFrame == true)
             _visible = !_visible;
         
         float currentTime = Time.unscaledTime;
@@ -119,7 +120,7 @@ public class GPUProfiler : MonoBehaviour
     }
 
     [Tooltip("切换面板的按键（默认 F2）")]
-    public KeyCode toggleKey = KeyCode.F2;
+    public Key toggleKey = Key.F2;
 
     private bool _visible;
     private Rect _windowRect;

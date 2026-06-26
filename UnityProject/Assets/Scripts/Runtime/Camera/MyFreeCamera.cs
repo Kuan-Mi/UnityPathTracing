@@ -1,5 +1,4 @@
 ﻿// #if ENABLE_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM_PACKAGE
-#define USE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 // #endif
 
@@ -38,24 +37,12 @@ namespace UnityEngine.Rendering
         /// </summary>
         public float m_Turbo = 10.0f;
 
-#if !USE_INPUT_SYSTEM
-        private static string kMouseX = "Mouse X";
-        private static string kMouseY = "Mouse Y";
-        private static string kRightStickX = "Controller Right Stick X";
-        private static string kRightStickY = "Controller Right Stick Y";
-        private static string kVertical = "Vertical";
-        private static string kHorizontal = "Horizontal";
-
-        private static string kYAxis = "YAxis";
-        private static string kSpeedAxis = "Speed Axis";
-#endif
-
-#if USE_INPUT_SYSTEM
-        InputAction lookAction;
+        InputActionMap inputMap;
+        InputAction mouseLookAction;
+        InputAction gamepadLookAction;
         InputAction moveAction;
         InputAction speedAction;
         InputAction yMoveAction;
-#endif
 
         void OnEnable()
         {
@@ -64,15 +51,14 @@ namespace UnityEngine.Rendering
 
         void RegisterInputs()
         {
-#if USE_INPUT_SYSTEM
-            var map = new InputActionMap("Free Camera");
+            inputMap = new InputActionMap("Free Camera");
 
-            lookAction = map.AddAction("look", binding: "<Mouse>/delta");
-            moveAction = map.AddAction("move", binding: "<Gamepad>/leftStick");
-            speedAction = map.AddAction("speed", binding: "<Gamepad>/dpad");
-            yMoveAction = map.AddAction("yMove");
+            mouseLookAction = inputMap.AddAction("mouseLook", binding: "<Mouse>/delta");
+            gamepadLookAction = inputMap.AddAction("gamepadLook", binding: "<Gamepad>/rightStick");
+            moveAction = inputMap.AddAction("move", binding: "<Gamepad>/leftStick");
+            speedAction = inputMap.AddAction("speed", binding: "<Gamepad>/dpad");
+            yMoveAction = inputMap.AddAction("yMove");
 
-            lookAction.AddBinding("<Gamepad>/rightStick").WithProcessor("scaleVector2(x=15, y=15)");
             moveAction.AddCompositeBinding("Dpad")
                 .With("Up", "<Keyboard>/w")
                 .With("Up", "<Keyboard>/upArrow")
@@ -93,31 +79,23 @@ namespace UnityEngine.Rendering
                 .With("Up", "<Gamepad>/rightshoulder")
                 .With("Down", "<Gamepad>/leftshoulder");
 
-            moveAction.Enable();
-            lookAction.Enable();
-            speedAction.Enable();
-            yMoveAction.Enable();
-#endif
+            inputMap.Enable();
+        }
 
-#if UNITY_EDITOR && !USE_INPUT_SYSTEM
-            List<InputManagerEntry> inputEntries = new List<InputManagerEntry>();
+        void OnDisable()
+        {
+            inputMap?.Disable();
+        }
 
-            // Add new bindings
-            inputEntries.Add(new InputManagerEntry { name = kRightStickX, kind = InputManagerEntry.Kind.Axis, axis = InputManagerEntry.Axis.Fourth, sensitivity = 1.0f, gravity = 1.0f, deadZone = 0.2f });
-            inputEntries.Add(new InputManagerEntry { name = kRightStickY, kind = InputManagerEntry.Kind.Axis, axis = InputManagerEntry.Axis.Fifth, sensitivity = 1.0f, gravity = 1.0f, deadZone = 0.2f, invert = true });
-
-            inputEntries.Add(new InputManagerEntry
-            {
-                name = kYAxis, kind = InputManagerEntry.Kind.KeyOrButton, btnPositive = "page up", altBtnPositive = "joystick button 5", btnNegative = "page down", altBtnNegative = "joystick button 4", gravity = 1000.0f, deadZone = 0.001f,
-                sensitivity = 1000.0f
-            });
-            inputEntries.Add(new InputManagerEntry { name = kYAxis, kind = InputManagerEntry.Kind.KeyOrButton, btnPositive = "q", btnNegative = "e", gravity = 1000.0f, deadZone = 0.001f, sensitivity = 1000.0f });
-
-            inputEntries.Add(new InputManagerEntry { name = kSpeedAxis, kind = InputManagerEntry.Kind.KeyOrButton, btnPositive = "home", btnNegative = "end", gravity = 1000.0f, deadZone = 0.001f, sensitivity = 1000.0f });
-            inputEntries.Add(new InputManagerEntry { name = kSpeedAxis, kind = InputManagerEntry.Kind.Axis, axis = InputManagerEntry.Axis.Seventh, gravity = 1000.0f, deadZone = 0.001f, sensitivity = 1000.0f });
-
-            InputRegistering.RegisterInputs(inputEntries);
-#endif
+        void OnDestroy()
+        {
+            inputMap?.Dispose();
+            inputMap = null;
+            mouseLookAction = null;
+            gamepadLookAction = null;
+            moveAction = null;
+            speedAction = null;
+            yMoveAction = null;
         }
 
         float inputRotateAxisX, inputRotateAxisY;
@@ -131,17 +109,18 @@ namespace UnityEngine.Rendering
             inputRotateAxisY = 0.0f;
             leftShiftBoost = false;
             fire1 = false;
-            
-            
-            if(Mouse.current?.rightButton?.isPressed == false)
+
+            if (Mouse.current?.rightButton?.isPressed == true)
             {
-                return;
+                leftShiftBoost = true;
+                var mouseLookDelta = mouseLookAction.ReadValue<Vector2>();
+                inputRotateAxisX = mouseLookDelta.x * m_LookSpeedMouse * k_MouseSensitivityMultiplier;
+                inputRotateAxisY = mouseLookDelta.y * m_LookSpeedMouse * k_MouseSensitivityMultiplier;
             }
 
-#if USE_INPUT_SYSTEM
-            var lookDelta = lookAction.ReadValue<Vector2>();
-            inputRotateAxisX = lookDelta.x * m_LookSpeedMouse * k_MouseSensitivityMultiplier;
-            inputRotateAxisY = lookDelta.y * m_LookSpeedMouse * k_MouseSensitivityMultiplier;
+            var gamepadLookDelta = gamepadLookAction.ReadValue<Vector2>();
+            inputRotateAxisX += gamepadLookDelta.x * m_LookSpeedController * k_MouseSensitivityMultiplier;
+            inputRotateAxisY += gamepadLookDelta.y * m_LookSpeedController * k_MouseSensitivityMultiplier;
 
             leftShift = Keyboard.current?.leftShiftKey?.isPressed ?? false;
             fire1 = Mouse.current?.leftButton?.isPressed == true || Gamepad.current?.xButton?.isPressed == true;
@@ -152,26 +131,6 @@ namespace UnityEngine.Rendering
             inputVertical = moveDelta.y;
             inputHorizontal = moveDelta.x;
             inputYAxis = yMoveAction.ReadValue<Vector2>().y;
-#else
-            if (Input.GetMouseButton(1))
-            {
-                leftShiftBoost = true;
-                inputRotateAxisX = Input.GetAxis(kMouseX) * m_LookSpeedMouse;
-                inputRotateAxisY = Input.GetAxis(kMouseY) * m_LookSpeedMouse;
-            }
-
-            inputRotateAxisX += (Input.GetAxis(kRightStickX) * m_LookSpeedController * k_MouseSensitivityMultiplier);
-            inputRotateAxisY += (Input.GetAxis(kRightStickY) * m_LookSpeedController * k_MouseSensitivityMultiplier);
-
-            leftShift = Input.GetKey(KeyCode.LeftShift);
-            fire1 = Input.GetAxis("Fire1") > 0.0f;
-
-            inputChangeSpeed = Input.GetAxis(kSpeedAxis);
-
-            inputVertical = Input.GetAxis(kVertical);
-            inputHorizontal = Input.GetAxis(kHorizontal);
-            inputYAxis = Input.GetAxis(kYAxis);
-#endif
         }
 
         void Update()

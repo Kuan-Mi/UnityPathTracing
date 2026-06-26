@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.Rendering.Universal;
 
 namespace PathTracing
@@ -10,7 +11,7 @@ namespace PathTracing
     public abstract class SettingGUI<TFeature, TSettings> : MonoBehaviour where TFeature : ScriptableRendererFeature
     {
         [Tooltip("切换面板的按键（默认 F1）")]
-        public KeyCode toggleKey = KeyCode.F1;
+        public Key toggleKey = Key.F1;
 
         public Transform mainLight;
 
@@ -53,7 +54,7 @@ namespace PathTracing
 
         private void Update()
         {
-            if (Input.GetKeyDown(toggleKey))
+            if (Keyboard.current?[toggleKey].wasPressedThisFrame == true)
                 _visible = !_visible;
         }
 

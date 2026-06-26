@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace PathTracing
 {
@@ -51,23 +52,38 @@ namespace PathTracing
         // ── Game view (play mode) ─────────────────────────────────────────────
         private void Update()
         {
-#if ENABLE_LEGACY_INPUT_MANAGER
             if (!Application.isPlaying) return;
 
-            bool ctrlHeld = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            var keyboard = Keyboard.current;
+            bool ctrlHeld = keyboard?.leftCtrlKey.isPressed == true || keyboard?.rightCtrlKey.isPressed == true;
             bool trigger = followMouse
                 ? (!requireCtrl || ctrlHeld)                                       // hover/scrub mode
-                : Input.GetMouseButtonDown(pickButton) && (!requireCtrl || ctrlHeld); // click mode
+                : IsMouseButtonPressedThisFrame(pickButton) && (!requireCtrl || ctrlHeld); // click mode
             if (!trigger) return;
 
             var cam = Camera.main;
             if (cam == null) return;
 
             // Input.mousePosition is bottom-left origin; debug-pixel coords are top-left.
-            Vector3 mp = Input.mousePosition;
+            Vector2 mp = Mouse.current?.position.ReadValue() ?? Vector2.zero;
             var uv = new Vector2(mp.x / cam.pixelWidth, 1f - mp.y / cam.pixelHeight);
             Pick(cam, uv, log: !followMouse);
-#endif
+        }
+
+        private static bool IsMouseButtonPressedThisFrame(int button)
+        {
+            var mouse = Mouse.current;
+            if (mouse == null) return false;
+
+            return button switch
+            {
+                0 => mouse.leftButton.wasPressedThisFrame,
+                1 => mouse.rightButton.wasPressedThisFrame,
+                2 => mouse.middleButton.wasPressedThisFrame,
+                3 => mouse.forwardButton.wasPressedThisFrame,
+                4 => mouse.backButton.wasPressedThisFrame,
+                _ => false
+            };
         }
 
         private void Pick(Camera cam, Vector2 uvTopLeft, bool log = true)

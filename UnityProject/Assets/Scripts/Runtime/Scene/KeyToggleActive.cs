@@ -1,18 +1,19 @@
 ﻿using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.InputSystem;
 
 namespace Runtime
 {
     public class KeyToggleActive : MonoBehaviour
     {
         [SerializeField]
-        private KeyCode _key = KeyCode.Space;
+        private Key _key = Key.Space;
 
         public GameObject target;
 
         private void Update()
         {
-            if (Input.GetKeyDown(_key))
+            if (Keyboard.current?[_key].wasPressedThisFrame == true)
             {
                 target.SetActive(!target.activeSelf);
             }

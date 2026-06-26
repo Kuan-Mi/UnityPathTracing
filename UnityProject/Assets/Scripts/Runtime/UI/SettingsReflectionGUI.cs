@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace PathTracing
 {
@@ -15,7 +16,7 @@ namespace PathTracing
     public abstract class SettingsReflectionGUI : MonoBehaviour
     {
         [Tooltip("切换面板的按键（默认 F1）")]
-        public KeyCode toggleKey = KeyCode.F1;
+        public Key toggleKey = Key.F1;
 
         /// <summary>返回要显示/编辑的设置对象，找不到时返回 null（基类会显示 <see cref="NotFoundMessage"/>）。</summary>
         protected abstract object GetSettings();
@@ -65,7 +66,7 @@ namespace PathTracing
 
         private void Update()
         {
-            if (Input.GetKeyDown(toggleKey))
+            if (Keyboard.current?[toggleKey].wasPressedThisFrame == true)
                 _visible = !_visible;
         }
 
