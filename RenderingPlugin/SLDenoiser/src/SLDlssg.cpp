@@ -63,6 +63,7 @@ namespace
     uint64_t               g_taggedFrames = 0;
     uint64_t               g_presentCount = 0;
     bool                   g_featuresEnabledOnPresent = false;
+    bool                   g_isDlssgModeOn = false;
     void ApplyDlssgMode(bool on)
     {
         if (g_fgApplied.load() == on) return;
@@ -75,6 +76,7 @@ namespace
         Logf(r == sl::Result::eOk ? 0 : 2, "slDLSSGSetOptions(mode=%s, gen=1, retain) -> %s",
              on ? "eOn" : "eOff", R(r));
         if (r == sl::Result::eOk) g_fgApplied.store(on);
+        g_isDlssgModeOn = on;
     }
 
     void LogDlssgState()
@@ -152,7 +154,7 @@ namespace
         if (!token) return;
         slPCLSetMarker(sl::PCLMarker::ePresentEnd, *token);
         const uint64_t p = ++g_presentCount;
-        if (SLCore::IsFGSupported() && (p <= 3 || (p & 0x7F) == 0)) LogDlssgState();
+        if (SLCore::IsFGSupported() && (p <= 3 || (p & 0x7F) == 0) && g_isDlssgModeOn) LogDlssgState();
     }
 
 }
