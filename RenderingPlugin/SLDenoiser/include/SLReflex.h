@@ -92,5 +92,10 @@ namespace SLReflex
     // Main thread. Emit ePCLatencyPing on the frame that C# determined will consume the ping.
     void MarkPclLatencyPing(const sl::FrameToken& token, unsigned count = 1);
 
+    // Main thread, on the frame whose input sampled a trigger (e.g. fire/click). Emits
+    // eTriggerFlash for the Reflex Latency Analyzer's flash indicator (LDAT click-to-photon).
+    // Idempotent per token. Optional — only meaningful with the hardware analyzer / flash overlay.
+    void MarkTriggerFlash(const sl::FrameToken& token);
+
     void Shutdown();
 }

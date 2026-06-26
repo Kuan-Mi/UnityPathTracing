@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.LowLevel;
 
@@ -11,6 +12,12 @@ namespace SLDLRR
         private static IntPtr _renderSubmitEndFunc;
         private static IntPtr _frameToken;
         private static bool _playerLoopInstalled;
+
+        // Distinct profiler markers so the two PlayerLoop delegates don't both aggregate under the
+        // generic "UpdateFunction.Invoke()" sample. The FrameBegin marker's time is dominated by
+        // slReflexSleep (intentional CPU pacing), not CPU work.
+        private static readonly ProfilerMarker s_frameBeginMarker = new ProfilerMarker("SL Reflex FrameBegin (Sleep+SimStart)");
+        private static readonly ProfilerMarker s_simEndMarker     = new ProfilerMarker("SL Reflex SimulationEnd");
 
         private struct SLReflexFrameBegin { }
         private struct SLReflexSimulationEnd { }
@@ -44,6 +51,7 @@ namespace SLDLRR
         private static void Initialize()
         {
             SLPclLatencyPing.Register();
+            SLReflexFlash.Register();
 
             InstallPlayerLoop();
             SLReflexRuntime.EnsureKeyPoller();
@@ -112,17 +120,20 @@ namespace SLDLRR
 #if UNITY_EDITOR
             if (!Application.isPlaying) return;
 #endif
-            try
+            using (s_frameBeginMarker.Auto())
             {
-                SLPclLatencyPing.ResetFrameState();
-                _frameToken = SLNative.SL_GetNewFrameToken();
-                if (_frameToken != IntPtr.Zero)
+                try
                 {
-                    SLNative.SL_ReflexSleep(_frameToken);
-                    SLNative.SL_MarkSimulationStart(_frameToken);
+                    SLPclLatencyPing.ResetFrameState();
+                    _frameToken = SLNative.SL_GetNewFrameToken();
+                    if (_frameToken != IntPtr.Zero)
+                    {
+                        SLNative.SL_ReflexSleep(_frameToken);
+                        SLNative.SL_MarkSimulationStart(_frameToken);
+                    }
                 }
+                catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
             }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
         }
 
         private static void OnPlayerLoopSimulationEnd()
@@ -130,13 +141,17 @@ namespace SLDLRR
             if (!SLNative.Available) return;
             if (_frameToken == IntPtr.Zero) return;
 
-            try { SLNative.SL_MarkSimulationEnd(_frameToken); }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            using (s_simEndMarker.Auto())
+            {
+                try { SLNative.SL_MarkSimulationEnd(_frameToken); }
+                catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            }
         }
 
         private static void Teardown()
         {
             SLPclLatencyPing.Unregister();
+            SLReflexFlash.Unregister();
             RemovePlayerLoop();
             SLDlssg.Dispose();
         }

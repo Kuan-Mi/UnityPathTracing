@@ -260,6 +260,14 @@ extern "C"
         SLReflex::MarkPclLatencyPing(*reinterpret_cast<sl::FrameToken*>(frameToken), count);
     }
 
+    // SL_MarkTriggerFlash: main thread, on the frame whose input sampled a trigger (click/fire).
+    // Drives the Reflex Latency Analyzer flash indicator. Player-only.
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_MarkTriggerFlash(void* frameToken)
+    {
+        if (!s_IsPlayer || !frameToken) return;
+        SLReflex::MarkTriggerFlash(*reinterpret_cast<sl::FrameToken*>(frameToken));
+    }
+
     // ---- Reflex (low latency) ----
     // mode: 0 = Off, 1 = On (Low Latency), 2 = On + Boost. fpsCapUs: 0 = uncapped.
     // Player-only: tied to the DLSS-G present path, so it's a no-op in the editor (Unity.exe).

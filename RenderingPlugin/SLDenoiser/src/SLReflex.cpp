@@ -32,6 +32,7 @@ namespace
     std::atomic<uint32_t> g_lastRenderSubmitEndIndex{ 0xFFFFFFFFu };
     std::atomic<uint32_t> g_lastPresentStartIndex{ 0xFFFFFFFFu };
     std::atomic<uint32_t> g_lastPresentEndIndex{ 0xFFFFFFFFu };
+    std::atomic<uint32_t> g_lastFlashIndex{ 0xFFFFFFFFu };
 
     // --- PCL latency ping (so FrameView / ReflexTest can MEASURE PC latency) ---
     // FrameView shows "PCL: NA" unless the app answers the PCL stats ping: a registered window
@@ -295,6 +296,22 @@ namespace SLReflex
             slPCLSetMarker(sl::PCLMarker::ePCLatencyPing, token);
     }
 
+    void MarkTriggerFlash(const sl::FrameToken& token)
+    {
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
+        // eTriggerFlash drives the Reflex Latency Analyzer's flash indicator (LDAT click-to-photon
+        // measurement). Emitted on the frame whose input sampled the trigger; dedup so multiple
+        // clicks in one frame flash once.
+        const uint32_t idx  = (uint32_t)token;
+        const uint32_t prev = g_lastFlashIndex.exchange(idx, std::memory_order_acq_rel);
+        if (prev == idx)
+        {
+            Logf(1, "duplicate eTriggerFlash ignored for frame token %u.", idx);
+            return;
+        }
+        slPCLSetMarker(sl::PCLMarker::eTriggerFlash, token);
+    }
+
     void Shutdown()
     {
         // Restore the original WndProc BEFORE the DLL can unload — otherwise Unity would call
@@ -315,6 +332,7 @@ namespace SLReflex
         g_lastRenderSubmitEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastPresentStartIndex.store(0xFFFFFFFFu, std::memory_order_release);
         g_lastPresentEndIndex.store(0xFFFFFFFFu, std::memory_order_release);
+        g_lastFlashIndex.store(0xFFFFFFFFu, std::memory_order_release);
         // slShutdown is owned by SLCore.
     }
 }

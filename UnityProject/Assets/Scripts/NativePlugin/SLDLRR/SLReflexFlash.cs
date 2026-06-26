@@ -5,11 +5,12 @@ using UnityEngine.InputSystem.LowLevel;
 
 namespace SLDLRR
 {
-    public static class SLPclLatencyPing
+    // Emits the Reflex eTriggerFlash PCL marker on the frame whose input sampled a click, so the
+    // Reflex Latency Analyzer (LDAT) / flash indicator can measure click-to-photon latency. Mirror
+    // of SLPclLatencyPing's main-thread input hook (same Dynamic-update gating + current frame
+    // token). Optional: only meaningful with the hardware analyzer or the flash-indicator overlay.
+    public static class SLReflexFlash
     {
-        public static bool LastFrameHadPing { get; private set; }
-        public static uint LastFramePingCount { get; private set; }
-
         internal static void Register()
         {
             InputSystem.onAfterUpdate -= OnAfterInputUpdate;
@@ -21,12 +22,6 @@ namespace SLDLRR
             InputSystem.onAfterUpdate -= OnAfterInputUpdate;
         }
 
-        internal static void ResetFrameState()
-        {
-            LastFramePingCount = 0;
-            LastFrameHadPing = false;
-        }
-
         private static void OnAfterInputUpdate()
         {
             if (!SLNative.Available) return;
@@ -35,23 +30,13 @@ namespace SLDLRR
 #endif
             if (InputState.currentUpdateType != InputUpdateType.Dynamic) return;
 
+            var mouse = Mouse.current;
+            if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
+
             IntPtr token = SLStreamlineFrameLoop.CurrentFrameTokenPtr;
             if (token == IntPtr.Zero) return;
 
-            try
-            {
-                LastFramePingCount = SLNative.SL_ConsumePclPingCount();
-                LastFrameHadPing = LastFramePingCount != 0;
-                if (LastFramePingCount != 0)
-                {
-                    // Debug.Log($"Mark ping {LastFramePingCount}");
-                    SLNative.SL_MarkPclLatencyPing(token, LastFramePingCount);
-                }
-                else
-                {
-                    // Debug.Log("No ping");
-                }
-            }
+            try { SLNative.SL_MarkTriggerFlash(token); }
             catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
         }
     }

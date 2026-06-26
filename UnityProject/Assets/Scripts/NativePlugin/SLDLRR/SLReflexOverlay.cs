@@ -25,7 +25,7 @@ namespace SLDLRR
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            if (FindObjectOfType<SLReflexOverlay>() != null) return;
+            if (FindFirstObjectByType<SLReflexOverlay>() != null) return;
             var go = new GameObject("SL Reflex Overlay") { hideFlags = HideFlags.HideAndDontSave };
             DontDestroyOnLoad(go);
             go.AddComponent<SLReflexOverlay>();
