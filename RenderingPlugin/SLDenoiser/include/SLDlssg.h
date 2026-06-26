@@ -25,6 +25,7 @@ namespace SLDlssg
     {
         void*    depth;          // linear view-Z (render res)
         void*    motionVectors;  // screen-space motion vectors (render res)
+        void*    frameToken;     // this frame's sl::FrameToken* (from SL_GetNewFrameToken)
         unsigned depthState, mvecState;  // D3D12_RESOURCE_STATES
         unsigned mvecDepthW, mvecDepthH; // render res (extent of depth/mvec)
         unsigned colorW, colorH;         // output/display res (full frame extent)

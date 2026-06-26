@@ -15,10 +15,10 @@
 // Frame timeline (token shared by index — see SLCore.h):
 //   * MAIN thread, top of frame: SLCore::GetNewFrameToken mints the frame token; C# then calls
 //     SLReflex sleep and eSimulationStart separately. End of game logic: SLReflex eSimulationEnd.
-//   * RENDER thread frame-begin/end events (data == the FrameToken*): SLCore::SetRenderFrame
-//     latches the token, then SLReflex emits eRenderSubmitStart/End.
+//   * RENDER thread frame-begin/end events (data == the FrameToken*): SLReflex emits
+//     eRenderSubmitStart/End for that token.
 //   * RENDER thread: ConsumeFrameInputs() (FG only) tags depth/mvec + sets constants on the
-//     render token (SLCore::CurrentFrameToken).
+//     frame's own token, carried in FrameInputs::frameToken.
 //   * PRESENT thread (native or SL proxy swapchain hook): SLHooks marks ePresentStart/End
 //     around Present; this file only prepares DLSS-G state before Present.
 
@@ -216,10 +216,10 @@ namespace SLDlssg
             Logf(0, "First real DLSS-G inputs received (mvec/depth %ux%u, frame %ux%u).",
                  inputs.mvecDepthW, inputs.mvecDepthH, inputs.colorW, inputs.colorH);
         }
-        sl::FrameToken* token = SLCore::CurrentFrameToken();
+        sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(inputs.frameToken);
         if (!token)
         {
-            Logf(1, "ConsumeFrameInputs: no render token latched yet (frame-begin event not run).");
+            Logf(1, "ConsumeFrameInputs: FrameInputs carried no frame token (C# token not minted yet).");
             return;
         }
         const uint32_t idx = (uint32_t)(*token);

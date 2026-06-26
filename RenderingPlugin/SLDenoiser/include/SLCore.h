@@ -56,38 +56,31 @@ namespace SLCore
     // minted EXACTLY ONCE per frame and that one pointer is shared across threads — matching
     // the donut/RTXPT pattern (mint in SimStart, reuse through present).
     //
-    // The plugin is otherwise STATELESS about the token: C# holds the minted pointer (the
-    // return of GetNewFrameToken, surfaced as SL_GetNewFrameToken) and passes it back into every call
-    // that has a data channel — the Reflex sim markers and DLSS-RR
-    // evaluate (SLDlssrrFrameData::frameToken). The ONE exception is the DLSS-G present path:
-    //   * SetRenderFrame() latches the C#-forwarded token (frame-begin render event) so the
-    //     DXGI Present hook — which Streamline/DXGI call with NO parameter we control — and
-    //     DLSS-G's render-thread tagging (same frame's valid-until-present tags) can read it
-    //     via CurrentFrameToken(). This single latch is irreducible: the present thread has
-    //     no other way to learn the frame's token.
+    // The plugin is STATELESS about the token: C# holds the minted pointer (the return of
+    // GetNewFrameToken, surfaced as SL_GetNewFrameToken) and passes it back into every call that
+    // has a data channel — the Reflex sim markers, DLSS-RR evaluate (SLDlssrrFrameData::frameToken)
+    // and DLSS-G's render-thread tagging (FrameInputs::frameToken). The DXGI Present hook is the
+    // one path with no such channel; see the present-marker FIFO below.
 
     // Main thread, top of frame. Mint and return a fresh frame token (no caching), or nullptr
-    // if SL is not initialized / the mint failed.
+    // if SL is not initialized / the mint failed. Also registers the frame in the present-marker
+    // FIFO below (mint is the single once-per-frame tick, so this is where present pairing starts).
     sl::FrameToken* GetNewFrameToken();
 
-    // Render thread. Latch the token forwarded from the main thread (frame-begin event data)
-    // for the DLSS-G render-tag + present PCL markers. nullptr is ignored (keeps the previous).
-    void            SetRenderFrame(sl::FrameToken* token);
-    // The latched render/present token (frame currently being rendered/presented). Null before
-    // the first SetRenderFrame. Used ONLY by the DLSS-G render-thread tagging (see above).
-    sl::FrameToken* CurrentFrameToken();
-
     // --- Present-marker FIFO (PCL latency correctness) ----------------------------------
-    // Unity presents on a separate task thread that lags the render-submit thread, so the
-    // single CurrentFrameToken() latch is already AHEAD of the frame actually being presented
-    // by the time the DXGI Present hook runs. Tagging ePresentStart/End with that latch
-    // mis-pairs the present timestamp with the wrong frame token, which corrupts FrameView's
-    // PC-latency math (presentEnd(T) - simStart(T)) and triggers "duplicate ePresent*" drops.
+    // Unity presents on a separate task thread that lags rendering, and the DXGI Present hook has
+    // no data channel to learn the presenting frame's token. Tagging ePresentStart/End with the
+    // latest in-flight token would be AHEAD of the frame actually being presented, which corrupts
+    // FrameView's PC-latency math (presentEnd(T) - simStart(T)) and triggers "duplicate ePresent*"
+    // drops.
     //
-    // Instead, render-submit-end enqueues the frame's token here (render thread) and the present
-    // hook dequeues the OLDEST (present thread). Flip-model present order matches submit order,
-    // so each present's PCL markers pair with the frame on screen. EnqueuePresentToken dedups by
-    // frame index, so multiple cameras forwarding the same per-frame token enqueue it only once.
-    void            EnqueuePresentToken(sl::FrameToken* token);
+    // Instead, GetNewFrameToken enqueues the frame's token at mint (main thread) and the present
+    // hook dequeues the OLDEST (present thread). Flip-model present order matches mint order, so
+    // each present's PCL markers pair with the frame on screen.
     sl::FrameToken* DequeuePresentToken();
+
+    // Player-only gate for the FIFO above. The present hook (the dequeuer) is installed only in the
+    // player; without this, the editor would enqueue at mint with nothing to drain it. The plugin
+    // calls this true when it installs the present-path hooks. Default: disabled.
+    void            SetPresentFifoEnabled(bool enabled);
 }

@@ -1,10 +1,10 @@
 // SLDlssrr.cpp — see SLDlssrr.h.
 //
 // DLSS Ray Reconstruction via Streamline. Per frame on Unity's command list:
-//   SLCore::CurrentFrameToken -> slDLSSDSetOptions (on change) -> slSetConstants ->
+//   frameToken (from SLDlssrrFrameData) -> slDLSSDSetOptions (on change) -> slSetConstants ->
 //   slSetTagForFrame(all RR guides) -> slEvaluateFeature(kFeatureDLSS_RR).
-// The frame token is the shared one owned by SLCore (all SL features must tag the same
-// token per frame); RR no longer mints its own.
+// The frame token is the shared one minted by SLCore::GetNewFrameToken and forwarded by C# in
+// the RR frame data (all SL features must tag the same token per frame); RR no longer mints its own.
 // SL manages the resource state transitions for tagged resources; the host is
 // responsible for restoring command-list state afterwards — we rely on Unity
 // rebinding its own pipeline for subsequent passes (same as the NRI path).

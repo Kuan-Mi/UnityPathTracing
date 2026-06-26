@@ -93,32 +93,24 @@ namespace
     }
 
     // Render-thread submit-start event: data is the FrameToken* minted on the main thread by
-    // SL_GetNewFrameToken, forwarded verbatim via IssuePluginEventAndData. Pins the render/present
-    // side to that exact token so DLSS-G tagging + present markers and DLSS-RR evaluate all
-    // use the frame actually being rendered. The latency-critical Reflex sleep is NOT here —
-    // it runs on the main thread.
+    // SL_GetNewFrameToken, forwarded verbatim via IssuePluginEventAndData. Emits the
+    // eRenderSubmitStart PCL marker for that exact token. The latency-critical Reflex sleep is
+    // NOT here — it runs on the main thread.
     void UNITY_INTERFACE_API OnRenderSubmitStart(int /*eventId*/, void* data)
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
-        SLCore::SetRenderFrame(token);
         // Start of CPU render submission for this frame. Universal (PCL works on every adapter,
         // FG or not).
         if (token) SLReflex::MarkRenderSubmitStart(*token);
     }
 
     // Render-thread submit-end event: data is the FrameToken* for the frame whose command-stream
-    // work is complete. Emits eRenderSubmitEnd before the present hook emits ePresentStart.
+    // work is complete. Emits eRenderSubmitEnd before the present hook emits ePresentStart. The
+    // present-marker FIFO is fed at mint (SLCore::GetNewFrameToken), not here.
     void UNITY_INTERFACE_API OnRenderSubmitEnd(int /*eventId*/, void* data)
     {
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data);
-        if (token)
-        {
-            SLReflex::MarkRenderSubmitEnd(*token);
-            // This frame's GPU work is fully submitted; hand its token to the present-marker FIFO
-            // so the DXGI Present hook tags ePresentStart/End with the frame actually presented
-            // (not the latest in-flight render token). See SLCore.h.
-            SLCore::EnqueuePresentToken(token);
-        }
+        if (token) SLReflex::MarkRenderSubmitEnd(*token);
     }
 
     // DLSS-G per-frame inputs (render thread): tag depth/mvec + set constants.
@@ -150,6 +142,9 @@ extern "C"
             // every frame under manual hooking) and are installed on every adapter; Frame
             // Generation is only enabled as a *mode* on top when the adapter supports it.
             SLHooks::InstallPresentPathHooks();
+            // The present hook is the FIFO's only consumer; enable mint-time enqueue now that it
+            // exists. In the editor this stays disabled, so GetNewFrameToken skips the enqueue.
+            SLCore::SetPresentFifoEnabled(true);
             LogBridge(0, "[NR/SLDlssg] Player detected: present-path hooks installed (Reflex/PCL on "
                          "every adapter; DLSS-G frame generation enabled only when supported).");
         }

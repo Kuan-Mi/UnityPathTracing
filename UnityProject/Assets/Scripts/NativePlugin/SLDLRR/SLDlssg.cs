@@ -16,6 +16,7 @@ namespace SLDLRR
         {
             public IntPtr depth;
             public IntPtr motionVectors;
+            public IntPtr frameToken;   // this frame's sl::FrameToken* (SL_GetNewFrameToken)
             public uint   depthState, mvecState;
             public uint   mvecDepthW, mvecDepthH;
             public uint   colorW, colorH;

@@ -846,6 +846,7 @@ namespace PathTracing
                         {
                             depth                = pool.ViewZ.NativePtr,
                             motionVectors        = pool.Mv.NativePtr,
+                            frameToken           = SLDLRR.SLStreamlineFrameLoop.CurrentFrameTokenPtr,
                             depthState           = SLDLRR.SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
                             mvecState            = SLDLRR.SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
                             mvecDepthW           = (uint)frameState.renderResolution.x,

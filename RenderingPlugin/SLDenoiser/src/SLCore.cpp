@@ -26,26 +26,27 @@ namespace
     std::atomic<bool> g_fgSupported{ false };
     std::atomic<bool> g_reflexSupported{ false };
 
-    // Render/present token latch (see SLCore.h). GetNewFrameToken mints on the main thread and returns
-    // the pointer to C# (no caching); C# forwards it to the render thread, where SetRenderFrame
-    // latches it here for the DLSS-G render-tag + present PCL markers (the present hook has no
-    // data channel of its own). Atomic: written on the render thread, read on the present thread.
-    std::atomic<sl::FrameToken*> g_renderToken{ nullptr };
-
-    // Present-marker FIFO (see SLCore.h). Render-submit-end pushes a frame's token; the present
-    // hook pops the oldest so each present pairs with the frame on screen. push (render thread) /
-    // pop (present thread) are mutex-guarded — both are once-per-frame, so contention is nil.
-    // The depth at steady state is the legitimate render-ahead (1-3); the cap is pure overflow
-    // protection so a present/submit count drift can't accumulate a growing, fixed offset.
+    // Present-marker FIFO (see SLCore.h). GetNewFrameToken pushes a frame's token at mint (main
+    // thread, frame top); the present hook pops the oldest so each present pairs with the frame on
+    // screen. push (main thread) / pop (present thread) are mutex-guarded — both are once-per-frame,
+    // so contention is nil. Mint is the single once-per-frame tick, so mint order == frame order ==
+    // flip-model present order; no enqueue-side dedup is needed. The cap is pure overflow protection
+    // so a present/mint count drift can't accumulate a growing, fixed offset; it must exceed the
+    // mint->present pipeline distance (main-thread-ahead + render-ahead, ~2-5) to avoid false drops.
     //
-    // Each entry carries the frame index captured at enqueue alongside the pointer: SL recycles
+    // Each entry carries the frame index captured at mint alongside the pointer: SL recycles
     // FrameTokens in a ring, so if a token lingers past the ring (only happens under drift) the
     // pointer's current index won't match and we can detect the aliasing instead of mis-tagging.
     struct PresentEntry { sl::FrameToken* token; uint32_t index; };
     std::mutex                   g_presentQueueMutex;
     std::deque<PresentEntry>     g_presentQueue;
-    std::atomic<uint32_t>        g_lastEnqueuedPresentIdx{ 0xFFFFFFFFu };
-    constexpr size_t             kMaxPresentQueue = 4;
+    constexpr size_t             kMaxPresentQueue = 8;
+
+    // Player-only gate: the present hook (the FIFO's consumer) is installed only in the player, so
+    // the editor must NOT enqueue at mint — nothing would ever dequeue it and the FIFO would fill
+    // and drop every frame. The plugin sets this true when it installs the present-path hooks;
+    // default false so the editor skips the enqueue entirely.
+    std::atomic<bool>            g_presentFifoEnabled{ false };
 
     // Drift instrumentation (all guarded by g_presentQueueMutex). The FIFO only stays correct if
     // enqueue:dequeue is 1:1; any persistent imbalance surfaces as one of these. Logged rate-
@@ -236,40 +237,36 @@ namespace SLCore
             Logf("SLCore", 1, "slGetNewFrameToken -> %s", ResultStr(r));
             return nullptr;
         }
+
+        // Register this frame for the present-marker FIFO at mint. GetNewFrameToken is the single
+        // once-per-frame tick (main thread, frame top), so mint order == frame order == flip-model
+        // present order — each present pairs with the right frame, no dedup needed. Push under the
+        // mutex; the present hook pops on the present thread. Player-only: skip when there is no
+        // present hook to dequeue (editor), else the FIFO fills and drops every frame.
+        if (g_presentFifoEnabled.load(std::memory_order_acquire))
+        {
+            const uint32_t idx = (uint32_t)(*token);
+            std::lock_guard<std::mutex> lk(g_presentQueueMutex);
+            g_presentQueue.push_back({ token, idx });
+            g_presentSeenEnqueue = true;
+            // Overflow = present falling behind mint (queue deeper than the mint->present pipeline
+            // distance). Keeping the newest entries IS the correct resync (no permanent stale
+            // offset), but the dropped frames lose their present markers — flag, don't swallow.
+            while (g_presentQueue.size() > kMaxPresentQueue)
+            {
+                g_presentQueue.pop_front();
+                if (++g_presentDropCount == 1 || g_presentDropCount % 64 == 0)
+                    Logf("SLCore", 2,
+                         "present FIFO overflow (depth>%zu): present lagging mint; dropped oldest, "
+                         "resynced to newest (drops=%u).", kMaxPresentQueue, g_presentDropCount);
+            }
+        }
         return token;
     }
 
-    void SetRenderFrame(sl::FrameToken* token)
+    void SetPresentFifoEnabled(bool enabled)
     {
-        if (token) g_renderToken.store(token, std::memory_order_release);
-    }
-
-    sl::FrameToken* CurrentFrameToken() { return g_renderToken.load(std::memory_order_acquire); }
-
-    void EnqueuePresentToken(sl::FrameToken* token)
-    {
-        if (!token) return;
-        // Dedup by frame index: multiple cameras (e.g. main + shadow) forward the SAME per-frame
-        // token, but present fires once per frame — enqueue each unique frame exactly once so the
-        // FIFO stays 1:1 with presents. The render thread serializes camera submits, so the
-        // exchange + push is effectively single-threaded against itself.
-        const uint32_t idx = (uint32_t)(*token);
-        if (g_lastEnqueuedPresentIdx.exchange(idx, std::memory_order_acq_rel) == idx) return;
-
-        std::lock_guard<std::mutex> lk(g_presentQueueMutex);
-        g_presentQueue.push_back({ token, idx });
-        g_presentSeenEnqueue = true;
-        // Overflow = present falling behind submit. Keeping the newest entries IS the correct
-        // resync (we never accumulate a permanent stale offset), but the dropped frames lose
-        // their present markers — flag it rather than swallow it silently.
-        while (g_presentQueue.size() > kMaxPresentQueue)
-        {
-            g_presentQueue.pop_front();
-            if (++g_presentDropCount == 1 || g_presentDropCount % 64 == 0)
-                Logf("SLCore", 2,
-                     "present FIFO overflow (depth>%zu): present lagging submit; dropped oldest, "
-                     "resynced to newest (drops=%u).", kMaxPresentQueue, g_presentDropCount);
-        }
+        g_presentFifoEnabled.store(enabled, std::memory_order_release);
     }
 
     sl::FrameToken* DequeuePresentToken()
@@ -309,7 +306,6 @@ namespace SLCore
         g_deviceSet = false;
         g_fgSupported.store(false);
         g_reflexSupported.store(false);
-        g_renderToken.store(nullptr);
         {
             std::lock_guard<std::mutex> lk(g_presentQueueMutex);
             g_presentQueue.clear();
@@ -318,7 +314,6 @@ namespace SLCore
             g_presentEmptyCount  = 0;
             g_presentAliasCount  = 0;
         }
-        g_lastEnqueuedPresentIdx.store(0xFFFFFFFFu, std::memory_order_release);
         sl::Result r = slShutdown();
         Logf("SLCore", r == sl::Result::eOk ? 0 : 1, "slShutdown -> %s", ResultStr(r));
     }
