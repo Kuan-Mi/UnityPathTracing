@@ -10,8 +10,6 @@
 // editor runs as Unity.exe) and skip them there. DLSS-RR (evaluate-only, no hooks) works in
 // both editor and player.
 //
-// Keep this plugin and the legacy StreamlineProbePlugin mutually exclusive (one slInit/process).
-
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <d3d12.h>
