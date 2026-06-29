@@ -168,7 +168,19 @@ namespace SLDLRR
         private static void StopMessageThread()
         {
             _messageThreadRunning = false;
+
+            // The thread publishes _messageThreadId only after it has started pumping. If we tear
+            // down before that, posting to id 0 is a no-op and the thread would slip into a blocking
+            // GetMessageW we can no longer wake — leaking the process. Briefly wait for the id.
             uint threadId = _messageThreadId;
+            if (threadId == 0 && _messageThread != null && _messageThread.IsAlive)
+            {
+                SpinWait spin = default;
+                while ((threadId = _messageThreadId) == 0 && _messageThread.IsAlive && !spin.NextSpinWillYield)
+                    spin.SpinOnce();
+                threadId = _messageThreadId;
+            }
+
             if (threadId != 0)
                 PostThreadMessageW(threadId, QuitMessage, UIntPtr.Zero, IntPtr.Zero);
 

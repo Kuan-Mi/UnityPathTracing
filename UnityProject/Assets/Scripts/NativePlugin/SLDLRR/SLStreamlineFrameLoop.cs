@@ -61,6 +61,12 @@ namespace SLDLRR
 #if UNITY_EDITOR
             UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= Teardown;
             UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += Teardown;
+            // Application.quitting only fires on play-mode exit; EditorApplication.quitting is the
+            // one that fires when the editor process itself closes. Without it, the PCL ping message
+            // thread is left blocked in GetMessageW (a native call Unity can't abort), which leaves a
+            // residual Unity.exe process behind after the editor window is closed.
+            UnityEditor.EditorApplication.quitting -= Teardown;
+            UnityEditor.EditorApplication.quitting += Teardown;
 #endif
         }
 
