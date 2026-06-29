@@ -68,18 +68,20 @@ namespace SLCore
     // if SL is not initialized / the mint failed.
     sl::FrameToken* GetNewFrameToken();
 
-    // --- Present-marker association by back-buffer index (PCL latency correctness) -------
+    // --- Present-marker association by FIFO (PCL latency correctness) -------
     // Unity presents on a separate task thread that lags rendering, and the DXGI Present hook has
     // no data channel to learn the presenting frame's token. Tagging ePresentStart/End with the
     // wrong frame corrupts FrameView's PC-latency math (presentEnd(T) - simStart(T)).
     //
-    // The render thread records each frame's token into the slot for the back buffer it rendered
-    // into (RegisterPresentToken), and the present hook resolves the token for the back buffer it is
-    // about to flip (ResolvePresentToken, keyed on GetCurrentBackBufferIndex). Keying on the physical
-    // back buffer is self-healing: a frame minted/rendered but never presented (occluded during an
-    // alt-tab) just has its slot overwritten when the index cycles — it can never accumulate a
-    // permanent offset the way a count-coupled FIFO does. Resolve consumes the slot (one present per
-    // registered frame) and skips if the token was recycled out from under it.
+    // The render thread pushes each frame's token in submit order (RegisterPresentToken); the present
+    // hook pops the oldest (ResolvePresentToken). In a flip-model swapchain present order == submit
+    // order, so the queue head is exactly the frame being presented — order-exact. (The earlier
+    // back-buffer-index map could mis-route a frame when the render thread raced ahead of present and
+    // sampled a stale GetCurrentBackBufferIndex; validated against this FIFO it dropped ~1.8% of frames
+    // and mis-tagged on occasion. Map code is retained, commented, in SLCore.cpp.) Resolve skips if the
+    // token was recycled out from under it; a bounded depth cap discards the oldest entry if a frame is
+    // ever registered but never presented (true occlusion drop), so the queue can't desync forever.
+    // The backBufferIndex argument is now unused (kept so callers/hook sites need not change).
     void            RegisterPresentToken(sl::FrameToken* token, uint32_t backBufferIndex);
     sl::FrameToken* ResolvePresentToken(uint32_t backBufferIndex);
 }
