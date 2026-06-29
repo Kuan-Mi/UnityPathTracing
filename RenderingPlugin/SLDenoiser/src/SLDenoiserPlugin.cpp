@@ -247,13 +247,10 @@ extern "C"
         SLReflex::MarkSimulationEnd(*reinterpret_cast<sl::FrameToken*>(frameToken));
     }
 
-    // SL_ConsumePclPingCount: main thread, after SL_GetNewFrameToken minted the token for the
-    // frame that is about to sample input. Returns how many PCL stats pings the WndProc saw
-    // since the previous consume; C# owns the token attribution and calls SL_MarkPclLatencyPing.
-    unsigned UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_ConsumePclPingCount()
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_SetPclPingThreadId(unsigned threadId)
     {
-        if (!s_IsPlayer) return 0;
-        return SLReflex::ConsumePclPingCount();
+        if (!s_IsPlayer) return;
+        SLReflex::SetPclPingThreadId(threadId);
     }
 
     void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SL_MarkPclLatencyPing(void* frameToken, unsigned count)

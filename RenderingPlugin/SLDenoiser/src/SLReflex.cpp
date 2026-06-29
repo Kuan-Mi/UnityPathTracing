@@ -23,6 +23,8 @@ namespace
     std::atomic<unsigned> g_fpsCapDesired{ 0 };
     std::atomic<int>      g_modeApplied{ -1 };
     std::atomic<unsigned> g_fpsCapApplied{ 0xFFFFFFFFu };
+    std::atomic<uint32_t> g_pclPingThreadDesired{ 0 };
+    std::atomic<uint32_t> g_pclPingThreadApplied{ 0xFFFFFFFFu };
 
     // Dedupe: the index of the frame we last slept on / marked sim-start / marked sim-end.
     std::atomic<uint32_t> g_lastSleptIndex{ 0xFFFFFFFFu };
@@ -35,24 +37,9 @@ namespace
     std::atomic<uint32_t> g_lastFlashIndex{ 0xFFFFFFFFu };
 
     // --- PCL latency ping (so FrameView / ReflexTest can MEASURE PC latency) ---
-    // FrameView shows "PCL: NA" unless the app answers the PCL stats ping: a registered window
-    // message (PCLState::statsWindowMessage) the driver/tool posts to the game window. We
-    // subclass the window's WndProc and queue that message until C# can choose the frame token
-    // that will consume the simulated input. C# consumes that queue at the next main-thread
-    // frame begin and emits ePCLatencyPing on that token. This is the 7th PCL marker (we already
-    // emit Simulation/RenderSubmit/Present start+end). See ProgrammingGuidePCL.md §3.0.
-    std::atomic<uint32_t>              g_pclPingMsg{ 0 };       // 0 until acquired from slPCLGetState
-    HWND                               g_pingHwnd    = nullptr;
-    WNDPROC                            g_origWndProc = nullptr;
-    std::atomic<uint64_t>              g_pclPingQueued{ 0 };    // PCL ping messages waiting for C#
-
-    LRESULT CALLBACK PclWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
-    {
-        const uint32_t ping = g_pclPingMsg.load(std::memory_order_acquire);
-        if (ping != 0 && msg == ping)
-            g_pclPingQueued.fetch_add(1, std::memory_order_release);
-        return CallWindowProcW(g_origWndProc, hwnd, msg, wp, lp);
-    }
+    // C# owns a message thread and passes its Win32 thread id here. Streamline PCL then posts its
+    // registered ping message to that thread. The C# thread immediately queues a virtual
+    // InputSystem event, letting Unity's native input update decide which frame sampled the ping.
 
     sl::ReflexMode MapMode(int m)
     {
@@ -70,20 +57,25 @@ namespace
     {
         const int      mode = g_modeDesired.load(std::memory_order_acquire);
         const unsigned cap  = g_fpsCapDesired.load(std::memory_order_acquire);
+        const uint32_t pingThread = g_pclPingThreadDesired.load(std::memory_order_acquire);
         if (g_modeApplied.load(std::memory_order_acquire) == mode &&
-            g_fpsCapApplied.load(std::memory_order_acquire) == cap)
+            g_fpsCapApplied.load(std::memory_order_acquire) == cap &&
+            g_pclPingThreadApplied.load(std::memory_order_acquire) == pingThread)
             return;
 
         sl::ReflexOptions opt{};
         opt.mode         = MapMode(mode);
         opt.frameLimitUs = cap;
+        opt.idThread     = pingThread;
         sl::Result r = slReflexSetOptions(opt);
         Logf(r == sl::Result::eOk ? 0 : 2,
-             "slReflexSetOptions(mode=%d, frameLimitUs=%u) -> %s", mode, cap, R(r));
+             "slReflexSetOptions(mode=%d, frameLimitUs=%u, pclPingThread=%u) -> %s",
+             mode, cap, pingThread, R(r));
         if (r == sl::Result::eOk)
         {
             g_modeApplied.store(mode, std::memory_order_release);
             g_fpsCapApplied.store(cap, std::memory_order_release);
+            g_pclPingThreadApplied.store(pingThread, std::memory_order_release);
         }
     }
 }
@@ -102,13 +94,18 @@ namespace SLReflex
 
     void InstallPclPing(void* hwndV)
     {
-        HWND hwnd = reinterpret_cast<HWND>(hwndV);
-        if (!hwnd || g_origWndProc) return; // idempotent (subclass once)
-        g_pingHwnd    = hwnd;
-        g_origWndProc = reinterpret_cast<WNDPROC>(
-            SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&PclWndProc)));
-        if (!g_origWndProc) { g_pingHwnd = nullptr; Logf(2, "InstallPclPing: SetWindowLongPtrW failed."); return; }
-        Logf(0, "InstallPclPing: subclassed game window %p for PCL latency-ping.", (void*)hwnd);
+        (void)hwndV;
+        Logf(0, "InstallPclPing: WndProc hook skipped; using PCL idThread message path.");
+    }
+
+    void SetPclPingThreadId(uint32_t threadId)
+    {
+        const uint32_t prev = g_pclPingThreadDesired.exchange(threadId, std::memory_order_acq_rel);
+        if (prev != threadId)
+        {
+            g_pclPingThreadApplied.store(0xFFFFFFFFu, std::memory_order_release);
+            Logf(0, "SetPclPingThreadId(%u) requested; applies on next Reflex options update.", threadId);
+        }
     }
 
     bool IsLowLatencyAvailable()
@@ -172,20 +169,6 @@ namespace SLReflex
     void Sleep(const sl::FrameToken& token)
     {
         if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return;
-
-        // Acquire the PCL stats window-message id once it becomes available (it can be 0 until a
-        // latency consumer such as FrameView/ReflexTest attaches), so the ping handler knows which
-        // message to queue for the main-thread owner.
-        if (g_pclPingMsg.load(std::memory_order_acquire) == 0)
-        {
-            sl::PCLState ps{};
-            if (slPCLGetState(ps) == sl::Result::eOk && ps.statsWindowMessage != 0)
-            {
-                g_pclPingMsg.store(ps.statsWindowMessage, std::memory_order_release);
-                Logf(0, "PCL stats ping acquired (statsWindowMessage=0x%x); PC latency now measurable.",
-                     ps.statsWindowMessage);
-            }
-        }
 
         // slReflexSetOptions + slReflexSleep must ALWAYS be issued (even when Reflex is Off);
         // the driver gates the actual sleep on the mode. See the guide's NOTEs in §4.0.
@@ -283,12 +266,6 @@ namespace SLReflex
         slPCLSetMarker(sl::PCLMarker::ePresentEnd, token);
     }
 
-    unsigned ConsumePclPingCount()
-    {
-        const uint64_t n = g_pclPingQueued.exchange(0, std::memory_order_acq_rel);
-        return n > 0xFFFFFFFFull ? 0xFFFFFFFFu : (unsigned)n;
-    }
-
     void MarkPclLatencyPing(const sl::FrameToken& token, unsigned count)
     {
         if (!SLCore::IsInited() || !SLCore::IsDeviceSet() || count == 0) return;
@@ -314,14 +291,8 @@ namespace SLReflex
 
     void Shutdown()
     {
-        // Restore the original WndProc BEFORE the DLL can unload — otherwise Unity would call
-        // into freed code on the next window message and crash.
-        if (g_origWndProc && g_pingHwnd)
-            SetWindowLongPtrW(g_pingHwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(g_origWndProc));
-        g_origWndProc = nullptr;
-        g_pingHwnd    = nullptr;
-        g_pclPingMsg.store(0, std::memory_order_release);
-        g_pclPingQueued.store(0, std::memory_order_release);
+        g_pclPingThreadDesired.store(0, std::memory_order_release);
+        g_pclPingThreadApplied.store(0xFFFFFFFFu, std::memory_order_release);
 
         g_modeApplied.store(-1, std::memory_order_release);
         g_fpsCapApplied.store(0xFFFFFFFFu, std::memory_order_release);

@@ -202,11 +202,7 @@ namespace
         g_proxySwapchain->QueryInterface(IID_PPV_ARGS(&g_proxySC3));
         InstallPresentHookOnProxy(*ppSwapChain);
 
-        HWND hwnd = nullptr;
-        if (g_proxySwapchain && SUCCEEDED(g_proxySwapchain->GetHwnd(&hwnd)) && hwnd)
-            SLReflex::InstallPclPing(hwnd);
-        else
-            Logf(1, "AdoptSwapChain: GetHwnd failed; PCL latency-ping not installed (PCL stays NA).");
+        SLReflex::InstallPclPing(nullptr);
 
         SLDlssg::OnSwapChainAdopted(desc.Width, desc.Height);
     }

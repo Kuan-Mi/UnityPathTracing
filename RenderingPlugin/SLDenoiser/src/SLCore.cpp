@@ -264,8 +264,8 @@ namespace SLCore
 
         // Per-present diagnostic: resolved frame index + remaining queue depth (idx 0xFFFFFFFF = the
         // queue was empty, e.g. pre-roll or a present with no prior register).
-        Logf("SLCore", 0, "present fifo idx=%u depth=%zu",
-             (have && q.token) ? (uint32_t)(*q.token) : 0xFFFFFFFFu, g_presentQueue.size());
+        // Logf("SLCore", 0, "present fifo idx=%u depth=%zu",
+        //      (have && q.token) ? (uint32_t)(*q.token) : 0xFFFFFFFFu, g_presentQueue.size());
 
         if (!have || !q.token) return nullptr;            // pre-roll, or a present with no registered frame
         // Lifetime guard: the FrameToken lives in SL's ring (memory stays valid) but may have been
