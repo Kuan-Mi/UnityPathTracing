@@ -15,19 +15,19 @@ namespace SLDLRR
     /// of <see cref="SLDlssrr"/>. Unlike the NRI path it can run concurrently with DLSS-G
     /// frame generation (both go through the same slInit), so it is the path the features use.
     ///
-    /// Backed by the native <c>SLDenoiser</c> DLL. Tags RAW ID3D12Resource* pointers
+    /// Backed by the native <c>StreamlinePlugin</c> DLL. Tags RAW ID3D12Resource* pointers
     /// (<see cref="NriTextureResource.NativePtr"/>) — Streamline evaluates DLSS-SR on Unity's
     /// command list and transitions the tagged resources itself.
     /// </summary>
     public class SLDlssr : IDisposable
     {
-        [DllImport("SLDenoiser")]
+        [DllImport("StreamlinePlugin")]
         private static extern int CreateSLDlssrInstance();
 
-        [DllImport("SLDenoiser")]
+        [DllImport("StreamlinePlugin")]
         private static extern void DestroySLDlssrInstance(int id);
 
-        [DllImport("SLDenoiser")]
+        [DllImport("StreamlinePlugin")]
         private static extern bool SLDlssr_QueryOptimalRenderSize(
             uint outputWidth, uint outputHeight, byte mode,
             out uint renderWidth, out uint renderHeight);

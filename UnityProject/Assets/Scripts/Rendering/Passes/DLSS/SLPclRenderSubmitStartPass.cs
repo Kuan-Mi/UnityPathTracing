@@ -6,7 +6,7 @@ using UnityEngine.Rendering.Universal;
 namespace PathTracing
 {
     /// <summary>
-    /// Pins the SLDenoiser render/present side to the frame currently being rendered, by
+    /// Pins the StreamlinePlugin render/present side to the frame currently being rendered, by
     /// forwarding this frame's Streamline FrameToken (minted on the main thread at the top of
     /// the frame by <see cref="SLDLRR.SLStreamlineFrameLoop"/>) to the render thread via
     /// <c>IssuePluginEventAndData</c>. The native begin event latches it (so the present-thread

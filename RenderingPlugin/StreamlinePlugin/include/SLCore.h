@@ -1,5 +1,5 @@
 // SLCore.h
-// Shared Streamline lifecycle for the SLDenoiser plugin: one slInit, one guarded
+// Shared Streamline lifecycle for the StreamlinePlugin plugin: one slInit, one guarded
 // slSetD3DDevice, one slShutdown, plus shared logging/result helpers. Every SL feature
 // hosted in this plugin (DLSS-RR, DLSS-G, and later DLSS-SR / NIS) uses this — they must
 // NOT call slInit/slSetD3DDevice/slShutdown themselves (Streamline is one instance per

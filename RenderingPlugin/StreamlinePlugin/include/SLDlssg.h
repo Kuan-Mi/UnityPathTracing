@@ -1,5 +1,5 @@
 // SLDlssg.h
-// DLSS-G (Frame Generation) via Streamline, hosted in the SLDenoiser plugin alongside
+// DLSS-G (Frame Generation) via Streamline, hosted in the StreamlinePlugin plugin alongside
 // DLSS-RR. Ported from the proven StreamlineProbe machinery, but fed REAL path-tracer
 // inputs (depth + motion vectors + camera constants; HUDLessColor omitted for now — SL
 // interpolates the presented backbuffer).
@@ -7,7 +7,7 @@
 // Unlike DLSS-RR (evaluate-time), DLSS-G takes over the PRESENT path: it needs the SL
 // device-queue + swapchain proxies installed BEFORE Unity creates them, so the plugin
 // must be load-on-startup and these hooks are installed only in the PLAYER (the editor
-// auto-detect in SLDenoiserPlugin.cpp skips them — queue proxying crashes the editor).
+// auto-detect in StreamlinePlugin.cpp skips them — queue proxying crashes the editor).
 //
 // slInit/slSetD3DDevice/slShutdown + logging are shared via SLCore (which loads
 // DLSS_G/Reflex/PCL alongside DLSS_RR). See SLCore.h.

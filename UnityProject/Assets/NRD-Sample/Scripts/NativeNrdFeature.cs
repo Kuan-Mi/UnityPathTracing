@@ -589,7 +589,7 @@ namespace PathTracing
 
             if (setting.RR)
             {
-                // DLSS Ray Reconstruction through Streamline (SLDenoiser).
+                // DLSS Ray Reconstruction through Streamline (StreamlinePlugin).
                 if (!_slDlrrDenoisers.TryGetValue(uniqueKey, out var slDlrr))
                 {
                     var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
@@ -640,7 +640,7 @@ namespace PathTracing
             }
             else if (setting.SR)
             {
-                // DLSS Super Resolution through Streamline (SLDenoiser): Composed → DlssOutput
+                // DLSS Super Resolution through Streamline (StreamlinePlugin): Composed → DlssOutput
                 // (replaces TAA + Final).
                 if (!_slDlsrUpscalers.TryGetValue(uniqueKey, out var slDlsr))
                 {
@@ -750,7 +750,7 @@ namespace PathTracing
                 renderer.EnqueuePass(_nisPass);
             }
 
-            // DLSS-G Frame Generation via Streamline (SLDenoiser). Player-only: in the editor
+            // DLSS-G Frame Generation via Streamline (StreamlinePlugin). Player-only: in the editor
             // the swapchain is never adopted so frame-token/inputs are no-ops. The Reflex/begin
             // tick is driven separately by SLStreamlineFrameLoop's main-thread PlayerLoop hook.
             if (eyeIndex == 0)

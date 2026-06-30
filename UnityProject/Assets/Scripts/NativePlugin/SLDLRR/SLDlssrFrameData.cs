@@ -7,7 +7,7 @@ namespace SLDLRR
 {
     // ===================================================================================
     // SLDlssrFrameData — byte-identical mirror of the native struct in
-    // RenderingPlugin/SLDenoiser/include/SLDlssrFrameData.h (#pragma pack(push,1)).
+    // RenderingPlugin/StreamlinePlugin/include/SLDlssrFrameData.h (#pragma pack(push,1)).
     // Field order and Pack=1 MUST stay in lock-step with the C++ side.
     //
     // DLSS Super Resolution counterpart of SLDlssrrFrameData — fewer guides (input color,

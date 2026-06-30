@@ -412,33 +412,33 @@ target_link_libraries(ShaderCompilerPlugin PRIVATE
 set(SL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Other/streamline-sdk-v2.11.1")
 
 # ---------------------------------------------------------------------------
-# SLDenoiser – DLSS Ray Reconstruction via Streamline (standalone A/B comparison
+# StreamlinePlugin – DLSS Ray Reconstruction via Streamline (standalone A/B comparison
 # against the NRI DLSS-RR path in Denoiser). Evaluate-time feature (no swapchain
 # proxying), so it is editor-safe and loaded on demand.
 # ---------------------------------------------------------------------------
-add_library(SLDenoiser SHARED
-    SLDenoiser/src/SLDenoiserPlugin.cpp
-    SLDenoiser/src/SLCore.cpp
-    SLDenoiser/src/SLHooks.cpp
-    SLDenoiser/src/SLDlssrr.cpp
-    SLDenoiser/src/SLDlssr.cpp
-    SLDenoiser/src/SLDlssg.cpp
-    SLDenoiser/src/SLReflex.cpp
+add_library(StreamlinePlugin SHARED
+    StreamlinePlugin/src/StreamlinePlugin.cpp
+    StreamlinePlugin/src/SLCore.cpp
+    StreamlinePlugin/src/SLHooks.cpp
+    StreamlinePlugin/src/SLDlssrr.cpp
+    StreamlinePlugin/src/SLDlssr.cpp
+    StreamlinePlugin/src/SLDlssg.cpp
+    StreamlinePlugin/src/SLReflex.cpp
 )
 
-target_include_directories(SLDenoiser PRIVATE
-    SLDenoiser/include
+target_include_directories(StreamlinePlugin PRIVATE
+    StreamlinePlugin/include
     "${UNITY_PLUGIN_API_DIR}"
     "${SL_DIR}/include"
     "${WIN_SDK_INC}/um"
     "${WIN_SDK_INC}/shared"
 )
 
-target_compile_options(SLDenoiser PRIVATE /utf-8)
+target_compile_options(StreamlinePlugin PRIVATE /utf-8)
 
-target_link_directories(SLDenoiser PRIVATE "${WIN_SDK_LIB}")
+target_link_directories(StreamlinePlugin PRIVATE "${WIN_SDK_LIB}")
 
-target_link_libraries(SLDenoiser PRIVATE
+target_link_libraries(StreamlinePlugin PRIVATE
     d3d12.lib
     dxgi.lib
     "${SL_DIR}/lib/x64/sl.interposer.lib"
@@ -448,7 +448,7 @@ target_link_libraries(SLDenoiser PRIVATE
 # Output directories and post-build copies for the native plugins
 # ---------------------------------------------------------------------------
 if(NOT NR_SKIP_UNITY_COPY)
-    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin SLDenoiser)
+    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin StreamlinePlugin)
         set_target_properties(${_TARGET} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY         "${NATIVE_PLUGINS_UNITY_DIR}"
             RUNTIME_OUTPUT_DIRECTORY_RELEASE "${NATIVE_PLUGINS_UNITY_DIR}"
@@ -459,7 +459,7 @@ if(NOT NR_SKIP_UNITY_COPY)
         )
     endforeach()
 
-    # Streamline runtime DLLs required by SLDenoiser. sl.dlss + nvngx_dlss = Super
+    # Streamline runtime DLLs required by StreamlinePlugin. sl.dlss + nvngx_dlss = Super
     # Resolution (evaluate); sl.dlss_d + nvngx_dlssd = Ray Reconstruction (evaluate);
     # sl.dlss_g + sl.reflex + nvngx_dlssg = Frame Generation (present-path, player-only).
     # WinPixEventRuntime is required by sl.dlss_g.
@@ -467,7 +467,7 @@ if(NOT NR_SKIP_UNITY_COPY)
                    sl.dlss.dll nvngx_dlss.dll
                    sl.dlss_d.dll nvngx_dlssd.dll
                    sl.dlss_g.dll sl.reflex.dll nvngx_dlssg.dll WinPixEventRuntime.dll)
-        add_custom_command(TARGET SLDenoiser POST_BUILD
+        add_custom_command(TARGET StreamlinePlugin POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${SL_DIR}/bin/x64/development/${_SLDLL}"
                 "${NATIVE_PLUGINS_UNITY_DIR}/${_SLDLL}"

@@ -1,5 +1,5 @@
 // SLReflex.h
-// Reflex Low Latency + PCL markers via Streamline, hosted in the SLDenoiser
+// Reflex Low Latency + PCL markers via Streamline, hosted in the StreamlinePlugin
 // plugin alongside DLSS-RR and DLSS-G.
 //
 // Reflex is INDEPENDENT of DLSS-G (see ProgrammingGuideReflex.md §NOTE: "the sub-features

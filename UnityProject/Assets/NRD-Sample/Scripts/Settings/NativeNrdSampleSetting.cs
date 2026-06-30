@@ -68,7 +68,7 @@ namespace PathTracing
         public bool         SR                   = false;
         public bool         RR                   = false;
 
-        [Tooltip("Enable DLSS-G Frame Generation through Streamline (SLDenoiser). Player-only " +
+        [Tooltip("Enable DLSS-G Frame Generation through Streamline (StreamlinePlugin). Player-only " +
                  "(present-path takeover; the editor ignores it). Keep mutually exclusive with " +
                  "the legacy StreamlineProbePlugin (one slInit per process).")]
         public bool         FGViaSL              = false;

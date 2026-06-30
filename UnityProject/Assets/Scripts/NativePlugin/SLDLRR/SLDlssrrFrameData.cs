@@ -7,7 +7,7 @@ namespace SLDLRR
 {
     // ===================================================================================
     // SLDlssrrFrameData — byte-identical mirror of the native struct in
-    // RenderingPlugin/SLDenoiser/include/SLDlssrrFrameData.h (#pragma pack(push,1)).
+    // RenderingPlugin/StreamlinePlugin/include/SLDlssrrFrameData.h (#pragma pack(push,1)).
     // Field order and Pack=1 MUST stay in lock-step with the C++ side.
     //
     // Matrices are Unity Matrix4x4 (column-major). The native side memcpy's their raw bytes

@@ -1,4 +1,4 @@
-// SLHooks.cpp - Streamline manual-hooking plumbing for SLDenoiser.
+// SLHooks.cpp - Streamline manual-hooking plumbing for StreamlinePlugin.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>

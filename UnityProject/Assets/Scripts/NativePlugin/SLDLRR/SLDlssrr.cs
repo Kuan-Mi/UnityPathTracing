@@ -15,7 +15,7 @@ namespace SLDLRR
     /// SL route against the NRI route inside NativeNrdFeature: swap the
     /// <c>DlrrDenoiser</c>/<c>DlssRRPass</c> pair for <c>SLDlssrr</c>/<c>SLDlssrrPass</c>.
     ///
-    /// Backed by the native <c>SLDenoiser</c> DLL. Unlike the NRI path this tags RAW
+    /// Backed by the native <c>StreamlinePlugin</c> DLL. Unlike the NRI path this tags RAW
     /// ID3D12Resource* pointers (<see cref="NriTextureResource.NativePtr"/>) — Streamline
     /// evaluates DLSS-RR on Unity's command list and transitions the tagged resources itself.
     ///
@@ -24,13 +24,13 @@ namespace SLDLRR
     /// </summary>
     public class SLDlssrr : IDisposable
     {
-        [DllImport("SLDenoiser")]
+        [DllImport("StreamlinePlugin")]
         private static extern int CreateSLDlssrrInstance();
 
-        [DllImport("SLDenoiser")]
+        [DllImport("StreamlinePlugin")]
         private static extern void DestroySLDlssrrInstance(int id);
 
-        [DllImport("SLDenoiser")]
+        [DllImport("StreamlinePlugin")]
         private static extern bool SLDlssrr_QueryOptimalRenderSize(
             uint outputWidth, uint outputHeight, byte mode,
             out uint renderWidth, out uint renderHeight);

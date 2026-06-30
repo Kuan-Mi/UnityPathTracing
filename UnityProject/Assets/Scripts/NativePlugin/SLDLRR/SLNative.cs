@@ -5,7 +5,7 @@ namespace SLDLRR
 {
     internal static class SLNative
     {
-        private const string DllName = "SLDenoiser";
+        private const string DllName = "StreamlinePlugin";
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct ReflexStats

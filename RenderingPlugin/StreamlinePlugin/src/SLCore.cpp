@@ -1,4 +1,4 @@
-// SLCore.cpp — see SLCore.h. Shared Streamline lifecycle + logging for SLDenoiser.
+// SLCore.cpp — see SLCore.h. Shared Streamline lifecycle + logging for StreamlinePlugin.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -47,7 +47,7 @@ namespace
     uint32_t                     g_presentAliasCount = 0;     // token recycled before its pop (rate-limited log)
     constexpr size_t             kMaxQueueDepth = 16;
 
-    // Directory containing THIS module (SLDenoiser.dll). In a player build Unity copies
+    // Directory containing THIS module (StreamlinePlugin.dll). In a player build Unity copies
     // native plugins — and the SL runtime DLLs deployed beside us (sl.dlss_g.dll,
     // nvngx_dlssg.dll, sl.dlss_d.dll, …) — into <build>_Data\Plugins\x86_64\, NOT next to
     // the .exe. SL's default plugin search is the executable directory, so it fails to load

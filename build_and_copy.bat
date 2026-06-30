@@ -70,9 +70,9 @@ copy /Y "%SL_BIN%\WinPixEventRuntime.dll" "%UNITY_PLUGINS%\" >nul
 :: ReflexTestEnable HUD does NOT draw through the SL proxy swapchain, so this is the in-build HUD.
 copy /Y "%SL_BIN%\sl.imgui.dll"           "%UNITY_PLUGINS%\" >nul
 
-copy /Y "%OUT_DIR%\SLDenoiser.dll"        "%UNITY_PLUGINS%\" >nul
-copy /Y "%OUT_DIR%\SLDenoiser.pdb"        "%UNITY_PLUGINS%\" >nul
-:: DLSS-SR Streamline plugin + model (kFeatureDLSS; must sit next to SLDenoiser.dll so
+copy /Y "%OUT_DIR%\StreamlinePlugin.dll"        "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\StreamlinePlugin.pdb"        "%UNITY_PLUGINS%\" >nul
+:: DLSS-SR Streamline plugin + model (kFeatureDLSS; must sit next to StreamlinePlugin.dll so
 :: SL's pathsToPlugins=SelfModuleDir can load it, else "kFeatureDLSS context is missing").
 copy /Y "%SL_BIN%\sl.dlss.dll"            "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlss.dll"         "%UNITY_PLUGINS%\" >nul

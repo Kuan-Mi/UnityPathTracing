@@ -1,4 +1,4 @@
-// SLDenoiserPlugin.cpp
+// StreamlinePlugin.cpp
 // Unity native plugin entry for DLSS Super Resolution + Ray Reconstruction (both
 // evaluate-time) AND DLSS-G Frame Generation (present-path) via Streamline. One shared
 // slInit via SLCore (loads DLSS + DLSS_RR + DLSS_G + Reflex + PCL). SLCore owns the SL
@@ -170,7 +170,7 @@ extern "C"
         // callback will (load-on-startup, before device creation).
         OnGraphicsDeviceEvent(kUnityGfxDeviceEventInitialize);
 
-        LogBridge(0, "[NR/SLDlssg] SLDenoiser plugin loaded (DLSS-RR + DLSS-G via Streamline).");
+        LogBridge(0, "[NR/SLDlssg] StreamlinePlugin loaded (DLSS-RR + DLSS-G via Streamline).");
     }
 
     void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload()
@@ -183,7 +183,7 @@ extern "C"
         SLDlssrr::Shutdown();
         SLDlssr::Shutdown();
         SLCore::Shutdown();
-        LogBridge(0, "[NR/SLDlssg] SLDenoiser plugin unloaded.");
+        LogBridge(0, "[NR/SLDlssg] StreamlinePlugin unloaded.");
     }
 
     // ---- DLSS-RR (evaluate) ----

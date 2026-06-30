@@ -10,7 +10,7 @@ namespace PathTracing
     /// Issues the DLSS Super Resolution evaluate through Streamline (SL), the mirror of
     /// <see cref="DlssSRPass"/> which goes through the NRI <c>Denoiser</c> plugin, and the
     /// upscaling counterpart of <see cref="SLDlssrrPass"/>. Backed by the native
-    /// <c>SLDenoiser</c> DLL; the data pointer is a packed
+    /// <c>StreamlinePlugin</c> DLL; the data pointer is a packed
     /// <see cref="SLDLRR.SLDlssr.GetInteropDataPtr"/> ring-buffer entry.
     /// </summary>
     public class SLDlssrPass : ScriptableRenderPass
@@ -31,7 +31,7 @@ namespace PathTracing
             public IntPtr SRDataPtr;
         }
 
-        [DllImport("SLDenoiser")]
+        [DllImport("StreamlinePlugin")]
         private static extern IntPtr GetSLDlssrRenderEventAndDataFunc();
 
         private static void ExecutePass(PassData data, UnsafeGraphContext context)

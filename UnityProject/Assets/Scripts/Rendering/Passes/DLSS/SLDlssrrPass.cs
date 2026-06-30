@@ -9,7 +9,7 @@ namespace PathTracing
     /// <summary>
     /// Issues the DLSS Ray Reconstruction evaluate through Streamline (SL), the mirror of
     /// <see cref="DlssRRPass"/> which goes through the NRI <c>Denoiser</c> plugin. Backed by
-    /// the native <c>SLDenoiser</c> DLL; the data pointer is a packed
+    /// the native <c>StreamlinePlugin</c> DLL; the data pointer is a packed
     /// <see cref="SLDLRR.SLDlssrr.GetInteropDataPtr"/> ring-buffer entry.
     /// </summary>
     public class SLDlssrrPass : ScriptableRenderPass
@@ -38,7 +38,7 @@ namespace PathTracing
             public IntPtr   RRDataPtr;
         }
 
-        [DllImport("SLDenoiser")]
+        [DllImport("StreamlinePlugin")]
         private static extern IntPtr GetSLDlssrrRenderEventAndDataFunc();
 
         private static void ExecutePass(PassData data, UnsafeGraphContext context)
