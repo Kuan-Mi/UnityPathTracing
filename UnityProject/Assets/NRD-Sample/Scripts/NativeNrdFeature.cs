@@ -75,8 +75,6 @@ namespace PathTracing
         private NRDDlssAfterPass        _nrdDlssAfterPass;
         private SLDlssrrPass            _slDlssrrPass;
         private SLDlssgInputsPass       _slDlssgInputsPass;
-        private SLPclRenderSubmitStartPass _slPclRenderSubmitStartPass;
-        private SLPclRenderSubmitEndPass   _slPclRenderSubmitEndPass;
         private bool                    _slFgLastEnabled;
         private SLDlssrPass             _slDlsrPass;
         private NisPass                 _nisPass;
@@ -165,9 +163,6 @@ namespace PathTracing
             _nrdDlssAfterPass        ??= new NRDDlssAfterPass(nrdDlssAfterShader) { renderPassEvent                                                = renderPassEvent };
             _slDlssrrPass            ??= new SLDlssrrPass { renderPassEvent                                                                        = renderPassEvent };
             _slDlssgInputsPass       ??= new SLDlssgInputsPass { renderPassEvent                                                                  = renderPassEvent };
-            // RenderSubmitStart must precede the RR/FG passes + present, so it sits at BeforeRendering.
-            _slPclRenderSubmitStartPass ??= new SLPclRenderSubmitStartPass { renderPassEvent                                                      = RenderPassEvent.BeforeRendering };
-            _slPclRenderSubmitEndPass   ??= new SLPclRenderSubmitEndPass { renderPassEvent                                                        = RenderPassEvent.AfterRendering };
             _slDlsrPass              ??= new SLDlssrPass { renderPassEvent                                                                         = renderPassEvent };
             _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
@@ -592,24 +587,6 @@ namespace PathTracing
                 renderer.EnqueuePass(_nrdDlssBeforePass);
             }
 
-            // Latch the SL present side to this frame's token (minted on the main thread at frame
-            // top) and emit the render-begin PCL marker. The native present hook reads this latch
-            // and has no data channel of its own. It feeds BOTH the Reflex/PCL present markers
-            // (which run on every adapter, even without Frame Generation) and, when FG is active,
-            // the DLSS-G depth/mvec tagging — so enqueue it every frame whenever SL is live in the
-            // player (token is non-Zero only in play mode), independent of FG/RR. DLSS-RR-via-SL
-            // does NOT depend on this latch; it carries its token directly in SLDlssrrFrameData.
-            if (eyeIndex == 0)
-            {
-                var slBeginFunc = SLDLRR.SLStreamlineFrameLoop.GetRenderSubmitStartEventFunc();
-                var slTokenPtr  = SLDLRR.SLStreamlineFrameLoop.CurrentFrameTokenPtr;
-                if (slBeginFunc != IntPtr.Zero && slTokenPtr != IntPtr.Zero)
-                {
-                    _slPclRenderSubmitStartPass.Setup(slBeginFunc, slTokenPtr);
-                    renderer.EnqueuePass(_slPclRenderSubmitStartPass);
-                }
-            }
-
             if (setting.RR)
             {
                 // DLSS Ray Reconstruction through Streamline (SLDenoiser).
@@ -871,17 +848,6 @@ namespace PathTracing
                 renderer.EnqueuePass(_outputBlitPass);
 
                 renderer.EnqueuePass(_depthBarrierFixPass);
-            }
-
-            if (eyeIndex == 0)
-            {
-                var slEndFunc  = SLDLRR.SLStreamlineFrameLoop.GetRenderSubmitEndEventFunc();
-                var slTokenPtr = SLDLRR.SLStreamlineFrameLoop.CurrentFrameTokenPtr;
-                if (slEndFunc != IntPtr.Zero && slTokenPtr != IntPtr.Zero)
-                {
-                    _slPclRenderSubmitEndPass.Setup(slEndFunc, slTokenPtr);
-                    renderer.EnqueuePass(_slPclRenderSubmitEndPass);
-                }
             }
 
             // DLSS-G frame generation: feed the real path-traced color/depth/motion + camera

@@ -26,7 +26,8 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: 6555254655959270782}
-  m_RendererFeatureMap: 7e85addc60f1f85a
+  - {fileID: 3151056815769802140}
+  m_RendererFeatureMap: 7e85addc60f1f85a9c55089b7acdba2b
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -55,6 +56,20 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &3151056815769802140
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f610a0ca9a946f49b2a3a48f1c6a5ae, type: 3}
+  m_Name: SLPclRenderSubmitFeature
+  m_EditorClassIdentifier: PathTracing.Core::PathTracing.SLPclRenderSubmitFeature
+  m_Active: 1
+  playerOnly: 1
 --- !u!114 &6555254655959270782
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -93,8 +108,8 @@ MonoBehaviour:
     separator: 0
     hitDistScale: 3
     resolutionScale: 1
-    maxAccumulatedFrameNum: 6
-    maxFastAccumulatedFrameNum: 1
+    maxAccumulatedFrameNum: 4
+    maxFastAccumulatedFrameNum: 0
     onScreen: 0
     forcedMaterial: 0
     denoiser: 0

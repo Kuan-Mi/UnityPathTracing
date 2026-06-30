@@ -12,6 +12,7 @@ namespace SLDLRR
         private static IntPtr _renderSubmitStartFunc;
         private static IntPtr _renderSubmitEndFunc;
         private static IntPtr _frameToken;
+        private static int _frameSequence;
         private static bool _playerLoopInstalled;
 
         // Distinct profiler markers so the two PlayerLoop delegates don't both aggregate under the
@@ -30,6 +31,7 @@ namespace SLDLRR
         // PlayerLoop and can render a camera several times per tick — a single shared token would be
         // tagged more than once, which Streamline forbids.
         public static IntPtr CurrentFrameTokenPtr => _frameToken;
+        public static int CurrentFrameSequence => _frameSequence;
 
         public static IntPtr GetRenderSubmitStartEventFunc()
         {
@@ -164,6 +166,7 @@ namespace SLDLRR
                 {
                     SLPclLatencyPing.ResetFrameState();
                     _frameToken = SLNative.SL_GetNewFrameToken();
+                    unchecked { _frameSequence++; }
                     if (_frameToken != IntPtr.Zero)
                     {
                         SLNative.SL_ReflexSleep(_frameToken);
