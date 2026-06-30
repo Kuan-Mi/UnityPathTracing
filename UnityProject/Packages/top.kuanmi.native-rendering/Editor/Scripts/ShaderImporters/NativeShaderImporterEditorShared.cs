@@ -32,7 +32,7 @@ namespace NativeRender
             for (int i = 0; i < count; i++)
             {
                 var elem = prop.GetArrayElementAtIndex(i);
-                elem.FindPropertyRelative("Name").stringValue            = bindings[i].Name ?? "";
+                elem.FindPropertyRelative("Name").stringValue             = bindings[i].Name ?? "";
                 elem.FindPropertyRelative("Sampler").objectReferenceValue = bindings[i].Sampler.asset;
             }
         }
@@ -62,21 +62,21 @@ namespace NativeRender
     internal sealed class ShaderBindingEntry
     {
         public string Name;
-        public string Type;     // SRV / UAV / CBV / Sampler / TLAS
+        public string Type; // SRV / UAV / CBV / Sampler / TLAS
         public int    Space;
         public int    Reg;
-        public int    Size;     // CBV byte size (0 when not reflected / not a CBV)
-        public string Dim;      // e.g. "Texture2D", "Buffer", "ByteAddressBuffer"
-        public string RetType;  // e.g. "float", "uint", ""
+        public int    Size; // CBV byte size (0 when not reflected / not a CBV)
+        public string Dim; // e.g. "Texture2D", "Buffer", "ByteAddressBuffer"
+        public string RetType; // e.g. "float", "uint", ""
 
         /// <summary>Human-readable HLSL-like type, e.g. "Texture2D&lt;float4&gt;" or "StructuredBuffer".</summary>
         public string HlslType
         {
             get
             {
-                if (Type == "CBV")     return "ConstantBuffer";
+                if (Type == "CBV") return "ConstantBuffer";
                 if (Type == "Sampler") return "SamplerState";
-                if (Type == "TLAS")    return "RaytracingAccelerationStructure";
+                if (Type == "TLAS") return "RaytracingAccelerationStructure";
 
                 string prefix = Type == "UAV" ? "RW" : "";
                 string dim    = string.IsNullOrEmpty(Dim) ? "Buffer" : Dim;
@@ -159,21 +159,21 @@ namespace NativeRender
                         {
                             Name    = ExtractString(obj, "name"),
                             Type    = ExtractString(obj, "type"),
-                            Space   = ExtractInt   (obj, "space"),
-                            Reg     = ExtractInt   (obj, "reg"),
-                            Size    = ExtractInt   (obj, "size"),
+                            Space   = ExtractInt(obj, "space"),
+                            Reg     = ExtractInt(obj, "reg"),
+                            Size    = ExtractInt(obj, "size"),
                             Dim     = ExtractString(obj, "dim"),
                             RetType = ExtractString(obj, "retType"),
                         };
 
                         var list = entry.Type switch
                         {
-                            "SRV"     => result.SRV,
-                            "UAV"     => result.UAV,
-                            "CBV"     => result.CBV,
+                            "SRV" => result.SRV,
+                            "UAV" => result.UAV,
+                            "CBV" => result.CBV,
                             "Sampler" => result.Sampler,
-                            "TLAS"    => result.TLAS,
-                            _         => null
+                            "TLAS" => result.TLAS,
+                            _ => null
                         };
                         list?.Add(entry);
                     }
@@ -204,6 +204,7 @@ namespace NativeRender
                 else if (json[i] == ']' && --depth == 0)
                     return json.Substring(open + 1, i - open - 1);
             }
+
             return null;
         }
 
@@ -220,8 +221,13 @@ namespace NativeRender
                 for (int i = o1; i < arrayBody.Length; i++)
                 {
                     if (arrayBody[i] == '{') depth++;
-                    else if (arrayBody[i] == '}' && --depth == 0) { o2 = i; break; }
+                    else if (arrayBody[i] == '}' && --depth == 0)
+                    {
+                        o2 = i;
+                        break;
+                    }
                 }
+
                 if (o2 < 0) yield break;
 
                 yield return arrayBody.Substring(o1 + 1, o2 - o1 - 1);
@@ -232,7 +238,7 @@ namespace NativeRender
         private static string ExtractString(string obj, string key)
         {
             string search = $"\"{key}\"";
-            int ki = obj.IndexOf(search, StringComparison.Ordinal);
+            int    ki     = obj.IndexOf(search, StringComparison.Ordinal);
             if (ki < 0) return "";
             int colon = obj.IndexOf(':', ki + search.Length);
             if (colon < 0) return "";
@@ -246,7 +252,7 @@ namespace NativeRender
         private static int ExtractInt(string obj, string key)
         {
             string search = $"\"{key}\"";
-            int ki = obj.IndexOf(search, StringComparison.Ordinal);
+            int    ki     = obj.IndexOf(search, StringComparison.Ordinal);
             if (ki < 0) return 0;
             int colon = obj.IndexOf(':', ki + search.Length);
             if (colon < 0) return 0;
@@ -263,7 +269,7 @@ namespace NativeRender
     internal static class ShaderImporterGUI
     {
         private static readonly Color CompiledColor = new(0.4f, 0.8f, 0.4f);
-        private static readonly Color StaleColor    = new(1f,   0.6f, 0.3f);
+        private static readonly Color StaleColor    = new(1f, 0.6f, 0.3f);
 
         /// <summary>Session-persisted foldout (survives selection changes, unlike a plain field).</summary>
         public static bool Foldout(string key, string label, bool defaultOpen, bool header = false)
@@ -338,7 +344,7 @@ namespace NativeRender
         /// trailing block (e.g. cleanup of hints whose binding no longer exists).
         /// </summary>
         public static void DrawReflectionPanel(string keyPrefix, string assetPath, ShaderReflectionInfo info,
-                                               Func<ShaderBindingEntry, bool> drawRow = null, Action drawExtra = null)
+            Func<ShaderBindingEntry, bool> drawRow = null, Action drawExtra = null)
         {
             EditorGUILayout.Space(6);
             if (!Foldout(keyPrefix + ".reflection", "Shader Reflection", true, header: true))
@@ -351,12 +357,12 @@ namespace NativeRender
                     $"[{info.NumThreadsX}, {info.NumThreadsY}, {info.NumThreadsZ}]",
                     EditorStyles.boldLabel);
 
-            DrawShaderGroup (keyPrefix + ".shaders", info.Shaders);
-            DrawBindingGroup(keyPrefix + ".srv",     "SRV",     info.SRV,     drawRow);
-            DrawBindingGroup(keyPrefix + ".uav",     "UAV",     info.UAV,     drawRow);
-            DrawBindingGroup(keyPrefix + ".cbv",     "CBV",     info.CBV,     drawRow);
+            DrawShaderGroup(keyPrefix + ".shaders", info.Shaders);
+            DrawBindingGroup(keyPrefix + ".srv", "SRV", info.SRV, drawRow);
+            DrawBindingGroup(keyPrefix + ".uav", "UAV", info.UAV, drawRow);
+            DrawBindingGroup(keyPrefix + ".cbv", "CBV", info.CBV, drawRow);
             DrawBindingGroup(keyPrefix + ".sampler", "Sampler", info.Sampler, drawRow);
-            DrawBindingGroup(keyPrefix + ".tlas",    "TLAS",    info.TLAS,    drawRow);
+            DrawBindingGroup(keyPrefix + ".tlas", "TLAS", info.TLAS, drawRow);
 
             drawExtra?.Invoke();
 
@@ -383,7 +389,7 @@ namespace NativeRender
             => EditorGUILayout.LabelField(e.Name, $"{e.HlslType}    space{e.Space}:{ResourcePrefix(label)}{e.Reg}");
 
         private static void DrawBindingGroup(string key, string label, List<ShaderBindingEntry> entries,
-                                             Func<ShaderBindingEntry, bool> drawRow)
+            Func<ShaderBindingEntry, bool> drawRow)
         {
             if (entries.Count == 0) return;
             if (!Foldout(key, $"{label}  ({entries.Count})", true)) return;
@@ -397,12 +403,12 @@ namespace NativeRender
 
         public static string ResourcePrefix(string type) => type switch
         {
-            "SRV"     => "t",
-            "UAV"     => "u",
-            "CBV"     => "b",
+            "SRV" => "t",
+            "UAV" => "u",
+            "CBV" => "b",
             "Sampler" => "s",
-            "TLAS"    => "t",
-            _         => ""
+            "TLAS" => "t",
+            _ => ""
         };
 
         private static void PrintToConsole(string assetPath, ShaderReflectionInfo info)
@@ -431,11 +437,11 @@ namespace NativeRender
                 sb.AppendLine();
             }
 
-            AppendGroup("SRV",     info.SRV);
-            AppendGroup("UAV",     info.UAV);
-            AppendGroup("CBV",     info.CBV);
+            AppendGroup("SRV", info.SRV);
+            AppendGroup("UAV", info.UAV);
+            AppendGroup("CBV", info.CBV);
             AppendGroup("Sampler", info.Sampler);
-            AppendGroup("TLAS",    info.TLAS);
+            AppendGroup("TLAS", info.TLAS);
 
             Debug.Log(sb.ToString());
         }
@@ -470,9 +476,9 @@ namespace NativeRender
         public static void DrawStaleHints(ScriptedImporter importer, ShaderReflectionInfo info)
         {
             var reflected = new HashSet<string>();
-            foreach (var c in info.CBV)     reflected.Add(c.Name);
-            foreach (var s in info.SRV)     reflected.Add(s.Name);
-            foreach (var t in info.TLAS)    reflected.Add(t.Name);
+            foreach (var c in info.CBV) reflected.Add(c.Name);
+            foreach (var s in info.SRV) reflected.Add(s.Name);
+            foreach (var t in info.TLAS) reflected.Add(t.Name);
             foreach (var s in info.Sampler) reflected.Add(s.Name);
 
             var so = new SerializedObject(importer);
@@ -559,6 +565,7 @@ namespace NativeRender
                 {
                     prop.DeleteArrayElementAtIndex(idx);
                 }
+
                 so.ApplyModifiedProperties();
                 ShaderImporterGUI.ScheduleReimport(importer);
                 return true;
@@ -590,6 +597,7 @@ namespace NativeRender
                     }
                 }
             }
+
             return true;
         }
 
@@ -620,9 +628,11 @@ namespace NativeRender
                 {
                     prop.DeleteArrayElementAtIndex(idx);
                 }
+
                 so.ApplyModifiedProperties();
                 ShaderImporterGUI.ScheduleReimport(importer);
             }
+
             return true;
         }
 
@@ -657,6 +667,7 @@ namespace NativeRender
                     prop.InsertArrayElementAtIndex(idx);
                     prop.GetArrayElementAtIndex(idx).FindPropertyRelative("Name").stringValue = e.Name;
                 }
+
                 prop.GetArrayElementAtIndex(idx).FindPropertyRelative("Sampler").objectReferenceValue = newSampler;
             }
             else if (idx >= 0)
@@ -727,7 +738,9 @@ namespace NativeRender
         protected virtual bool TryDrawBindingRow(ShaderBindingEntry entry) => false;
 
         /// <summary>Optional trailing UI inside the reflection panel (e.g. stale-hint cleanup).</summary>
-        protected virtual void DrawExtraReflection(ShaderReflectionInfo info) { }
+        protected virtual void DrawExtraReflection(ShaderReflectionInfo info)
+        {
+        }
 
         public override void OnInspectorGUI()
         {

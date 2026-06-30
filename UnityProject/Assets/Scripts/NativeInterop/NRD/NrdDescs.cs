@@ -160,8 +160,8 @@ namespace PathTracing.NativeInterop.NRD
 
         public NrdDenoiserDesc(Denoiser denoiser)
         {
-            identifier = 0;
-            this.denoiser   = denoiser;
+            identifier    = 0;
+            this.denoiser = denoiser;
         }
     }
 }

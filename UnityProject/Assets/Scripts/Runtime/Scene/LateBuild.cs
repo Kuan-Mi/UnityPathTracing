@@ -7,9 +7,8 @@ namespace PathTracing
         private async void Start()
         {
             await Awaitable.WaitForSecondsAsync(1);
-            
+
             // PathTracingDataBuilder.instance.Build();
         }
-        
     }
 }

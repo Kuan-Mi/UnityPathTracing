@@ -24,7 +24,7 @@ namespace PathTracing
     {
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
-        private          RtxptPassContext     _ctx;
+        private          RtxptPassContext           _ctx;
 
         public RtxptStablePlanesDebugVizPass(NativeComputeShader shader)
         {
@@ -46,7 +46,7 @@ namespace PathTracing
         {
             internal NativeComputePipeline      Cs;
             internal NativeComputeDescriptorSet Ds;
-            internal RtxptPassContext     Ctx;
+            internal RtxptPassContext           Ctx;
         }
 
         // ── RenderGraph ───────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ namespace PathTracing
                 ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
 
             ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
-            ds.SetRWTexture("u_StableRadiance",     res.StableRadiance.NativePtr);
+            ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
 
             if (buf?.StablePlanesBufferPtr != IntPtr.Zero)
                 ds.SetRWStructuredBuffer("u_StablePlanesBuffer",

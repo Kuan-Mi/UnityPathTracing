@@ -67,7 +67,7 @@ namespace NativeRender
         public static IReadOnlyList<NativeRayTracingTarget> All => s_All;
 
         /// <summary>Pending add events to be consumed by the resource manager each frame.</summary>
-        public static readonly Queue<TargetAddEvent>    AddQueue    = new Queue<TargetAddEvent>();
+        public static readonly Queue<TargetAddEvent> AddQueue = new Queue<TargetAddEvent>();
 
         /// <summary>
         /// Pending remove events to be consumed by the resource manager each frame.
@@ -81,12 +81,14 @@ namespace NativeRender
         /// <summary>
         /// Cached static flag — serialized so it survives a build (GameObject.isStatic is editor-only).
         /// </summary>
-        [SerializeField] private bool _isStaticObject;
+        [SerializeField]
+        private bool _isStaticObject;
 
         /// <summary>True when this target should be treated as a static (immovable) object.</summary>
         public bool IsStatic => _isStaticObject;
 
         public MeshRenderer meshRenderer;
+
         [NonSerialized]
         public int instanceId;
 
@@ -101,7 +103,6 @@ namespace NativeRender
         /// texture native pointers, scalar properties, and classifies submeshes into groups.
         /// Must be called on the main thread.
         /// </summary>
-        
         [ContextMenu("Rebuild Material Data")]
         public void RebuildMaterialData()
         {
@@ -156,7 +157,7 @@ namespace NativeRender
 
             // Object is alive here — safe to capture component references.
             meshRenderer = GetComponent<MeshRenderer>();
-            instanceId = meshRenderer != null ? meshRenderer.GetInstanceID() : 0;
+            instanceId   = meshRenderer != null ? meshRenderer.GetInstanceID() : 0;
             RebuildMaterialData();
             AddQueue.Enqueue(new TargetAddEvent(this, meshRenderer, instanceId));
         }

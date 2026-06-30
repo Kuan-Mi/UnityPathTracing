@@ -45,6 +45,7 @@ namespace PathTracing.NativeInterop.DLRR
                 renderRes = new int2((int)rw, (int)rh);
                 return true;
             }
+
             renderRes = outputRes;
             return false;
         }

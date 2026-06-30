@@ -1,4 +1,4 @@
-using System; 
+using System;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
@@ -26,7 +26,7 @@ namespace PathTracing.NativeInterop.NRD
             public float     denoisingRange;
             public float     strandMaterialID;
         }
-        
+
         public static unsafe void GetCommonSettings(ref CommonSettings commonSettings, NrdDenoiserHelper.CommonFrameInput fi)
         {
             commonSettings.viewToClipMatrix      = fi.viewToClip;
@@ -63,7 +63,7 @@ namespace PathTracing.NativeInterop.NRD
             commonSettings.disocclusionThresholdAlternate = 0.1f;
             commonSettings.isHistoryConfidenceAvailable   = fi.isHistoryConfidenceAvailable;
         }
-        
+
         [DllImport("Denoiser")]
         public static extern int CreateDenoiserInstance(IntPtr denoisers, int count);
 

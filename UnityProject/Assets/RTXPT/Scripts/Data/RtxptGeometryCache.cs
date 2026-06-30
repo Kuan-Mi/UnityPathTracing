@@ -26,8 +26,8 @@ namespace PathTracing
         public readonly uint TotalBytes;
 
         public bool HasPrevPos => PrevPos != Pos;
-        public bool HasNormal  => Normal  != Absent;
-        public bool HasUv      => Uv      != Absent;
+        public bool HasNormal => Normal != Absent;
+        public bool HasUv => Uv != Absent;
         public bool HasTangent => Tangent != Absent;
 
         public RtxptMeshStreamOffsets(Mesh mesh, bool withPrevPosition = false)
@@ -35,20 +35,36 @@ namespace PathTracing
             uint vc     = (uint)mesh.vertexCount;
             uint offset = 0u;
 
-            Pos     = offset;
+            Pos    =  offset;
             offset += vc * 12u;
 
-            if (withPrevPosition) { PrevPos = offset; offset += vc * 12u; }
-            else                    PrevPos = Pos;
+            if (withPrevPosition)
+            {
+                PrevPos =  offset;
+                offset  += vc * 12u;
+            }
+            else PrevPos = Pos;
 
-            if (mesh.HasVertexAttribute(VertexAttribute.Normal)) { Normal = offset; offset += vc * 4u; }
-            else                                                   Normal = Absent;
+            if (mesh.HasVertexAttribute(VertexAttribute.Normal))
+            {
+                Normal =  offset;
+                offset += vc * 4u;
+            }
+            else Normal = Absent;
 
-            if (mesh.HasVertexAttribute(VertexAttribute.TexCoord0)) { Uv = offset; offset += vc * 8u; }
-            else                                                      Uv = Absent;
+            if (mesh.HasVertexAttribute(VertexAttribute.TexCoord0))
+            {
+                Uv     =  offset;
+                offset += vc * 8u;
+            }
+            else Uv = Absent;
 
-            if (mesh.HasVertexAttribute(VertexAttribute.Tangent)) { Tangent = offset; offset += vc * 4u; }
-            else                                                    Tangent = Absent;
+            if (mesh.HasVertexAttribute(VertexAttribute.Tangent))
+            {
+                Tangent =  offset;
+                offset  += vc * 4u;
+            }
+            else Tangent = Absent;
 
             TotalBytes = offset;
         }
@@ -61,10 +77,10 @@ namespace PathTracing
     /// </summary>
     internal sealed class RtxptSkinnedGeometry
     {
-        public GraphicsBuffer Vb;          // owned by the cache
-        public GraphicsBuffer Ib;          // shared per-mesh donut IB (cache-owned)
+        public GraphicsBuffer Vb; // owned by the cache
+        public GraphicsBuffer Ib; // shared per-mesh donut IB (cache-owned)
         public int            VertexCount;
-        public int            MeshId;      // rest-pose mesh, for staleness detection
+        public int            MeshId; // rest-pose mesh, for staleness detection
 
         /// <summary>True until the first repack dispatch (prev = current on that dispatch).</summary>
         public bool PendingFirstFrame = true;
@@ -88,7 +104,7 @@ namespace PathTracing
         private readonly Dictionary<int, GraphicsBuffer>       _staticVbCache = new(); // mesh id
         private readonly Dictionary<int, GraphicsBuffer>       _ibCache       = new(); // mesh id
         private readonly Dictionary<int, RtxptSkinnedGeometry> _skinnedCache  = new(); // renderer id
-        private readonly List<int> _evictScratch = new();
+        private readonly List<int>                             _evictScratch  = new();
 
         /// <summary>Static path: shared per-mesh SoA VB + donut IB.</summary>
         public (GraphicsBuffer vb, GraphicsBuffer ib) GetOrCreate(Mesh src)
@@ -97,7 +113,7 @@ namespace PathTracing
 
             if (!_staticVbCache.TryGetValue(key, out var vb))
             {
-                vb = BuildSoAVertexBuffer(src, new RtxptMeshStreamOffsets(src));
+                vb                  = BuildSoAVertexBuffer(src, new RtxptMeshStreamOffsets(src));
                 _staticVbCache[key] = vb;
             }
 
@@ -188,7 +204,7 @@ namespace PathTracing
             if (_ibCache.TryGetValue(meshId, out var cached)) return cached;
 
             using var meshDataArray = Mesh.AcquireReadOnlyMeshData(src);
-            var meshData = meshDataArray[0];
+            var       meshData      = meshDataArray[0];
 
             int totalIndexSlots = 0;
             for (int s = 0; s < src.subMeshCount; s++)
@@ -224,10 +240,10 @@ namespace PathTracing
             int vbBytes = (int)streams.TotalBytes;
 
             using var meshDataArray = Mesh.AcquireReadOnlyMeshData(src);
-            var meshData = meshDataArray[0];
+            var       meshData      = meshDataArray[0];
 
             var vbData = new NativeArray<uint>(vbBytes / 4, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-            int w = 0; // write cursor, in uints (streams are packed in declaration order)
+            int w      = 0; // write cursor, in uints (streams are packed in declaration order)
 
             // Position stream (float3, no compression)
             {
@@ -252,6 +268,7 @@ namespace PathTracing
                         vbData[w++] = (uint)BitConverter.SingleToInt32Bits(p.z);
                     }
                 }
+
                 positions.Dispose();
             }
 
@@ -276,6 +293,7 @@ namespace PathTracing
                     vbData[w++] = (uint)BitConverter.SingleToInt32Bits(uv.x);
                     vbData[w++] = (uint)BitConverter.SingleToInt32Bits(uv.y);
                 }
+
                 uvs.Dispose();
             }
 
@@ -290,6 +308,7 @@ namespace PathTracing
                     Vector4 t = tangents[i];
                     vbData[w++] = PackRGBA8Snorm(new Vector4(t.x, t.y, t.z, -t.w));
                 }
+
                 tangents.Dispose();
             }
 
@@ -306,9 +325,9 @@ namespace PathTracing
         private static uint PackRGB8Snorm(Vector3 v)
         {
             float scale = 127.0f / Mathf.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-            int r = (int)(v.x * scale) & 0xFF;
-            int g = (int)(v.y * scale) & 0xFF;
-            int b = (int)(v.z * scale) & 0xFF;
+            int   r     = (int)(v.x * scale) & 0xFF;
+            int   g     = (int)(v.y * scale) & 0xFF;
+            int   b     = (int)(v.z * scale) & 0xFF;
             return (uint)(r | (g << 8) | (b << 16));
         }
 
@@ -316,10 +335,10 @@ namespace PathTracing
         {
             // donut scales all four channels by 127/length(xyz) (w shares the xyz-based scale).
             float scale = 127.0f / Mathf.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-            int r = (int)(v.x * scale) & 0xFF;
-            int g = (int)(v.y * scale) & 0xFF;
-            int b = (int)(v.z * scale) & 0xFF;
-            int a = (int)(v.w * scale) & 0xFF;
+            int   r     = (int)(v.x * scale) & 0xFF;
+            int   g     = (int)(v.y * scale) & 0xFF;
+            int   b     = (int)(v.z * scale) & 0xFF;
+            int   a     = (int)(v.w * scale) & 0xFF;
             return (uint)(r | (g << 8) | (b << 16) | (a << 24));
         }
     }

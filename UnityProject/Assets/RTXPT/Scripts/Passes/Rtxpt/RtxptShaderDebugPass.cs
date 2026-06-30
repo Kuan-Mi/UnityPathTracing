@@ -59,8 +59,8 @@ namespace PathTracing
     {
         private const uint kRGBA16F = (uint)DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
 
-        private RtxptPassContext _ctx;
-        private readonly uint[] _header = new uint[RtxptBufferResources.ShaderDebugHeaderBytes / 4];
+        private          RtxptPassContext _ctx;
+        private readonly uint[]           _header = new uint[RtxptBufferResources.ShaderDebugHeaderBytes / 4];
 
         public void Dispose()
         {
@@ -91,8 +91,8 @@ namespace PathTracing
             // so rebuild worldToClip with the far plane at infinity (reverse-Z: m22 = 0,
             // m23 = near, where near = m23/(1+m22) of the finite matrix). Only the ShaderDebug
             // draw shaders read this matrix.
-            Matrix4x4 proj = _ctx.FrameState.viewToClip;
-            float nearZ = proj.m23 / (1f + proj.m22);
+            Matrix4x4 proj  = _ctx.FrameState.viewToClip;
+            float     nearZ = proj.m23 / (1f + proj.m22);
             proj.m22 = 0f;
             proj.m23 = nearZ;
             Matrix4x4 m = proj * _ctx.FrameState.worldToView;
@@ -154,16 +154,16 @@ namespace PathTracing
         private readonly uint[] _colorFmt = { kRGBA16F };
 
         private RtxptPassContext _ctx;
-        private IntPtr                 _targetPtr;
-        private int2                   _targetRes;
+        private IntPtr           _targetPtr;
+        private int2             _targetRes;
 
         private static int s_pendingPrintReadbacks;
         private static int s_pendingFeedbackReadbacks;
 
         public RtxptShaderDebugDrawPass(NativeRasterShader trianglesShader,
-                                              NativeRasterShader linesShader,
-                                              NativeRasterShader feedbackLinesShader,
-                                              NativeRasterShader blendVizShader)
+            NativeRasterShader linesShader,
+            NativeRasterShader feedbackLinesShader,
+            NativeRasterShader blendVizShader)
         {
             var alphaTris = NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(
                 kRGBA16F, NativeRenderPlugin.RasterPipelineStateDesc.TopologyTriangleList);
@@ -208,8 +208,8 @@ namespace PathTracing
         private class PassData
         {
             internal NativeRasterPipeline      TrianglesRaster, LinesRaster, FeedbackLinesRaster, BlendVizRaster;
-            internal NativeRasterDescriptorSet TrianglesDs, LinesDs, FeedbackLinesDs, BlendVizDs;
-            internal RtxptPassContext    Ctx;
+            internal NativeRasterDescriptorSet TrianglesDs,     LinesDs,     FeedbackLinesDs,     BlendVizDs;
+            internal RtxptPassContext          Ctx;
             internal IntPtr                    TargetPtr;
             internal int2                      TargetRes;
             internal uint[]                    ColorFmt;
@@ -241,8 +241,8 @@ namespace PathTracing
             pd.DrawFeedbackLines   = s.showDebugLines;
             // While a debug view is selected the output blit shows the viz texture fullscreen;
             // blending it over the LDR image as well would double-display it.
-            pd.DrawVizOverlay      = s.debugViewType == RtxptDebugViewType.Disabled
-                                     && s.showMode != RtxptShowMode.NEELightColor;
+            pd.DrawVizOverlay = s.debugViewType == RtxptDebugViewType.Disabled
+                                && s.showMode != RtxptShowMode.NEELightColor;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -271,9 +271,9 @@ namespace PathTracing
                 ds.SetTexture("t_Depth", depthPtr);
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = viewport,
-                    vertexCount = 3, instanceCount = kGeometryInstanceBudget,
+                    numRenderTargets = 1, colorResources     = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = viewport,
+                    vertexCount      = 3, instanceCount      = kGeometryInstanceBudget,
                 };
                 data.TrianglesRaster.Draw(cmd, ds, in draw);
             }
@@ -286,9 +286,9 @@ namespace PathTracing
                 ds.SetTexture("t_DebugVizOutput", vizPtr);
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = viewport,
-                    vertexCount = 3, instanceCount = kGeometryInstanceBudget,
+                    numRenderTargets = 1, colorResources     = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = viewport,
+                    vertexCount      = 3, instanceCount      = kGeometryInstanceBudget,
                 };
                 data.LinesRaster.Draw(cmd, ds, in draw);
             }
@@ -298,16 +298,16 @@ namespace PathTracing
             {
                 var ds = data.FeedbackLinesDs;
                 ds.SetStructuredBuffer("t_DebugLines", buf.DebugLinesBufferPtr,
-                                       RtxptBufferResources.MaxDebugLines,
-                                       RtxptBufferResources.DebugLineStructSize);
+                    RtxptBufferResources.MaxDebugLines,
+                    RtxptBufferResources.DebugLineStructSize);
                 ds.SetBuffer("t_ShaderDebugBuffer", debugBufPtr);
                 ds.SetBuffer("t_Feedback", buf.FeedbackBufferPtr);
                 ds.SetTexture("t_Depth", depthPtr);
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = viewport,
-                    vertexCount = RtxptBufferResources.MaxDebugLines, instanceCount = 1,
+                    numRenderTargets = 1, colorResources                                 = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport                             = viewport,
+                    vertexCount      = RtxptBufferResources.MaxDebugLines, instanceCount = 1,
                 };
                 data.FeedbackLinesRaster.Draw(cmd, ds, in draw);
             }
@@ -319,9 +319,9 @@ namespace PathTracing
                 ds.SetTexture("t_DebugVizOutput", vizPtr);
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = viewport,
-                    vertexCount = 4, instanceCount = 1,
+                    numRenderTargets = 1, colorResources     = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = viewport,
+                    vertexCount      = 4, instanceCount      = 1,
                 };
                 data.BlendVizRaster.Draw(cmd, ds, in draw);
             }
@@ -371,10 +371,10 @@ namespace PathTracing
             };
             float* f = (float*)p;
             for (int i = 0; i < 16; i++)
-                fb.DebugPrintSlots[i] = new Vector4(f[i*4 + 0], f[i*4 + 1], f[i*4 + 2], f[i*4 + 3]);
+                fb.DebugPrintSlots[i] = new Vector4(f[i * 4 + 0], f[i * 4 + 1], f[i * 4 + 2], f[i * 4 + 3]);
             int* ints = (int*)(p + 16 * 16);
-            fb.LineVertexCount  = ints[0];
-            fb.PickedMaterialID = ints[1];
+            fb.LineVertexCount            = ints[0];
+            fb.PickedMaterialID           = ints[1];
             RtxptShaderDebug.LastFeedback = fb;
         }
 
@@ -391,7 +391,7 @@ namespace PathTracing
             int printByteCount = *(int*)raw;
             if (printByteCount <= 0) return;
 
-            bool hadOverflow = printByteCount > kPrintBytes;
+            bool hadOverflow                = printByteCount > kPrintBytes;
             if (hadOverflow) printByteCount = kPrintBytes;
 
             byte* cur = raw + kHeaderBytes;
@@ -420,12 +420,13 @@ namespace PathTracing
                     if (arg == null)
                         break;
                     string placeholder = "{" + i + "}";
-                    int idx = text.IndexOf(placeholder, StringComparison.Ordinal);
+                    int    idx         = text.IndexOf(placeholder, StringComparison.Ordinal);
                     if (idx < 0)
                         unformatted = (unformatted ?? " [unformatted args] ") + i + ": " + arg + " ";
                     else
                         text = text.Substring(0, idx) + arg + text.Substring(idx + placeholder.Length);
                 }
+
                 if (unformatted != null)
                     text += unformatted;
 
@@ -462,13 +463,14 @@ namespace PathTracing
 
             if (elementCount == 1)
                 return ReadValue(ref cur, typeGroup);
- 
+
             var sb = new StringBuilder("(");
             for (int i = 0; i < elementCount; i++)
             {
                 if (i != 0) sb.Append(", ");
                 sb.Append(ReadValue(ref cur, typeGroup));
             }
+
             return sb.Append(')').ToString();
         }
 

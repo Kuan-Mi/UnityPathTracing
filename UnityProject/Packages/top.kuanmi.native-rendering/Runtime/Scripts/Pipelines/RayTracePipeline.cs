@@ -19,9 +19,9 @@ namespace NativeRender
     /// </summary>
     public sealed class RayTracePipeline : IDisposable
     {
-        private ulong _handle;
-        private RayTraceShader  _shader;
-        private HitGroupShader[] _hitGroupShaders; // null when not using multi-blob path
+        private ulong               _handle;
+        private RayTraceShader      _shader;
+        private HitGroupShader[]    _hitGroupShaders; // null when not using multi-blob path
         private RootConstantsHint[] _rootConstantsHints;
         private string[]            _rootSRVHints;
         private SamplerHint[]       _samplerHints;
@@ -47,9 +47,9 @@ namespace NativeRender
         // Persisted event data for hit-group-table rebuild dispatches.
         // Ring of 3 slots so consecutive rebuilds don't overwrite a slot the render
         // thread may still be reading from a previous (in-flight) frame.
-        private const int kShtRingSize = 3;
-        private NativeArray<NativeRenderPlugin.ShtRebuildEventData> _shtEventData;
-        private int _shtRingIndex;
+        private const int                                                 kShtRingSize = 3;
+        private       NativeArray<NativeRenderPlugin.ShtRebuildEventData> _shtEventData;
+        private       int                                                 _shtRingIndex;
 
         // Pipeline-owned copy of the last-applied per-geometry variant indices
         // (main-thread master) plus a ring of pinned copies the render thread reads.
@@ -73,8 +73,8 @@ namespace NativeRender
         /// </summary>
         public RayTracePipeline(RayTraceShader shader)
             : this(shader,
-                   shader != null ? shader.RootConstantsHints : null,
-                   shader != null ? shader.RootSRVHints        : null)
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null)
         {
         }
 
@@ -107,8 +107,8 @@ namespace NativeRender
         /// </summary>
         public RayTracePipeline(RayTraceShader primaryShader, HitGroupShader[] hitGroupShaders)
             : this(primaryShader, hitGroupShaders,
-                   primaryShader != null ? primaryShader.RootConstantsHints : null,
-                   primaryShader != null ? primaryShader.RootSRVHints        : null)
+                primaryShader != null ? primaryShader.RootConstantsHints : null,
+                primaryShader != null ? primaryShader.RootSRVHints : null)
         {
         }
 
@@ -131,8 +131,8 @@ namespace NativeRender
             _samplerHints       = primaryShader.ResolveSamplerHints();
 
             BuildNativeHandleMultiBlob(primaryShader, hitGroupShaders);
-            RayTraceShader.OnRecompiled  += OnShaderRecompiled;
-            HitGroupShader.OnRecompiled  += OnHitGroupShaderRecompiled;
+            RayTraceShader.OnRecompiled += OnShaderRecompiled;
+            HitGroupShader.OnRecompiled += OnHitGroupShaderRecompiled;
         }
 
         private void BuildNativeHandle(RayTraceShader shader)
@@ -142,11 +142,11 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            uint flags = ProfileSupportsOpacityMicromaps(shader.TargetProfile) ? 1u : 0u;
+            uint flags      = ProfileSupportsOpacityMicromaps(shader.TargetProfile) ? 1u : 0u;
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
             string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
-            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
+            string hintsJson  = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
             _handle = hintsJson != null
                 ? NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName, hintsJson)
                 : NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
@@ -159,9 +159,9 @@ namespace NativeRender
 
         private void BuildNativeHandleMultiBlob(RayTraceShader primaryShader, HitGroupShader[] hitGroupShaders)
         {
-            int totalBlobs = 1 + hitGroupShaders.Length;
-            byte[][]  dxils = new byte[totalBlobs][];
-            GCHandle[] pins  = new GCHandle[totalBlobs];
+            int        totalBlobs = 1 + hitGroupShaders.Length;
+            byte[][]   dxils      = new byte[totalBlobs][];
+            GCHandle[] pins       = new GCHandle[totalBlobs];
 
             try
             {
@@ -189,8 +189,8 @@ namespace NativeRender
                     sizes[i] = (uint)dxils[i].Length;
                 }
 
-                uint flags      = ProfileSupportsOpacityMicromaps(primaryShader.TargetProfile) ? 1u : 0u;
-                uint maxPayload = primaryShader.MaxPayloadSizeInBytes;
+                uint   flags      = ProfileSupportsOpacityMicromaps(primaryShader.TargetProfile) ? 1u : 0u;
+                uint   maxPayload = primaryShader.MaxPayloadSizeInBytes;
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
@@ -210,7 +210,8 @@ namespace NativeRender
             finally
             {
                 foreach (var pin in pins)
-                    if (pin.IsAllocated) pin.Free();
+                    if (pin.IsAllocated)
+                        pin.Free();
             }
 
             RefreshSlotLayout();
@@ -226,17 +227,17 @@ namespace NativeRender
             // Strip leading "lib_" and parse major.minor
             const string prefix = "lib_";
             if (!profile.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase)) return false;
-            string version = profile.Substring(prefix.Length); // e.g. "6_9" or "6_6"
-            string[] parts = version.Split('_');
+            string   version = profile.Substring(prefix.Length); // e.g. "6_9" or "6_6"
+            string[] parts   = version.Split('_');
             if (parts.Length < 2) return false;
             if (!int.TryParse(parts[0], out int major) || !int.TryParse(parts[1], out int minor)) return false;
             return major > 6 || (major == 6 && minor >= 9);
         }
 
         private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-                                             SamplerHint[] samplerHints)
+            SamplerHint[] samplerHints)
         {
-            bool hasRC   = rcHints  != null && rcHints.Length  > 0;
+            bool hasRC   = rcHints != null && rcHints.Length > 0;
             bool hasSRV  = srvHints != null && srvHints.Length > 0;
             bool hasSamp = SamplerHintJson.Has(samplerHints);
             if (!hasRC && !hasSRV && !hasSamp) return null;
@@ -257,6 +258,7 @@ namespace NativeRender
                     sb.Append(rcHints[i].Count);
                     sb.Append('}');
                 }
+
                 sb.Append(']');
                 any = true;
             }
@@ -272,6 +274,7 @@ namespace NativeRender
                     sb.Append(srvHints[i]);
                     sb.Append('"');
                 }
+
                 sb.Append(']');
                 any = true;
             }
@@ -289,7 +292,12 @@ namespace NativeRender
         private void RefreshSlotLayout()
         {
             _nameToSlot.Clear();
-            if (_handle == 0) { _slotCount = 0; return; }
+            if (_handle == 0)
+            {
+                _slotCount = 0;
+                return;
+            }
+
             _slotCount = NativeRenderPlugin.NR_RTS_GetBindingCount(_handle);
             for (uint i = 0; i < _slotCount; i++)
             {
@@ -314,7 +322,11 @@ namespace NativeRender
             // Rebuild whenever any of our hit-group blobs changes.
             if (_hitGroupShaders == null) return;
             foreach (var hg in _hitGroupShaders)
-                if (hg == shader) { RebuildPipeline(); return; }
+                if (hg == shader)
+                {
+                    RebuildPipeline();
+                    return;
+                }
         }
 
         // Guards against re-entrance: BuildNativeHandle* → GetOrCompileDxil →
@@ -326,8 +338,14 @@ namespace NativeRender
         {
             if (_rebuilding) return;
             _rebuilding = true;
-            try { RebuildPipelineCore(); }
-            finally { _rebuilding = false; }
+            try
+            {
+                RebuildPipelineCore();
+            }
+            finally
+            {
+                _rebuilding = false;
+            }
         }
 
         private void RebuildPipelineCore()
@@ -381,15 +399,16 @@ namespace NativeRender
 
         public void Dispose()
         {
-            RayTraceShader.OnRecompiled  -= OnShaderRecompiled;
-            HitGroupShader.OnRecompiled  -= OnHitGroupShaderRecompiled;
+            RayTraceShader.OnRecompiled -= OnShaderRecompiled;
+            HitGroupShader.OnRecompiled -= OnHitGroupShaderRecompiled;
 
             if (_shtEventData.IsCreated) _shtEventData.Dispose();
-            if (_shtVariants.IsCreated)  _shtVariants.Dispose();
+            if (_shtVariants.IsCreated) _shtVariants.Dispose();
             if (_shtVariantRing != null)
             {
                 for (int i = 0; i < _shtVariantRing.Length; i++)
-                    if (_shtVariantRing[i].IsCreated) _shtVariantRing[i].Dispose();
+                    if (_shtVariantRing[i].IsCreated)
+                        _shtVariantRing[i].Dispose();
                 _shtVariantRing = null;
             }
 
@@ -421,6 +440,7 @@ namespace NativeRender
                 _shtNeedsReapply = false;
                 IssueShtRebuild(cmd);
             }
+
             IntPtr ptr = ds.SnapshotAndBuildHeader(width, height);
             if (ptr == IntPtr.Zero) return;
             cmd.IssuePluginEventAndData(NativeRenderPlugin.NR_RTS_GetRenderEventFunc(), 1, ptr);
@@ -445,6 +465,7 @@ namespace NativeRender
                 if (_shtVariants.IsCreated) _shtVariants.Dispose();
                 _shtVariants = new NativeArray<uint>(variantIndices.Length, Allocator.Persistent);
             }
+
             _shtVariants.CopyFrom(variantIndices);
             _shtNeedsReapply = false;
             IssueShtRebuild(cmd);
@@ -471,6 +492,7 @@ namespace NativeRender
                 if (ringSlot.IsCreated) ringSlot.Dispose();
                 ringSlot = new NativeArray<uint>(_shtVariants.Length, Allocator.Persistent);
             }
+
             ringSlot.CopyFrom(_shtVariants);
 
             _shtEventData[_shtRingIndex] = new NativeRenderPlugin.ShtRebuildEventData

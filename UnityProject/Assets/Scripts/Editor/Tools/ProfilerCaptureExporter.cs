@@ -121,8 +121,8 @@ namespace PathTracing.Editor.Tools
             Dictionary<string, double> threadSelf,
             Dictionary<string, int> threadFrames)
         {
-            var children = new List<int>();
-            var stack    = new Stack<int>();
+            var  children   = new List<int>();
+            var  stack      = new Stack<int>();
             bool gotSummary = false;
 
             // Thread indices are contiguous from 0 within a frame; stop at the first
@@ -167,7 +167,7 @@ namespace PathTracing.Editor.Tools
 
                     if (!byThread.TryGetValue(threadKey, out var markers))
                     {
-                        markers           = new Dictionary<string, MarkerAgg>();
+                        markers             = new Dictionary<string, MarkerAgg>();
                         byThread[threadKey] = markers;
                     }
 
@@ -180,9 +180,9 @@ namespace PathTracing.Editor.Tools
                     {
                         int id = stack.Pop();
 
-                        float self    = view.GetItemColumnDataAsFloat(id, HierarchyFrameDataView.columnSelfTime);
-                        int   calls    = (int)view.GetItemColumnDataAsFloat(id, HierarchyFrameDataView.columnCalls);
-                        string name    = view.GetItemName(id);
+                        float  self  = view.GetItemColumnDataAsFloat(id, HierarchyFrameDataView.columnSelfTime);
+                        int    calls = (int)view.GetItemColumnDataAsFloat(id, HierarchyFrameDataView.columnCalls);
+                        string name  = view.GetItemName(id);
 
                         if (self > 0f && !string.IsNullOrEmpty(name))
                         {
@@ -207,9 +207,9 @@ namespace PathTracing.Editor.Tools
         private static void Accum(Dictionary<string, MarkerAgg> map, string name, double self, int calls)
         {
             if (!map.TryGetValue(name, out var a)) a = new MarkerAgg();
-            a.SelfMs += self;
-            a.Calls  += calls;
-            map[name] = a;
+            a.SelfMs  += self;
+            a.Calls   += calls;
+            map[name] =  a;
         }
 
         // ---------------------------------------------------------------
@@ -260,7 +260,7 @@ namespace PathTracing.Editor.Tools
 
             foreach (string threadKey in threadsOrdered)
             {
-                int    tf       = Math.Max(1, threadFrames.GetValueOrDefault(threadKey));
+                int    tf        = Math.Max(1, threadFrames.GetValueOrDefault(threadKey));
                 double avgThread = threadSelf.GetValueOrDefault(threadKey) / tf;
                 if (avgThread < ThreadSkipSelfMs) continue;
 
@@ -305,15 +305,27 @@ namespace PathTracing.Editor.Tools
             for (int t = 0; t < 1024; t++)
             {
                 RawFrameDataView view;
-                try { view = ProfilerDriver.GetRawFrameDataView(frame, t); }
-                catch { break; }
+                try
+                {
+                    view = ProfilerDriver.GetRawFrameDataView(frame, t);
+                }
+                catch
+                {
+                    break;
+                }
 
-                if (view == null || !view.valid) { view?.Dispose(); break; }
+                if (view == null || !view.valid)
+                {
+                    view?.Dispose();
+                    break;
+                }
+
                 using (view)
                     names.Add(string.IsNullOrEmpty(view.threadGroupName)
                         ? view.threadName
                         : $"{view.threadGroupName}/{view.threadName}");
             }
+
             return names;
         }
 
@@ -350,8 +362,14 @@ namespace PathTracing.Editor.Tools
             for (int t = 0; t < 1024; t++)
             {
                 RawFrameDataView view;
-                try { view = ProfilerDriver.GetRawFrameDataView(frame, t); }
-                catch { break; }
+                try
+                {
+                    view = ProfilerDriver.GetRawFrameDataView(frame, t);
+                }
+                catch
+                {
+                    break;
+                }
 
                 if (view == null || !view.valid)
                 {

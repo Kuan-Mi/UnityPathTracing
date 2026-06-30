@@ -37,10 +37,11 @@ namespace PathTracing
             _srcFolder = EditorGUILayout.TextField("JSON Folder", _srcFolder);
             if (GUILayout.Button("…", GUILayout.Width(26)))
             {
-                string start  = Directory.Exists(_srcFolder) ? _srcFolder : "";
-                string picked = EditorUtility.OpenFolderPanel("Select folder containing JSON files", start, "");
+                string start                                  = Directory.Exists(_srcFolder) ? _srcFolder : "";
+                string picked                                 = EditorUtility.OpenFolderPanel("Select folder containing JSON files", start, "");
                 if (!string.IsNullOrEmpty(picked)) _srcFolder = Normalize(picked);
             }
+
             EditorGUILayout.EndHorizontal();
 
             bool srcOk = !string.IsNullOrWhiteSpace(_srcFolder) && Directory.Exists(_srcFolder);
@@ -58,7 +59,7 @@ namespace PathTracing
             if (GUILayout.Button("…", GUILayout.Width(26)))
             {
                 // Compute an absolute start path for the dialog.
-                string startAbs = ToAbsoluteIfRelative(_dstFolder);
+                string startAbs                           = ToAbsoluteIfRelative(_dstFolder);
                 if (!Directory.Exists(startAbs)) startAbs = Application.dataPath;
 
                 string picked = EditorUtility.OpenFolderPanel("Select destination inside the project", startAbs, "");
@@ -71,17 +72,18 @@ namespace PathTracing
                         EditorUtility.DisplayDialog("Invalid folder", "Destination must be inside the project's Assets folder.", "OK");
                 }
             }
+
             EditorGUILayout.EndHorizontal();
 
             // Accept and convert absolute paths typed directly into the field.
             if (Path.IsPathRooted(_dstFolder))
             {
-                string rel = AbsToRelative(_dstFolder);
+                string rel                  = AbsToRelative(_dstFolder);
                 if (rel != null) _dstFolder = rel;
             }
 
             bool dstOk = !string.IsNullOrWhiteSpace(_dstFolder)
-                      && _dstFolder.StartsWith("Assets", StringComparison.OrdinalIgnoreCase);
+                         && _dstFolder.StartsWith("Assets", StringComparison.OrdinalIgnoreCase);
             if (!dstOk)
                 EditorGUILayout.HelpBox("Must be a path starting with 'Assets'.", MessageType.Warning);
 
@@ -92,14 +94,14 @@ namespace PathTracing
             EditorGUILayout.Space(8);
             EditorGUILayout.LabelField("Textures", EditorStyles.boldLabel);
             _importTextures = EditorGUILayout.Toggle(new GUIContent("Resolve Textures",
-                "Resolve texture path entries in the JSON to project textures and assign them to each slot."),
+                    "Resolve texture path entries in the JSON to project textures and assign them to each slot."),
                 _importTextures);
 
             if (_importTextures)
             {
                 EditorGUILayout.BeginHorizontal();
                 _textureRoot = EditorGUILayout.TextField(new GUIContent("Texture Root",
-                    "Project-relative folder the JSON 'path' fields are resolved against, e.g. \"Models\\Kitchen\\foo.dds\" under Assets/Art/RTXPTAssets."),
+                        "Project-relative folder the JSON 'path' fields are resolved against, e.g. \"Models\\Kitchen\\foo.dds\" under Assets/Art/RTXPTAssets."),
                     _textureRoot);
                 if (GUILayout.Button("…", GUILayout.Width(26)))
                 {
@@ -111,11 +113,12 @@ namespace PathTracing
                         else EditorUtility.DisplayDialog("Invalid folder", "Texture root must be inside the project's Assets folder.", "OK");
                     }
                 }
+
                 EditorGUILayout.EndHorizontal();
 
                 if (Path.IsPathRooted(_textureRoot))
                 {
-                    string rel = AbsToRelative(_textureRoot);
+                    string rel                    = AbsToRelative(_textureRoot);
                     if (rel != null) _textureRoot = rel;
                 }
 
@@ -153,10 +156,17 @@ namespace PathTracing
                 return;
             }
 
-            var    searchOption = _recurse ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            var      searchOption = _recurse ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             string[] jsonFiles;
-            try   { jsonFiles = Directory.GetFiles(srcNorm, "*.json", searchOption); }
-            catch (Exception ex) { _lastReport = $"ERROR reading source folder:\n{ex.Message}"; return; }
+            try
+            {
+                jsonFiles = Directory.GetFiles(srcNorm, "*.json", searchOption);
+            }
+            catch (Exception ex)
+            {
+                _lastReport = $"ERROR reading source folder:\n{ex.Message}";
+                return;
+            }
 
             // Build report header so the user can always verify what was scanned.
             var sb = new System.Text.StringBuilder();
@@ -175,7 +185,7 @@ namespace PathTracing
 
             string textureRoot = _textureRoot.Trim().Replace('\\', '/').TrimEnd('/');
 
-            int created = 0, skipped = 0, failed = 0, texMissing = 0;
+            int created       = 0, skipped = 0, failed = 0, texMissing = 0;
             var errors        = new List<string>();
             var missingTexErr = new HashSet<string>();
 
@@ -218,6 +228,7 @@ namespace PathTracing
                                 texMissing++;
                                 missingTexErr.Add(texRef.Path);
                             }
+
                             return tex;
                         };
 
@@ -239,17 +250,19 @@ namespace PathTracing
 
             sb.AppendLine($"Created : {created}");
             if (skipped > 0) sb.AppendLine($"Skipped : {skipped}  (already existed)");
-            if (failed  > 0)
+            if (failed > 0)
             {
                 sb.AppendLine($"Failed  : {failed}");
                 foreach (var e in errors) sb.AppendLine($"  • {e}");
             }
+
             if (_importTextures && texMissing > 0)
             {
                 sb.AppendLine();
                 sb.AppendLine($"Textures unresolved : {texMissing} reference(s), {missingTexErr.Count} unique path(s) under '{textureRoot}':");
                 foreach (var p in missingTexErr) sb.AppendLine($"  • {p}");
             }
+
             _lastReport = sb.ToString().TrimEnd();
         }
 

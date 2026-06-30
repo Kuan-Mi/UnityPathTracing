@@ -52,7 +52,7 @@ namespace PathTracing
             if (choice == 1) return;
             bool overwrite = choice == 2;
 
-            int created = 0, updated = 0, skipped = 0, failed = 0, texMissing = 0;
+            int created       = 0, updated = 0, skipped = 0, failed = 0, texMissing = 0;
             var errors        = new List<string>();
             var missingTexErr = new HashSet<string>();
 
@@ -62,8 +62,8 @@ namespace PathTracing
 
                 for (int i = 0; i < jsonFiles.Length; i++)
                 {
-                    string jsonPath  = jsonFiles[i].Replace('\\', '/');
-                    string dir       = Path.GetDirectoryName(jsonPath)!.Replace('\\', '/');
+                    string jsonPath = jsonFiles[i].Replace('\\', '/');
+                    string dir      = Path.GetDirectoryName(jsonPath)!.Replace('\\', '/');
                     // Strip both ".json" and the ".material" sub-extension: Foo.material.json -> Foo.
                     string baseName  = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(jsonPath));
                     string assetPath = $"{dir}/{baseName}.asset";
@@ -87,6 +87,7 @@ namespace PathTracing
                             texMissing++;
                             missingTexErr.Add(texRef.Path);
                         }
+
                         return tex;
                     };
 
@@ -130,11 +131,12 @@ namespace PathTracing
             sb.AppendLine($"Created: {created}");
             if (updated > 0) sb.AppendLine($"Updated: {updated}");
             if (skipped > 0) sb.AppendLine($"Skipped: {skipped}  (already existed)");
-            if (failed  > 0)
+            if (failed > 0)
             {
                 sb.AppendLine($"Failed : {failed}");
                 foreach (var e in errors) sb.AppendLine($"  • {e}");
             }
+
             if (texMissing > 0)
             {
                 sb.AppendLine();

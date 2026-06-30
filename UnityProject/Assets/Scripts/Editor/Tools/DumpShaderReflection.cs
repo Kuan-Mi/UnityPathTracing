@@ -18,15 +18,15 @@ namespace PathTracing.Editor.Tools
     /// </summary>
     public static class DumpShaderReflection
     {
-        private const string MenuRoot          = "Tools/Native Shader Reflection";
-        private const string ReflectionSuffix  = ".reflection.json";
+        private const string MenuRoot         = "Tools/Native Shader Reflection";
+        private const string ReflectionSuffix = ".reflection.json";
 
         /// <summary>Describes one native shader asset type for the table-driven menu actions.</summary>
         private sealed class Kind
         {
-            public readonly string                   TypeName;   // for AssetDatabase.FindAssets("t:...")
-            public readonly string                   Extension;  // source asset extension, e.g. ".computeshader"
-            public readonly Func<string, bool, bool> Dump;       // (assetPath, force) => wrote a file
+            public readonly string                   TypeName; // for AssetDatabase.FindAssets("t:...")
+            public readonly string                   Extension; // source asset extension, e.g. ".computeshader"
+            public readonly Func<string, bool, bool> Dump; // (assetPath, force) => wrote a file
 
             public Kind(string typeName, string extension, Func<string, bool, bool> dump)
             {
@@ -83,8 +83,8 @@ namespace PathTracing.Editor.Tools
         [MenuItem(MenuRoot + "/Dump All To Sibling Files")]
         public static void DumpAll()
         {
-            List<string> paths = CollectAssetPaths(searchFolders: null);
-            int written = 0, skipped = 0;
+            List<string> paths   = CollectAssetPaths(searchFolders: null);
+            int          written = 0, skipped = 0;
             try
             {
                 AssetDatabase.StartAssetEditing();
@@ -208,7 +208,7 @@ namespace PathTracing.Editor.Tools
         /// <paramref name="force"/> is set), and writes the pretty-printed sibling file.
         /// </summary>
         private static bool Dump<T>(string assetPath, bool force,
-                                    Func<T, string> getJson, Action<T> recompile) where T : Object
+            Func<T, string> getJson, Action<T> recompile) where T : Object
         {
             var shader = AssetDatabase.LoadAssetAtPath<T>(assetPath);
             if (shader == null) return false;

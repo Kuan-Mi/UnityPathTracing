@@ -79,10 +79,13 @@ namespace PathTracing
         // ── Bloom scratch (donut BloomPass: downscale ×2 → separable blur ping-pong) ──
         /// <summary>Bloom half-resolution downscale. RGBA16_FLOAT.</summary>
         public NriTextureResource BloomDownscale1;
+
         /// <summary>Bloom quarter-resolution downscale (blur source). RGBA16_FLOAT.</summary>
         public NriTextureResource BloomDownscale2;
+
         /// <summary>Bloom horizontal-blur result (quarter res). RGBA16_FLOAT.</summary>
         public NriTextureResource BloomBlurPass1;
+
         /// <summary>Bloom vertical-blur result (quarter res), composited back into the HDR image. RGBA16_FLOAT.</summary>
         public NriTextureResource BloomBlurPass2;
 
@@ -152,7 +155,7 @@ namespace PathTracing
         /// the original EnvMapBaker m_cubemapBC6H returned by GetEnvMapCube() when m_outputIsCompressed.
         /// </summary>
         public IntPtr EnvCubemapBC6H;
-        
+
         /// <summary>1024×1024 env-light lookup map (R32_UINT). Filled by EnvLightsFillLookupMap. Bound as t_EnvLookupMap (t18).</summary>
         public NriTextureResource EnvLightLookupMap;
 
@@ -163,7 +166,7 @@ namespace PathTracing
         /// always produces valid contents before they are sampled. Mirrors the original
         /// EnvMapBaker's force-rebake-on-recreate behaviour.
         /// </summary>
-        public bool  EnvBaked;
+        public bool EnvBaked;
 
         /// <summary>
         /// Hash of the inputs used for the last bake: the env baker constants (directional
@@ -175,67 +178,67 @@ namespace PathTracing
         public ulong EnvBakeSignature;
 
         // ── Resolved dimensions ───────────────────────────────────────────────
-        public int2 renderResolution  { get; private set; }
+        public int2 renderResolution { get; private set; }
         public int2 displayResolution { get; private set; }
 
         public RtxptTextureResources()
         {
-            var srv = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE,         layout = Layout.SHADER_RESOURCE,         stageBits = 1 << 7  };
+            var srv = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout         = Layout.SHADER_RESOURCE, stageBits         = 1 << 7 };
             var uav = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
 
             // Texture debug names are kept byte-for-byte identical to the original RTXPT
             // RenderTargets.cpp / LightsBaker.cpp / EnvMapBaker.cpp / donut BloomPass.cpp
             // debugName strings, so PIX captures of the replica line up with the reference.
-            OutputColor           = new NriTextureResource("OutputColor",                 GraphicsFormat.R16G16B16A16_SFloat,     uav);
-            Depth                 = new NriTextureResource("Depth",                       GraphicsFormat.R32_SFloat,               uav);
-            ScreenMotionVectors   = new NriTextureResource("ScreenMotionVectors",         GraphicsFormat.R16G16B16A16_SFloat,     uav);
-            Throughput            = new NriTextureResource("Throughput",                  GraphicsFormat.R32_UInt,                 uav);
+            OutputColor         = new NriTextureResource("OutputColor", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            Depth               = new NriTextureResource("Depth", GraphicsFormat.R32_SFloat, uav);
+            ScreenMotionVectors = new NriTextureResource("ScreenMotionVectors", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            Throughput          = new NriTextureResource("Throughput", GraphicsFormat.R32_UInt, uav);
 
-            SpecularHitT          = new NriTextureResource("SpecularHitT",                GraphicsFormat.R32_SFloat,               uav);
-            ScratchFloat1         = new NriTextureResource("ScratchFloat1",               GraphicsFormat.R32_SFloat,               uav);
+            SpecularHitT  = new NriTextureResource("SpecularHitT", GraphicsFormat.R32_SFloat, uav);
+            ScratchFloat1 = new NriTextureResource("ScratchFloat1", GraphicsFormat.R32_SFloat, uav);
 
-            StablePlanesHeader    = new NriTextureResource("StablePlanesHeader",          GraphicsFormat.R32_UInt,                 uav);
-            StableRadiance        = new NriTextureResource("StableRadianceBuffer",        GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            StablePlanesHeader = new NriTextureResource("StablePlanesHeader", GraphicsFormat.R32_UInt, uav);
+            StableRadiance     = new NriTextureResource("StableRadianceBuffer", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
-            BaseColor             = new NriTextureResource("GBufferBaseColor",            GraphicsFormat.B10G11R11_UFloatPack32,  uav);
-            SpecNormal            = new NriTextureResource("GBufferSpecNormal",           GraphicsFormat.R32_UInt,                 uav);
-            RoughnessMetal        = new NriTextureResource("GBufferRoughnessMetal",       GraphicsFormat.R16G16_SFloat,            uav);
-            MaterialInfo          = new NriTextureResource("GBufferMaterialInfo",         GraphicsFormat.R32_UInt,                 uav);
+            BaseColor      = new NriTextureResource("GBufferBaseColor", GraphicsFormat.B10G11R11_UFloatPack32, uav);
+            SpecNormal     = new NriTextureResource("GBufferSpecNormal", GraphicsFormat.R32_UInt, uav);
+            RoughnessMetal = new NriTextureResource("GBufferRoughnessMetal", GraphicsFormat.R16G16_SFloat, uav);
+            MaterialInfo   = new NriTextureResource("GBufferMaterialInfo", GraphicsFormat.R32_UInt, uav);
 
-            DlssRrDiffAlbedo      = new NriTextureResource("RRDiffuseAlbedo",             GraphicsFormat.B10G11R11_UFloatPack32,  uav);
-            DlssRrSpecAlbedo      = new NriTextureResource("RRSpecAlbedo",               GraphicsFormat.B10G11R11_UFloatPack32,  uav);
-            DlssRrSpecMotionVectors = new NriTextureResource("RRSpecMotionVectors",       GraphicsFormat.R16G16_SFloat,          uav);
-            DlssRrNormalRoughness = new NriTextureResource("RRNormalsAndRoughness",       GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            DlssRrDiffAlbedo        = new NriTextureResource("RRDiffuseAlbedo", GraphicsFormat.B10G11R11_UFloatPack32, uav);
+            DlssRrSpecAlbedo        = new NriTextureResource("RRSpecAlbedo", GraphicsFormat.B10G11R11_UFloatPack32, uav);
+            DlssRrSpecMotionVectors = new NriTextureResource("RRSpecMotionVectors", GraphicsFormat.R16G16_SFloat, uav);
+            DlssRrNormalRoughness   = new NriTextureResource("RRNormalsAndRoughness", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
             // DLSS-RR evaluate output → original ProcessedOutputColor (display res).
-            DlssRrOutput          = new NriTextureResource("ProcessedOutputColor",        GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            DlssRrOutput = new NriTextureResource("ProcessedOutputColor", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
-            BloomDownscale1       = new NriTextureResource("bloom src mip1",              GraphicsFormat.R16G16B16A16_SFloat,     uav);
-            BloomDownscale2       = new NriTextureResource("bloom src mip2",              GraphicsFormat.R16G16B16A16_SFloat,     uav);
-            BloomBlurPass1        = new NriTextureResource("bloom accumulation pass1",    GraphicsFormat.R16G16B16A16_SFloat,     uav);
-            BloomBlurPass2        = new NriTextureResource("bloom accumulation pass2",    GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            BloomDownscale1 = new NriTextureResource("bloom src mip1", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            BloomDownscale2 = new NriTextureResource("bloom src mip2", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            BloomBlurPass1  = new NriTextureResource("bloom accumulation pass1", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            BloomBlurPass2  = new NriTextureResource("bloom accumulation pass2", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
-            LightFeedbackTotalWeight = new NriTextureResource("NEE_AT_FeedbackTotalWeight", GraphicsFormat.R32_SFloat,  uav);
-            LightFeedbackCandidates  = new NriTextureResource("NEE_AT_FeedbackCandidates",  GraphicsFormat.R32_UInt,    uav);
+            LightFeedbackTotalWeight = new NriTextureResource("NEE_AT_FeedbackTotalWeight", GraphicsFormat.R32_SFloat, uav);
+            LightFeedbackCandidates  = new NriTextureResource("NEE_AT_FeedbackCandidates", GraphicsFormat.R32_UInt, uav);
 
-            FeedbackTotalWeightScratch  = new NriTextureResource("NEE_AT_FeedbackTotalWeightScratch",       GraphicsFormat.R32_SFloat, uav);
-            FeedbackCandidatesScratch   = new NriTextureResource("NEE_AT_FeedbackCandidatesScratch",        GraphicsFormat.R32_UInt,   uav);
-            FeedbackTotalWeightBlended  = new NriTextureResource("NEE_AT_EarlyFeedbackTotalWeightScratch",  GraphicsFormat.R32_SFloat, uav);
-            FeedbackCandidatesBlended   = new NriTextureResource("NEE_AT_EarlyFeedbackCandidatesScratch",   GraphicsFormat.R32_UInt,   uav);
-            NEEATHistoryDepth           = new NriTextureResource("NEE_AT_HistoryDepth",                     GraphicsFormat.R32_SFloat, uav);
+            FeedbackTotalWeightScratch = new NriTextureResource("NEE_AT_FeedbackTotalWeightScratch", GraphicsFormat.R32_SFloat, uav);
+            FeedbackCandidatesScratch  = new NriTextureResource("NEE_AT_FeedbackCandidatesScratch", GraphicsFormat.R32_UInt, uav);
+            FeedbackTotalWeightBlended = new NriTextureResource("NEE_AT_EarlyFeedbackTotalWeightScratch", GraphicsFormat.R32_SFloat, uav);
+            FeedbackCandidatesBlended  = new NriTextureResource("NEE_AT_EarlyFeedbackCandidatesScratch", GraphicsFormat.R32_UInt, uav);
+            NEEATHistoryDepth          = new NriTextureResource("NEE_AT_HistoryDepth", GraphicsFormat.R32_SFloat, uav);
 
-            ShaderDebugViz       = new NriTextureResource("DebugVizOutput",              GraphicsFormat.R16G16B16A16_SFloat,               uav);
+            ShaderDebugViz = new NriTextureResource("DebugVizOutput", GraphicsFormat.R16G16B16A16_SFloat, uav);
             // DebugOutputColor / EnvDummyCube have no original RTXPT counterpart (replica-only); kept unprefixed.
-            DebugOutputColor     = new NriTextureResource("DebugOutputColor",            GraphicsFormat.R16G16B16A16_SFloat,     uav);
-            AccumulatedRadiance  = new NriTextureResource("AccumulatedRadiance",         GraphicsFormat.R32G32B32A32_SFloat,     uav);
+            DebugOutputColor    = new NriTextureResource("DebugOutputColor", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            AccumulatedRadiance = new NriTextureResource("AccumulatedRadiance", GraphicsFormat.R32G32B32A32_SFloat, uav);
             // Replica's final LDR / tone-map target → original tone-map output (LdrColor).
-            ProcessedOutputColor = new NriTextureResource("LdrColor",                    GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            ProcessedOutputColor = new NriTextureResource("LdrColor", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
-            EnvCubemap      = new NriTextureResource("EnvMapBakerMainCube",       GraphicsFormat.R16G16B16A16_SFloat, uav);
-            EnvImportanceMap = new NriTextureResource("EnvImportanceMap",          GraphicsFormat.R32_SFloat,           uav);
-            EnvRadianceMap   = new NriTextureResource("EnvRadianceMap",            GraphicsFormat.R16G16B16A16_SFloat, uav);
-            EnvDummyCube     = new NriTextureResource("EnvDummyCube",              GraphicsFormat.R8G8B8A8_UNorm,      srv);
-            EnvLightLookupMap     = new NriTextureResource("EnvLightLookupMap",    GraphicsFormat.R32_UInt,      srv);
+            EnvCubemap            = new NriTextureResource("EnvMapBakerMainCube", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            EnvImportanceMap      = new NriTextureResource("EnvImportanceMap", GraphicsFormat.R32_SFloat, uav);
+            EnvRadianceMap        = new NriTextureResource("EnvRadianceMap", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            EnvDummyCube          = new NriTextureResource("EnvDummyCube", GraphicsFormat.R8G8B8A8_UNorm, srv);
+            EnvLightLookupMap     = new NriTextureResource("EnvLightLookupMap", GraphicsFormat.R32_UInt, srv);
             EnvCubemapBC6HScratch = new NriTextureResource("EnvMapBakerMainCubeBC6HScratch", GraphicsFormat.R32G32B32A32_UInt, uav);
         }
 
@@ -275,9 +278,9 @@ namespace PathTracing
         /// </summary>
         public bool EnsureResources(int2 renderRes, int2 displayRes)
         {
-            bool sameRender  = OutputColor.IsCreated
-                               && renderResolution.x  == renderRes.x
-                               && renderResolution.y  == renderRes.y;
+            bool sameRender = OutputColor.IsCreated
+                              && renderResolution.x == renderRes.x
+                              && renderResolution.y == renderRes.y;
             bool sameDisplay = DlssRrOutput.IsCreated
                                && displayResolution.x == displayRes.x
                                && displayResolution.y == displayRes.y;
@@ -343,6 +346,7 @@ namespace PathTracing
                     break;
                 }
             }
+
             foreach (var tex in AllTextures()) tex.Release();
 
             if (EnvCubemapBC6H != IntPtr.Zero)

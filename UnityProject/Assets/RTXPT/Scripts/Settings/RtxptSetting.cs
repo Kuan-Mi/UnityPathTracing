@@ -59,9 +59,11 @@ namespace PathTracing
 
         // ── AA / Upscaler ─────────────────────────────────────────────────────
         // realtimeAA: 0=None, 1=TAA, 2=DLSS-SR, 3=DLSS-RR
-        public int          realtimeAA   = 3;
+        public int realtimeAA = 3;
+
         // C++ default: SampleUIData::DLSSModeDefault = eBalanced.
         public UpscalerMode upscalerMode = UpscalerMode.BALANCED;
+
         // DLSS-RR render preset (only used when realtimeAA == 3). Default = driver/OTA default network.
         public DlssRRPreset dlssRRPreset = DlssRRPreset.Default;
 
@@ -93,59 +95,76 @@ namespace PathTracing
         public int accumulationTarget = 4096;
 
         public bool accumulationPreWarmRealtimeCaches = true;
-        public bool accumulationAA                   = true;
+        public bool accumulationAA                    = true;
 
         // ── NEE / Lighting ────────────────────────────────────────────────────
-        public bool  useNEE              = true;
+        public bool useNEE = true;
+
         // C++ default: CommandLineOptions::NEEType = 2 (NEE-AT).
         public RtxptNeeType neeType = RtxptNeeType.NEEAT;
+
         [Range(1, 16)]
-        public int   neeCandidateSamples = 5;
+        public int neeCandidateSamples = 5;
+
         // C++ default: SampleUIData::NEEFullSamples = 1 (each full sample casts a shadow ray).
         [Range(1, 4)]
-        public int   neeFullSamples      = 1;
+        public int neeFullSamples = 1;
+
         /// <summary>0=Full MIS always; 1=Full in ref / approx in realtime; 2=Approx always.</summary>
-        public int   neeMisType          = 1;
+        public int neeMisType = 1;
+
         public float neeatGlobalTemporalFeedbackWeight = 0.75f;
         public float neeatLocalToGlobalSampleRatio     = 0.65f;
-        public float neeatDistantVsLocalImportance     = 1.0f;
+
+        public float neeatDistantVsLocalImportance = 1.0f;
+
         // Advanced NEE-AT baker knobs (mirror LightsBaker.cpp m_advSetting_*).
         public float neeatScreenSpaceVsWorldSpaceThreshold = 0.3f;
         public float neeatDepthDisocclusionThreshold       = 1.5f;
         public float neeatReservoirHistoryDropoff          = 0.005f;
-        public bool  neeatEnableMotionReprojection         = true;
+
+        public bool neeatEnableMotionReprojection = true;
+
         // Original RTXPT enables both boosts by default (LightsBaker.h:245-249):
         //   IntensityDelta = m_importanceBoost_IntensityDelta(true) ? 64.0 : 0
         //   FrustumMul     = m_importanceBoost_Frustum(true)        ? 8.0  : 0
         //   FrustumFadeDistance = 5.0 (ungated)
-        public float neeatImportanceBoostIntensityDelta    = 64.0f;
-        public float neeatImportanceBoostFrustumMul        = 8.0f;
+        public float neeatImportanceBoostIntensityDelta      = 64.0f;
+        public float neeatImportanceBoostFrustumMul          = 8.0f;
         public float neeatImportanceBoostFrustumFadeDistance = 5.0f;
-        public float neeatSceneAverageContentsDistance     = 10.0f;
+        public float neeatSceneAverageContentsDistance       = 10.0f;
+
         /// <summary>
         /// Sample the baked env cube for distant-light radiance (LightsBaker.h:241
         /// m_advSetting_SampleBakedEnvironment). Compile-time macro
         /// NEE_AT_SAMPLE_BAKED_ENVIRONMENT — applied via the shader-macro sync (reimport).
         /// </summary>
-        public bool  neeatSampleBakedEnvironment           = true;
+        public bool neeatSampleBakedEnvironment = true;
+
         /// <summary>m_importanceBoost_PreFilter (LightsBaker.h:251) — gates the
         /// ProcessFeedbackHistoryPreFilter pass ("...by pre-filter merge").</summary>
-        public bool  neeatImportanceBoostPreFilter         = true;
+        public bool neeatImportanceBoostPreFilter = true;
 
         // LightsBaker debugging (mirrors LightsBaker.h m_dbg* / LightsBaker::DebugGUI).
         // The draws go through the ShaderDebug machinery (enableShaderDebug must be on).
         /// <summary>m_dbgDebugDrawLights — wireframe color: red env / green emissive / blue analytic.</summary>
         public bool neeatDbgDrawLights = false;
+
         /// <summary>m_dbgDebugDrawTileLightConnections — lights sampled by the debug pixel's tile.</summary>
         public bool neeatDbgDrawTileLightConnections = false;
+
         /// <summary>m_dbgFreezeUpdates — freezes path-tracer feedback while enabled.</summary>
         public bool neeatDbgFreezeUpdates = false;
+
         /// <summary>m_dbgDebugDrawType — NEE-AT buffer visualisations (written to the debug-viz overlay).</summary>
         public RtxptLightingDebugViewType neeatDbgViewType = RtxptLightingDebugViewType.Disabled;
+
         /// <summary>m_dbgDebugDisableJitter — disable the pixel→tile mapping jitter.</summary>
         public bool neeatDbgDisableJitter = false;
+
         /// <summary>m_dbgDebugDisableLastFrameFeedback — quality reverts to ~power-based sampling.</summary>
         public bool neeatDbgDisableLastFrameFeedback = false;
+
         /// <summary>m_dbgFreezeFrustumUpdates — freeze + draw the frustum used by importance boosts.</summary>
         public bool neeatDbgFreezeFrustumUpdates = false;
 
@@ -153,69 +172,87 @@ namespace PathTracing
         // ── Material / shading features ───────────────────────────────────────
 
         public bool enableLDSamplerForBSDF = true;
-        public bool enableRussianRoulette = true;
+        public bool enableRussianRoulette  = true;
+
         [Range(0, 2)]
-        public int  nestedDielectricsQuality = 1; // 0=off, 1=fast, 2=quality
-        public bool useFp16Types         = true;
+        public int nestedDielectricsQuality = 1; // 0=off, 1=fast, 2=quality
+
+        public bool useFp16Types = true;
 
         // ── Ray-tracing pipeline (compile-time macros, applied via shader-macro sync) ──
         // C++ defaults to the NVAPI HitObject extension (SampleUI.h:221-225); the Unity plugin has
         // no NVAPI integration, so the SM 6.9 DX HitObject path is used instead (USE_NVAPI_* stay 0).
         /// <summary>USE_DX_HIT_OBJECT_EXTENSION — DX1.x HitObject API (SER) on SM 6.9.</summary>
-        public bool dxHitObjectExtension  = true;
+        public bool dxHitObjectExtension = true;
+
         /// <summary>USE_DX_MAYBE_REORDER_THREADS — MaybeReorderThread() with the DX HitObject path.</summary>
         public bool dxMaybeReorderThreads = true;
 
         // ── PSR / SHARC / Stable Planes ───────────────────────────────────────
-        public bool  allowPrimarySurfaceReplacement          = true;
-        public bool  stablePlanesSuppressPrimaryIndirectSpecular = true;
+        public bool allowPrimarySurfaceReplacement              = true;
+        public bool stablePlanesSuppressPrimaryIndirectSpecular = true;
+
         [Range(0f, 1f)]
         public float stablePlanesSuppressPrimaryIndirectSpecularK = 0.6f;
+
         [Range(1, 3)]
-        public int   stablePlanesActiveCount     = PathTracerConfig.cStablePlaneCount;
+        public int stablePlanesActiveCount = PathTracerConfig.cStablePlaneCount;
+
         [Range(1, 9)]
-        public int   stablePlanesMaxVertexDepth  = 9;
+        public int stablePlanesMaxVertexDepth = 9;
+
         [Range(0f, 1f)]
-        public float stablePlanesSplitStopThreshold      = 0.95f;
+        public float stablePlanesSplitStopThreshold = 0.95f;
+
         [Range(0f, 1f)]
         public float stablePlanesAntiAliasingFallthrough = 0.6f;
 
         // ── Firefly filter ────────────────────────────────────────────────────
-        public bool  realtimeFireflyFilterEnabled       = true;
+        public bool realtimeFireflyFilterEnabled = true;
+
         [Range(0f, 2f)]
-        public float realtimeFireflyFilterThreshold     = 0.10f;
-        public bool  referenceFireflyFilterEnabled      = true;
+        public float realtimeFireflyFilterThreshold = 0.10f;
+
+        public bool referenceFireflyFilterEnabled = true;
+
         [Range(0f, 20f)]
-        public float referenceFireflyFilterThreshold    = 5.0f;
+        public float referenceFireflyFilterThreshold = 5.0f;
 
         // ── Denoiser / DLSS-RR ────────────────────────────────────────────────
         [Range(0f, 32f)]
-        public float denoiserRadianceClampK  = 8.0f;
+        public float denoiserRadianceClampK = 8.0f;
+
         [Range(0f, 8192f)]
-        public float dlssrrBrightnessClampK  = 4096.0f;
-        public float dlssrrMicroJitter       = 0.1f;
-        public bool  tmpDisableDlssRR        = false;
+        public float dlssrrBrightnessClampK = 4096.0f;
+
+        public float dlssrrMicroJitter = 0.1f;
+        public bool  tmpDisableDlssRR  = false;
+
         [Tooltip("Enable DLSS-G Frame Generation through Streamline (StreamlinePlugin). Player-only " +
                  "(present-path takeover; the editor ignores it).")]
-        public bool  FG                      = false;
+        public bool FG = false;
 
         // ── Bloom ─────────────────────────────────────────────────────────────
-        public bool  enableBloom     = true;
+        public bool enableBloom = true;
+
         [Range(0f, 32f)]
-        public float bloomRadius     = 8.0f;
+        public float bloomRadius = 8.0f;
+
         [Range(0f, 0.1f)]
-        public float bloomIntensity  = 0.004f;
+        public float bloomIntensity = 0.004f;
 
         // ── Environment map ───────────────────────────────────────────────────
         [Range(0, 5)]
-        public int       environmentMapDiffuseSampleMIPLevel = 2;
-        public bool      environmentMapEnabled   = true;
-        public float     environmentMapIntensity = 1.0f;
-        public float     environmentMapRotationY = 0.0f;
-        public Color     environmentMapTint      = Color.white;
+        public int environmentMapDiffuseSampleMIPLevel = 2;
+
+        public bool  environmentMapEnabled   = true;
+        public float environmentMapIntensity = 1.0f;
+        public float environmentMapRotationY = 0.0f;
+        public Color environmentMapTint      = Color.white;
+
         /// <summary>HDR environment map: either an equirectangular Texture2D or a Cubemap. Baked into
         /// the radiance cube (t_EnvironmentMap, t10) by RtxptEnvMapBakerPass.</summary>
-        public Texture environmentMap          = null;
+        public Texture environmentMap = null;
 
         // ── Tone mapping ──────────────────────────────────────────────────────
         // Mirrors RTXPT ToneMappingParameters (ToneMapper/ToneMappingPasses.h).
@@ -244,6 +281,7 @@ namespace PathTracing
 
         /// <summary>Auto-exposure clamp range, in EV.</summary>
         public float exposureValueMin = -16.0f;
+
         public float exposureValueMax = 16.0f;
 
         // Photographic controls (manual exposure path).
@@ -252,14 +290,15 @@ namespace PathTracing
         public float shutter   = 1.0f;
 
         // Color grading / operator parameters.
-        public bool  toneMapWhiteBalance   = false;
-        public float toneMapWhitePoint     = 6500.0f;
+        public bool  toneMapWhiteBalance      = false;
+        public float toneMapWhitePoint        = 6500.0f;
         public float toneMapWhiteMaxLuminance = 1.0f;
-        public float toneMapWhiteScale     = 5.1f;
-        public bool  toneMapClamped        = true;
+        public float toneMapWhiteScale        = 5.1f;
+        public bool  toneMapClamped           = true;
 
         // ── Debug ─────────────────────────────────────────────────────────────
-        public bool showValidation    = false;
+        public bool showValidation = false;
+
         /// <summary>
         /// Master switch for the ShaderDebug machinery (SampleUIData::EnableShaderDebug):
         /// allocates the u_ShaderDebugBuffer (u125, ~100 MB like the original), clears its header
@@ -271,18 +310,24 @@ namespace PathTracing
         // ── ShaderDebug / pixel debugging (mirrors SampleUIData debug block) ──
         /// <summary>Draw the picked pixel's path-trace debug lines (SampleUIData::ShowDebugLines).
         /// Compile-time macro ENABLE_DEBUG_LINES_VIZ — applied via the shader-macro sync.</summary>
-        public bool  showDebugLines = false;
+        public bool showDebugLines = false;
+
         /// <summary>DebugConstants::debugLineScale (C++ DebugLineScale default 0.05; 0 disables).</summary>
         public float debugLineScale = 0.05f;
+
         /// <summary>Debug pixel for pick feedback + DebugPrint (SampleUIData::DebugPixel).</summary>
         public int debugPixelX = 0;
+
         public int debugPixelY = 0;
+
         /// <summary>Pick the debug pixel every frame (SampleUIData::ContinuousDebugFeedback).</summary>
         public bool continuousDebugFeedback = false;
+
         public bool dbgFreezeRealtimeNoiseSeed   = false;
         public bool dbgDiscardNonNEELighting     = false;
         public bool dbgDiscardNEELighting        = false;
         public bool dbgDisablePostProcessFilters = false;
+
         /// <summary>RTXPT_DISABLE_SER_TERMINATION_HINT (SampleUI.h:299). Compile-time macro.</summary>
         public bool dbgDisableSERTerminationHint = false;
 

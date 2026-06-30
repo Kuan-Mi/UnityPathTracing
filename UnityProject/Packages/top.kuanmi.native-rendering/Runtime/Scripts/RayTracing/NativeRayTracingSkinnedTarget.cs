@@ -54,7 +54,7 @@ namespace NativeRender
         public static IReadOnlyList<NativeRayTracingSkinnedTarget> All => s_All;
 
         /// <summary>Pending add events — consumed by <see cref="NRDSampleResource"/> each frame.</summary>
-        public static readonly Queue<SkinnedTargetAddEvent>    AddQueue    = new();
+        public static readonly Queue<SkinnedTargetAddEvent> AddQueue = new();
 
         /// <summary>Pending remove events — consumed by <see cref="NRDSampleResource"/> each frame.</summary>
         public static readonly Queue<SkinnedTargetRemoveEvent> RemoveQueue = new();
@@ -114,8 +114,8 @@ namespace NativeRender
             {
                 // CRITICAL: Set vertexBufferTarget BEFORE the first render so Unity creates
                 // the double-buffered vertex buffers needed for GetPreviousVertexBuffer().
-                smr.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
-                smr.skinnedMotionVectors = true;
+                smr.vertexBufferTarget   |= GraphicsBuffer.Target.Raw;
+                smr.skinnedMotionVectors =  true;
             }
 
             AddQueue.Enqueue(new SkinnedTargetAddEvent(this, smr, smr != null ? smr.GetInstanceID() : 0));
@@ -123,7 +123,7 @@ namespace NativeRender
 
         private void OnDisable()
         {
-            var smr  = GetComponent<SkinnedMeshRenderer>();
+            var smr   = GetComponent<SkinnedMeshRenderer>();
             int smrId = smr != null ? smr.GetInstanceID() : 0;
 
             RemoveQueue.Enqueue(new SkinnedTargetRemoveEvent(smrId));

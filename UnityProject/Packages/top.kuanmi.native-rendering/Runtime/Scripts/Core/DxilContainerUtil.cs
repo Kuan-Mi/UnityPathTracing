@@ -26,9 +26,9 @@ namespace NativeRender
 
         // Each part: [0..4) fourcc, [4..8) data size, [8..) data. The HASH part's data is a
         // DxilShaderHash { uint32 Flags; byte Digest[16] }, so the digest starts 4 bytes in.
-        private const int PartHeaderSize = 8;
+        private const int PartHeaderSize         = 8;
         private const int HashDigestOffsetInPart = 4;
-        private const int HashByteCount = 16;
+        private const int HashByteCount          = 16;
 
         /// <summary>
         /// Returns the DXIL shader hash (the <c>HASH</c> part's 16-byte digest) as a 32-char
@@ -58,6 +58,7 @@ namespace NativeRender
                     sb.Append(dxil[digest + b].ToString("x2"));
                 return sb.ToString();
             }
+
             return "";
         }
 

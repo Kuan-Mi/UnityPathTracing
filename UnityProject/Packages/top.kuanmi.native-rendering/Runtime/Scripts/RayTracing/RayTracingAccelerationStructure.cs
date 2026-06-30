@@ -95,6 +95,7 @@ namespace NativeRender
             {
                 _buildEventData = new NativeArray<NativeRenderPlugin.AS_BuildEventData>(1, Allocator.Persistent);
             }
+
             _buildEventData[0] = new NativeRenderPlugin.AS_BuildEventData { asHandle = _handle };
 
             // cmd.EndSample(mark1);
@@ -817,6 +818,7 @@ namespace NativeRender
             {
                 return;
             }
+
             int id = smr.GetInstanceID();
             NativeRenderPlugin.NR_AS_RemoveInstance(_handle, (uint)id);
 

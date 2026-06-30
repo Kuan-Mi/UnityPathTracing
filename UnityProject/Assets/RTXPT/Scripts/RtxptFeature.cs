@@ -32,8 +32,8 @@ namespace PathTracing
     public class RtxptFeature : ScriptableRendererFeature
     {
         // ---- Inspector fields -----------------------------------------------
-        public RtxptSetting setting;
-        public RenderPassEvent    renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+        public RtxptSetting    setting;
+        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
         public SampleConstants sampleConstants;
 
@@ -53,77 +53,77 @@ namespace PathTracing
         public ComputeShader skinnedRepackCs;
 
         // Phase 3
-        public LazyLoadReference<NativeComputeShader>exportVisibilityBufferCs;
+        public LazyLoadReference<NativeComputeShader> exportVisibilityBufferCs;
 
         // Phase 4
-        public LazyLoadReference<NativeComputeShader>denoiseSpecHitTCs;
+        public LazyLoadReference<NativeComputeShader> denoiseSpecHitTCs;
 
         // Phase 5
-        public LazyLoadReference<NativeComputeShader>dlssBeforeCs;
+        public LazyLoadReference<NativeComputeShader> dlssBeforeCs;
 
         // Phase 6: Bloom (donut BloomPass: downsample → separable blur → composite).
         // Verbatim raster wrappers: blur = fullscreen_vs + passes/bloom_ps.hlsl; downsample/composite =
         // fullscreen_vs + blit_ps.hlsl (composite uses the constant-color blend = donut's ConstantColor).
-        public LazyLoadReference<NativeRasterShader>bloomDownsampleRasterShader;
-        public LazyLoadReference<NativeRasterShader>bloomBlurRasterShader;
-        public LazyLoadReference<NativeRasterShader>bloomCompositeRasterShader;
+        public LazyLoadReference<NativeRasterShader> bloomDownsampleRasterShader;
+        public LazyLoadReference<NativeRasterShader> bloomBlurRasterShader;
+        public LazyLoadReference<NativeRasterShader> bloomCompositeRasterShader;
 
         // Phase 7: Tone mapping — faithful native replica of RTXPT ToneMappingPasses.cpp, built from the
         // original shaders as thin verbatim #include wrappers: luminance_ps (raster) → donut
         // mipmapgen_cs mip reduce (shared mipMapGenCs asset) → capture_cs → CPU read-back →
         // ToneMapping main_ps (raster).
-        public LazyLoadReference<NativeRasterShader> luminanceRasterShader; // Luminance.rastershader (= fullscreen_vs + luminance_ps)
-        public LazyLoadReference<NativeComputeShader>captureLuminanceCs; // capture_cs.computeshader (= ToneMapping.hlsl capture_cs)
-        public LazyLoadReference<NativeRasterShader> toneMapApplyRasterShader; // ToneMapping.rastershader (= fullscreen_vs + main_ps)
+        public LazyLoadReference<NativeRasterShader>  luminanceRasterShader; // Luminance.rastershader (= fullscreen_vs + luminance_ps)
+        public LazyLoadReference<NativeComputeShader> captureLuminanceCs; // capture_cs.computeshader (= ToneMapping.hlsl capture_cs)
+        public LazyLoadReference<NativeRasterShader>  toneMapApplyRasterShader; // ToneMapping.rastershader (= fullscreen_vs + main_ps)
 
         // Phase 8
-        public LazyLoadReference<NativeComputeShader>accumulationCs;
+        public LazyLoadReference<NativeComputeShader> accumulationCs;
 
         // Phase Debug: StablePlanesDebugViz
-        public LazyLoadReference<NativeComputeShader>stablePlanesDebugVizCs;
+        public LazyLoadReference<NativeComputeShader> stablePlanesDebugVizCs;
 
         // Phase Debug: ShaderDebug (DebugPrint readback, DebugLine/DebugTriangle draw, viz overlay).
         // Ports of Libraries/ShaderDebug/ShaderDebug.hlsl draw shaders + the Sample.cpp debug-lines draw.
-        public LazyLoadReference<NativeRasterShader>shaderDebugTrianglesRasterShader;
-        public LazyLoadReference<NativeRasterShader>shaderDebugLinesRasterShader;
-        public LazyLoadReference<NativeRasterShader>shaderDebugFeedbackLinesRasterShader;
-        public LazyLoadReference<NativeRasterShader>shaderDebugBlendVizRasterShader;
+        public LazyLoadReference<NativeRasterShader> shaderDebugTrianglesRasterShader;
+        public LazyLoadReference<NativeRasterShader> shaderDebugLinesRasterShader;
+        public LazyLoadReference<NativeRasterShader> shaderDebugFeedbackLinesRasterShader;
+        public LazyLoadReference<NativeRasterShader> shaderDebugBlendVizRasterShader;
 
         // EnvMapBaker + LightingUpdateBegin compute shaders
-        public LazyLoadReference<NativeComputeShader>baseLayerCs;
-        public LazyLoadReference<NativeComputeShader>mipReduceCs;
-        public LazyLoadReference<NativeComputeShader>envMapImportanceBakerCs;
-        public LazyLoadReference<NativeComputeShader>mipMapGenCs; // mipmapgen_cs.computeshader (donut MipMapGenPass MODE_COLOR)
-        public LazyLoadReference<NativeComputeShader>bc6uCompressCs;
-        public LazyLoadReference<NativeComputeShader>envLightsBackupPastCs;
-        public LazyLoadReference<NativeComputeShader>envLightsSubdivideBaseCs;
-        public LazyLoadReference<NativeComputeShader>envLightsSubdivideBoostCs;
-        public LazyLoadReference<NativeComputeShader>envLightsFillLookupMapCs;
-        public LazyLoadReference<NativeComputeShader>envLightsMapPastToCurrentCs;
-        public LazyLoadReference<NativeComputeShader>resetLightProxyCountersCs;
-        public LazyLoadReference<NativeComputeShader>resetPastToCurrentHistoryCs;
-        public LazyLoadReference<NativeComputeShader>computeWeightsCs;
-        public LazyLoadReference<NativeComputeShader>computeProxyCountsCs;
-        public LazyLoadReference<NativeComputeShader>computeProxyBaselineOffsetsCs;
-        public LazyLoadReference<NativeComputeShader>createProxyJobsCs;
-        public LazyLoadReference<NativeComputeShader>executeProxyJobsCs;
-        public LazyLoadReference<NativeComputeShader>bakeEmissiveTrianglesCs;
+        public LazyLoadReference<NativeComputeShader> baseLayerCs;
+        public LazyLoadReference<NativeComputeShader> mipReduceCs;
+        public LazyLoadReference<NativeComputeShader> envMapImportanceBakerCs;
+        public LazyLoadReference<NativeComputeShader> mipMapGenCs; // mipmapgen_cs.computeshader (donut MipMapGenPass MODE_COLOR)
+        public LazyLoadReference<NativeComputeShader> bc6uCompressCs;
+        public LazyLoadReference<NativeComputeShader> envLightsBackupPastCs;
+        public LazyLoadReference<NativeComputeShader> envLightsSubdivideBaseCs;
+        public LazyLoadReference<NativeComputeShader> envLightsSubdivideBoostCs;
+        public LazyLoadReference<NativeComputeShader> envLightsFillLookupMapCs;
+        public LazyLoadReference<NativeComputeShader> envLightsMapPastToCurrentCs;
+        public LazyLoadReference<NativeComputeShader> resetLightProxyCountersCs;
+        public LazyLoadReference<NativeComputeShader> resetPastToCurrentHistoryCs;
+        public LazyLoadReference<NativeComputeShader> computeWeightsCs;
+        public LazyLoadReference<NativeComputeShader> computeProxyCountsCs;
+        public LazyLoadReference<NativeComputeShader> computeProxyBaselineOffsetsCs;
+        public LazyLoadReference<NativeComputeShader> createProxyJobsCs;
+        public LazyLoadReference<NativeComputeShader> executeProxyJobsCs;
+        public LazyLoadReference<NativeComputeShader> bakeEmissiveTrianglesCs;
 
         // LightingUpdateBegin feedback passes
-        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryPreFilterCs;
+        public LazyLoadReference<NativeComputeShader> processFeedbackHistoryPreFilterCs;
 
-        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP0Cs;
+        public LazyLoadReference<NativeComputeShader> processFeedbackHistoryP0Cs;
 
         // LightingUpdateEnd feedback passes
-        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP1aCs;
-        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP1bCs;
-        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP2Cs;
-        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP3Cs;
-        public LazyLoadReference<NativeComputeShader>clearFeedbackHistoryCs;
+        public LazyLoadReference<NativeComputeShader> processFeedbackHistoryP1aCs;
+        public LazyLoadReference<NativeComputeShader> processFeedbackHistoryP1bCs;
+        public LazyLoadReference<NativeComputeShader> processFeedbackHistoryP2Cs;
+        public LazyLoadReference<NativeComputeShader> processFeedbackHistoryP3Cs;
+        public LazyLoadReference<NativeComputeShader> clearFeedbackHistoryCs;
 
         // LightsBaker debug passes (LightsBaker::DebugGUI — draw all lights / NEE-AT debug viz)
-        public LazyLoadReference<NativeComputeShader>debugDrawLightsCs;
-        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryDebugVizCs;
+        public LazyLoadReference<NativeComputeShader> debugDrawLightsCs;
+        public LazyLoadReference<NativeComputeShader> processFeedbackHistoryDebugVizCs;
 
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
@@ -138,9 +138,9 @@ namespace PathTracing
         private RtxptFillStablePlanesPass       _fillStablePlanesPass;
         private RtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
         private RtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
-        private SLDlssrrPass                          _dlssRRPass;
-        private SLDlssgInputsPass                     _slDlssgInputsPass;
-        private bool                                  _slFgLastEnabled;
+        private SLDlssrrPass                    _dlssRRPass;
+        private SLDlssgInputsPass               _slDlssgInputsPass;
+        private bool                            _slFgLastEnabled;
         private RtxptBloomPass                  _bloomPass;
         private RtxptToneMappingMipChainPass    _toneMappingMipChainPass;
         private RtxptAccumulationPass           _accumulationPass;
@@ -177,11 +177,11 @@ namespace PathTracing
         }
 
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
-        private readonly Dictionary<long, RtxptTextureResources> _texturePools      = new();
-        private readonly Dictionary<long, RtxptBufferResources>  _bufferPools       = new();
-        private readonly Dictionary<long, VolatileConstantBuffer>      _constantBuffers   = new();
-        private readonly Dictionary<long, SLDlssrr>                    _dlrrDenoisers     = new();
-        private readonly Dictionary<long, RtxptCameraFrameState>       _cameraFrameStates = new();
+        private readonly Dictionary<long, RtxptTextureResources>  _texturePools      = new();
+        private readonly Dictionary<long, RtxptBufferResources>   _bufferPools       = new();
+        private readonly Dictionary<long, VolatileConstantBuffer> _constantBuffers   = new();
+        private readonly Dictionary<long, SLDlssrr>               _dlrrDenoisers     = new();
+        private readonly Dictionary<long, RtxptCameraFrameState>  _cameraFrameStates = new();
 
         // ---- Lifecycle ------------------------------------------------------
 
@@ -217,7 +217,7 @@ namespace PathTracing
                 { renderPassEvent = renderPassEvent };
 
             _buildStablePlanesPass      ??= new RtxptBuildStablePlanesPass(buildStablePlanesShader.asset, ResolveHitGroups(buildHitGroups)) { renderPassEvent = renderPassEvent };
-            _exportVisibilityBufferPass ??= new RtxptExportVisibilityBufferPass(exportVisibilityBufferCs.asset) { renderPassEvent           = renderPassEvent };
+            _exportVisibilityBufferPass ??= new RtxptExportVisibilityBufferPass(exportVisibilityBufferCs.asset) { renderPassEvent                             = renderPassEvent };
 
             _lightingUpdateEndPass ??= new RtxptLightingUpdateEndPass(
                     processFeedbackHistoryP1aCs.asset, processFeedbackHistoryP1bCs.asset,
@@ -226,15 +226,15 @@ namespace PathTracing
                     processFeedbackHistoryDebugVizCs.asset)
                 { renderPassEvent = renderPassEvent };
 
-            _fillStablePlanesPass     ??= new RtxptFillStablePlanesPass(fillStablePlanesShader.asset, referenceShader.asset, ResolveHitGroups(fillHitGroups), ResolveHitGroups(referenceHitGroups)) { renderPassEvent          = renderPassEvent };
-            _denoisingGuidesBakePass  ??= new RtxptDenoisingGuidesBakePass(denoiseSpecHitTCs.asset) { renderPassEvent                                                                = renderPassEvent };
-            _dlssRrPrepareInputsPass  ??= new RtxptDlssRRPrepareInputsPass(dlssBeforeCs.asset) { renderPassEvent                                                                     = renderPassEvent };
-            _dlssRRPass               ??= new SLDlssrrPass { renderPassEvent                                                                                                         = renderPassEvent };
-            _slDlssgInputsPass        ??= new SLDlssgInputsPass { renderPassEvent                                                                                                    = renderPassEvent };
-            _bloomPass                ??= new RtxptBloomPass(bloomDownsampleRasterShader.asset, bloomBlurRasterShader.asset, bloomCompositeRasterShader.asset) { renderPassEvent                 = renderPassEvent };
-            _toneMappingMipChainPass  ??= new RtxptToneMappingMipChainPass(luminanceRasterShader.asset, mipMapGenCs.asset, captureLuminanceCs.asset, toneMapApplyRasterShader.asset) { renderPassEvent = renderPassEvent };
-            _accumulationPass         ??= new RtxptAccumulationPass(accumulationCs.asset) { renderPassEvent                                                                          = renderPassEvent };
-            _stablePlanesDebugVizPass ??= new RtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs.asset) { renderPassEvent                                                          = renderPassEvent };
+            _fillStablePlanesPass     ??= new RtxptFillStablePlanesPass(fillStablePlanesShader.asset, referenceShader.asset, ResolveHitGroups(fillHitGroups), ResolveHitGroups(referenceHitGroups)) { renderPassEvent = renderPassEvent };
+            _denoisingGuidesBakePass  ??= new RtxptDenoisingGuidesBakePass(denoiseSpecHitTCs.asset) { renderPassEvent                                                                                                 = renderPassEvent };
+            _dlssRrPrepareInputsPass  ??= new RtxptDlssRRPrepareInputsPass(dlssBeforeCs.asset) { renderPassEvent                                                                                                      = renderPassEvent };
+            _dlssRRPass               ??= new SLDlssrrPass { renderPassEvent                                                                                                                                          = renderPassEvent };
+            _slDlssgInputsPass        ??= new SLDlssgInputsPass { renderPassEvent                                                                                                                                     = renderPassEvent };
+            _bloomPass                ??= new RtxptBloomPass(bloomDownsampleRasterShader.asset, bloomBlurRasterShader.asset, bloomCompositeRasterShader.asset) { renderPassEvent                                      = renderPassEvent };
+            _toneMappingMipChainPass  ??= new RtxptToneMappingMipChainPass(luminanceRasterShader.asset, mipMapGenCs.asset, captureLuminanceCs.asset, toneMapApplyRasterShader.asset) { renderPassEvent                = renderPassEvent };
+            _accumulationPass         ??= new RtxptAccumulationPass(accumulationCs.asset) { renderPassEvent                                                                                                           = renderPassEvent };
+            _stablePlanesDebugVizPass ??= new RtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs.asset) { renderPassEvent                                                                                           = renderPassEvent };
             // The begin pass also clears the debug-viz texture via the plugin's UAV-clear event
             // (ClearUnorderedAccessViewFloat, matching the original's nvrhi clearTextureFloat).
             _shaderDebugBeginPass ??= new RtxptShaderDebugBeginPass { renderPassEvent = renderPassEvent };
@@ -245,7 +245,7 @@ namespace PathTracing
                     shaderDebugTrianglesRasterShader.asset, shaderDebugLinesRasterShader.asset,
                     shaderDebugFeedbackLinesRasterShader.asset, shaderDebugBlendVizRasterShader.asset) { renderPassEvent = renderPassEvent };
             _outputBlitPass      ??= new RtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent = renderPassEvent };
-            _depthBarrierFixPass ??= new DepthBarrierFixPass { renderPassEvent                           = RenderPassEvent.AfterRendering };
+            _depthBarrierFixPass ??= new DepthBarrierFixPass { renderPassEvent                     = RenderPassEvent.AfterRendering };
         }
 
         private RtxptPassContext passCtx;
@@ -448,21 +448,21 @@ namespace PathTracing
                 {
                     var dlrrInput = new SLDlssrr.SLDlssrrFrameInput
                     {
-                        worldToView      = frameState.worldToView,
-                        viewToClip       = frameState.viewToClip,
-                        worldToClip      = frameState.worldToClip,
-                        prevWorldToClip  = frameState.prevWorldToClip,
-                        camPos           = frameState.camPos,
-                        viewportJitter   = frameState.viewportJitter,
-                        renderResolution = renderResolution,
-                        outputResolution = displayResolution,
-                        frameIndex       = frameState.frameIndex,
-                        cameraNear       = cam.nearClipPlane,
-                        cameraFar        = cam.farClipPlane,
-                        cameraFOV        = cam.fieldOfView * Mathf.Deg2Rad,
-                        cameraAspect     = cam.aspect,
+                        worldToView             = frameState.worldToView,
+                        viewToClip              = frameState.viewToClip,
+                        worldToClip             = frameState.worldToClip,
+                        prevWorldToClip         = frameState.prevWorldToClip,
+                        camPos                  = frameState.camPos,
+                        viewportJitter          = frameState.viewportJitter,
+                        renderResolution        = renderResolution,
+                        outputResolution        = displayResolution,
+                        frameIndex              = frameState.frameIndex,
+                        cameraNear              = cam.nearClipPlane,
+                        cameraFar               = cam.farClipPlane,
+                        cameraFOV               = cam.fieldOfView * Mathf.Deg2Rad,
+                        cameraAspect            = cam.aspect,
                         useSpecularMotionVector = true, // RTXPT supplies specular motion vectors
-                        reset            = false
+                        reset                   = false
                     };
                     var dlrrRes = new SLDlssrr.DlssrrResources
                     {
@@ -543,8 +543,8 @@ namespace PathTracing
         // ---- Helpers -------------------------------------------------------
 
         private void PushDlssgFrameInputs(ScriptableRenderer renderer, Camera cam, RtxptCameraFrameState frameState,
-                                          RtxptTextureResources texPool, int2 displayResolution, int2 renderResolution,
-                                          bool texturesChanged, RtxptSetting effectiveSetting, int eyeIndex)
+            RtxptTextureResources texPool, int2 displayResolution, int2 renderResolution,
+            bool texturesChanged, RtxptSetting effectiveSetting, int eyeIndex)
         {
             if (eyeIndex != 0)
                 return;
@@ -578,8 +578,8 @@ namespace PathTracing
             Matrix4x4 clipToPrevClip     = frameState.prevWorldToClip * worldToClipInv;
             Matrix4x4 prevClipToClip     = frameState.worldToClip * prevWorldToClipInv;
 
-            var camRight =  new Vector3(viewToWorld.m00, viewToWorld.m10, viewToWorld.m20);
-            var camUp    =  new Vector3(viewToWorld.m01, viewToWorld.m11, viewToWorld.m21);
+            var camRight = new Vector3(viewToWorld.m00, viewToWorld.m10, viewToWorld.m20);
+            var camUp    = new Vector3(viewToWorld.m01, viewToWorld.m11, viewToWorld.m21);
             var camFwd   = -new Vector3(viewToWorld.m02, viewToWorld.m12, viewToWorld.m22);
 
             float renderW = math.max(1, renderResolution.x);
@@ -702,7 +702,7 @@ namespace PathTracing
             _denoisingGuidesBakePass = null;
             _dlssRrPrepareInputsPass?.Dispose();
             _dlssRrPrepareInputsPass = null;
-            _slDlssgInputsPass = null;
+            _slDlssgInputsPass       = null;
             _bloomPass?.Dispose();
             _bloomPass = null;
             _toneMappingMipChainPass?.Dispose();

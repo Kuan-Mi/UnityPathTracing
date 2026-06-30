@@ -19,25 +19,47 @@ namespace NativeRender
     /// </summary>
     public class NativeRasterShader : ScriptableObject
     {
-        [SerializeField, HideInInspector] private string[] additionalIncludePaths = Array.Empty<string>();
-        [SerializeField, HideInInspector] private string[] _extraArgs = Array.Empty<string>();
-        [SerializeField, HideInInspector] private string[] _defines   = Array.Empty<string>();
+        [SerializeField, HideInInspector]
+        private string[] additionalIncludePaths = Array.Empty<string>();
 
-        [SerializeField, HideInInspector] private string _vsEntryPoint = "VSMain";
-        [SerializeField, HideInInspector] private string _psEntryPoint = "PSMain";
-        [SerializeField, HideInInspector] private string _vsTargetProfile = "vs_6_6";
-        [SerializeField, HideInInspector] private string _psTargetProfile = "ps_6_6";
+        [SerializeField, HideInInspector]
+        private string[] _extraArgs = Array.Empty<string>();
 
-        [SerializeField, HideInInspector] private RootConstantsHint[] _rootConstantsHints = Array.Empty<RootConstantsHint>();
-        [SerializeField, HideInInspector] private string[]            _rootSRVHints       = Array.Empty<string>();
-        [SerializeField, HideInInspector] private SamplerBinding[]    _samplerBindings    = Array.Empty<SamplerBinding>();
+        [SerializeField, HideInInspector]
+        private string[] _defines = Array.Empty<string>();
 
-        [SerializeField, HideInInspector] private byte[] _vsDxil;
-        [SerializeField, HideInInspector] private byte[] _psDxil;
-        [SerializeField, HideInInspector] private string _reflectionJson = "";
+        [SerializeField, HideInInspector]
+        private string _vsEntryPoint = "VSMain";
+
+        [SerializeField, HideInInspector]
+        private string _psEntryPoint = "PSMain";
+
+        [SerializeField, HideInInspector]
+        private string _vsTargetProfile = "vs_6_6";
+
+        [SerializeField, HideInInspector]
+        private string _psTargetProfile = "ps_6_6";
+
+        [SerializeField, HideInInspector]
+        private RootConstantsHint[] _rootConstantsHints = Array.Empty<RootConstantsHint>();
+
+        [SerializeField, HideInInspector]
+        private string[] _rootSRVHints = Array.Empty<string>();
+
+        [SerializeField, HideInInspector]
+        private SamplerBinding[] _samplerBindings = Array.Empty<SamplerBinding>();
+
+        [SerializeField, HideInInspector]
+        private byte[] _vsDxil;
+
+        [SerializeField, HideInInspector]
+        private byte[] _psDxil;
+
+        [SerializeField, HideInInspector]
+        private string _reflectionJson = "";
 
         public bool HasCompiledBytes => _vsDxil is { Length: > 0 } && _psDxil is { Length: > 0 };
-        public int  CompiledByteCount => (_vsDxil?.Length ?? 0) + (_psDxil?.Length ?? 0);
+        public int CompiledByteCount => (_vsDxil?.Length ?? 0) + (_psDxil?.Length ?? 0);
         public string ReflectionJson => _reflectionJson ?? "";
 
         /// <summary>The DXIL container shader hash (32-char hex) of the vertex-stage blob, or "".</summary>
@@ -59,9 +81,9 @@ namespace NativeRender
         }
 
         internal RootConstantsHint[] RootConstantsHints => _rootConstantsHints ?? Array.Empty<RootConstantsHint>();
-        internal string[]            RootSRVHints       => _rootSRVHints       ?? Array.Empty<string>();
-        internal SamplerBinding[]    SamplerBindings    => _samplerBindings    ?? Array.Empty<SamplerBinding>();
-        internal SamplerHint[]       ResolveSamplerHints() => SamplerBindingResolver.Resolve(_samplerBindings);
+        internal string[] RootSRVHints => _rootSRVHints ?? Array.Empty<string>();
+        internal SamplerBinding[] SamplerBindings => _samplerBindings ?? Array.Empty<SamplerBinding>();
+        internal SamplerHint[] ResolveSamplerHints() => SamplerBindingResolver.Resolve(_samplerBindings);
 
         public static event Action<NativeRasterShader> OnRecompiled;
         public static void InvokeOnRecompiled(NativeRasterShader shader) => OnRecompiled?.Invoke(shader);
@@ -77,7 +99,7 @@ namespace NativeRender
             if (string.IsNullOrEmpty(hlslPath))
                 hlslPath = GetHlslPath();
             string includeDirs = BuildIncludeDirs(hlslPath);
-            string defines     = _defines   is { Length: > 0 } ? string.Join(";", _defines)   : null;
+            string defines     = _defines is { Length: > 0 } ? string.Join(";", _defines) : null;
             string extraArgs   = _extraArgs is { Length: > 0 } ? string.Join(";", _extraArgs) : null;
 
             string vsEntry = string.IsNullOrEmpty(_vsEntryPoint) ? "VSMain" : _vsEntryPoint;
@@ -115,7 +137,7 @@ namespace NativeRender
             => string.IsNullOrEmpty(defines) ? extra : defines + ";" + extra;
 
         private byte[] CompileStage(string hlslPath, string entry, string target,
-                                    string includeDirs, string defines, string extraArgs)
+            string includeDirs, string defines, string extraArgs)
         {
             bool ok = NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_CompileCS(
                 hlslPath, entry, target, includeDirs, defines, extraArgs,
@@ -126,6 +148,7 @@ namespace NativeRender
                 Debug.LogError($"[NativeRasterShader] {target} '{entry}' compile failed: {hlslPath}", this);
                 return null;
             }
+
             var bytes = new byte[nativeSize];
             Marshal.Copy(nativePtr, bytes, 0, (int)nativeSize);
             NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Free(nativePtr);
@@ -140,7 +163,7 @@ namespace NativeRender
             // are harmless: the pipeline's slot map resolves each via NR_RAS_GetSlotIndex.
             string vsArr = ExtractBindingsArrayBody(vsJson);
             string psArr = ExtractBindingsArrayBody(psJson);
-            var sb = new StringBuilder();
+            var    sb    = new StringBuilder();
             sb.Append("{\"bindings\":[");
             sb.Append(vsArr);
             if (vsArr.Length > 0 && psArr.Length > 0) sb.Append(',');
@@ -160,6 +183,7 @@ namespace NativeRender
                 NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Free(jsonPtr);
                 return s;
             }
+
             return "";
         }
 
@@ -187,8 +211,17 @@ namespace NativeRender
         // Internal access for NativeRasterPipeline
         // -------------------------------------------------------------------
 
-        internal byte[] GetOrCompileVsDxil() { EnsureCompiled(); return _vsDxil; }
-        internal byte[] GetOrCompilePsDxil() { EnsureCompiled(); return _psDxil; }
+        internal byte[] GetOrCompileVsDxil()
+        {
+            EnsureCompiled();
+            return _vsDxil;
+        }
+
+        internal byte[] GetOrCompilePsDxil()
+        {
+            EnsureCompiled();
+            return _psDxil;
+        }
 
         internal string GetHlslPath()
         {

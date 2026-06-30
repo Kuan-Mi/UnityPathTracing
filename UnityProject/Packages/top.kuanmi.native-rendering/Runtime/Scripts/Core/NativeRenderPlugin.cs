@@ -311,9 +311,9 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct ShtRebuildEventData
         {
-            public ulong  shaderHandle;      // RayTraceShader*
+            public ulong  shaderHandle; // RayTraceShader*
             public IntPtr variantIndicesPtr; // const uint32_t* — per-geometry variant index array
-            public uint   count;             // number of geometries
+            public uint   count; // number of geometries
             public uint   _pad;
         }
 
@@ -648,9 +648,9 @@ namespace NativeRender
         public struct BC6HCopy_RenderEventData
         {
             public ulong srcScratch; // ID3D12Resource* RGBA32_UINT scratch cube
-            public ulong dstBC6H;    // ID3D12Resource* BC6H cube
+            public ulong dstBC6H; // ID3D12Resource* BC6H cube
             public uint  mipLevels;
-            public uint  arraySize;  // 6 for a cube
+            public uint  arraySize; // 6 for a cube
         }
 
         // -------------------------------------------------------------------
@@ -665,30 +665,32 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct RasterPipelineStateDesc
         {
-            public uint numRenderTargets;                                  // 0..8
+            public uint numRenderTargets; // 0..8
+
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
-            public uint[] rtvFormats;                                      // DXGI_FORMAT per RT
-            public uint dsvFormat;                                         // DXGI_FORMAT, 0 = none
-            public uint cullMode;                                          // D3D12_CULL_MODE; 0 => NONE
-            public uint fillMode;                                          // D3D12_FILL_MODE; 0 => SOLID
+            public uint[] rtvFormats; // DXGI_FORMAT per RT
+
+            public uint dsvFormat; // DXGI_FORMAT, 0 = none
+            public uint cullMode; // D3D12_CULL_MODE; 0 => NONE
+            public uint fillMode; // D3D12_FILL_MODE; 0 => SOLID
             public uint depthTestEnable;
             public uint depthWriteEnable;
-            public uint depthFunc;                                         // D3D12_COMPARISON_FUNC; 0 => LESS_EQUAL
-            public uint blendMode;                                         // 0=opaque,1=alpha,2=additive,3=premultiplied
-            public uint primitiveTopology;                                 // D3D_PRIMITIVE_TOPOLOGY (TRIANGLELIST=4, TRIANGLESTRIP=5, …); 0 => TRIANGLELIST
+            public uint depthFunc; // D3D12_COMPARISON_FUNC; 0 => LESS_EQUAL
+            public uint blendMode; // 0=opaque,1=alpha,2=additive,3=premultiplied
+            public uint primitiveTopology; // D3D_PRIMITIVE_TOPOLOGY (TRIANGLELIST=4, TRIANGLESTRIP=5, …); 0 => TRIANGLELIST
             public uint frontCounterClockwise;
-            public uint sampleCount;                                       // 0 => 1
+            public uint sampleCount; // 0 => 1
 
             // D3D_PRIMITIVE_TOPOLOGY values.
             public const uint TopologyTriangleList  = 4;
             public const uint TopologyTriangleStrip = 5;
 
             // blendMode values (see C++ MakeBlend).
-            public const uint BlendModeOpaque         = 0;
-            public const uint BlendModeAlpha          = 1;
-            public const uint BlendModeAdditive       = 2;
-            public const uint BlendModePremultiplied  = 3;
-            public const uint BlendModeConstantColor  = 4; // src*C + dst*(1-C); C = RasterDrawDesc.blendFactor
+            public const uint BlendModeOpaque        = 0;
+            public const uint BlendModeAlpha         = 1;
+            public const uint BlendModeAdditive      = 2;
+            public const uint BlendModePremultiplied = 3;
+            public const uint BlendModeConstantColor = 4; // src*C + dst*(1-C); C = RasterDrawDesc.blendFactor
 
             /// <summary>
             /// Single-RTV opaque fullscreen-pass default for the given color format. Uses a triangle
@@ -700,18 +702,18 @@ namespace NativeRender
             {
                 var d = new RasterPipelineStateDesc
                 {
-                    numRenderTargets = 1,
-                    rtvFormats       = new uint[8],
-                    dsvFormat        = 0,
-                    cullMode         = 1, // D3D12_CULL_MODE_NONE
-                    fillMode         = 3, // D3D12_FILL_MODE_SOLID
-                    depthTestEnable  = 0,
-                    depthWriteEnable = 0,
-                    depthFunc        = 0,
-                    blendMode        = 0,
-                    primitiveTopology = primitiveTopology,
+                    numRenderTargets      = 1,
+                    rtvFormats            = new uint[8],
+                    dsvFormat             = 0,
+                    cullMode              = 1, // D3D12_CULL_MODE_NONE
+                    fillMode              = 3, // D3D12_FILL_MODE_SOLID
+                    depthTestEnable       = 0,
+                    depthWriteEnable      = 0,
+                    depthFunc             = 0,
+                    blendMode             = 0,
+                    primitiveTopology     = primitiveTopology,
                     frontCounterClockwise = 0,
-                    sampleCount      = 1,
+                    sampleCount           = 1,
                 };
                 d.rtvFormats[0] = rtvFormat;
                 return d;
@@ -778,21 +780,21 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public unsafe struct RAS_RenderEventData
         {
-            public ulong descriptorSetHandle; // RasterDescriptorSet*
-            public ulong bindingSlotsPtr;     // CS_BindingSlot*
-            public uint  bindingCount;
-            public uint  numRenderTargets;
+            public       ulong descriptorSetHandle; // RasterDescriptorSet*
+            public       ulong bindingSlotsPtr; // CS_BindingSlot*
+            public       uint  bindingCount;
+            public       uint  numRenderTargets;
             public fixed ulong rtvResources[8]; // ID3D12Resource*
-            public fixed uint  rtvFormats[8];   // DXGI_FORMAT
-            public ulong dsvResource;         // ID3D12Resource* or 0
-            public uint  dsvFormat;           // DXGI_FORMAT
-            public uint  clearFlags;          // bit0 = clear color, bit1 = clear depth
+            public fixed uint  rtvFormats[8]; // DXGI_FORMAT
+            public       ulong dsvResource; // ID3D12Resource* or 0
+            public       uint  dsvFormat; // DXGI_FORMAT
+            public       uint  clearFlags; // bit0 = clear color, bit1 = clear depth
             public fixed float clearColor[4];
-            public float clearDepth;
-            public float viewportX, viewportY, viewportW, viewportH;
-            public uint  vertexCount;
-            public uint  instanceCount;
-            public float blendFactor;       // OMSetBlendFactor constant (blendMode==4 constant-color); was _pad
+            public       float clearDepth;
+            public       float viewportX, viewportY, viewportW, viewportH;
+            public       uint  vertexCount;
+            public       uint  instanceCount;
+            public       float blendFactor; // OMSetBlendFactor constant (blendMode==4 constant-color); was _pad
         }
 
         // -----------------------------------------------------------------------

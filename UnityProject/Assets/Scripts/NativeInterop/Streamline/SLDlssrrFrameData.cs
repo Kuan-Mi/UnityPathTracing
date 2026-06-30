@@ -59,11 +59,11 @@ namespace PathTracing.NativeInterop.Streamline
         public float3 cameraFwd;
 
         public float2 cameraJitter; // pixel space
-        public float2 mvecScale;    // brings mvec into [-1,1]
+        public float2 mvecScale; // brings mvec into [-1,1]
 
         public float cameraNear;
         public float cameraFar;
-        public float cameraFOV;    // radians
+        public float cameraFOV; // radians
         public float cameraAspect;
 
         public ushort outputWidth;

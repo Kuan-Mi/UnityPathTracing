@@ -47,10 +47,10 @@ namespace PathTracing
 
         // ── HitInfo packing ───────────────────────────────────────────────────
 
-        internal const int HIT_INFO_INSTANCE_ID_BITS      = 29;
-        internal const int HIT_INFO_PRIMITIVE_INDEX_BITS  = 32;
-        internal const int HIT_INFO_TYPE_BITS             = 3;
-        internal const int HIT_INFO_USE_COMPRESSION       = 0;
+        internal const int HIT_INFO_INSTANCE_ID_BITS     = 29;
+        internal const int HIT_INFO_PRIMITIVE_INDEX_BITS = 32;
+        internal const int HIT_INFO_TYPE_BITS            = 3;
+        internal const int HIT_INFO_USE_COMPRESSION      = 0;
 
         // ── Feature flags (must match shader #defines) ────────────────────────
 
@@ -64,12 +64,12 @@ namespace PathTracing
         // ── Path tracer mode IDs ──────────────────────────────────────────────
 
         /// <summary>Reference mode — stable planes ignored.</summary>
-        internal const int PATH_TRACER_MODE_REFERENCE           = 0;
+        internal const int PATH_TRACER_MODE_REFERENCE = 0;
 
         /// <summary>Build stable planes pass — non-noisy rays only, stops at diffuse vertices.</summary>
         internal const int PATH_TRACER_MODE_BUILD_STABLE_PLANES = 1;
 
         /// <summary>Fill stable planes pass — standard noisy ray tracing with stable plane tracking.</summary>
-        internal const int PATH_TRACER_MODE_FILL_STABLE_PLANES  = 2;
+        internal const int PATH_TRACER_MODE_FILL_STABLE_PLANES = 2;
     }
 }

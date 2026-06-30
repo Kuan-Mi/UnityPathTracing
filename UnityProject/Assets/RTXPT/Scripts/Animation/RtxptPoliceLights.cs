@@ -66,10 +66,10 @@ namespace PathTracing
         private void Tick()
         {
             if (_path == null) _path = GetComponent<PropFlightPath>();
-            float t = _path != null ? _path.AnimationTime : 0f;
+            float t                  = _path != null ? _path.AnimationTime : 0f;
 
-            float blobRightI = 0f;
-            float blobRotAngle = 0f;   // radians
+            float blobRightI   = 0f;
+            float blobRotAngle = 0f; // radians
 
             if (t > animTimeStart && t < animTimeStop)
             {
@@ -77,42 +77,45 @@ namespace PathTracing
 
                 if (t < animTimeStart + 2f || t > animTimeStop - 2f) // intro / outro
                 {
-                    spotLeftI  = spotLeftIntensity  * 0.1f;
+                    spotLeftI  = spotLeftIntensity * 0.1f;
                     spotRightI = spotRightIntensity * 0.1f;
-                    blobLeftI  = blobLeftIntensity  * 0.01f;
+                    blobLeftI  = blobLeftIntensity * 0.01f;
                     blobRightI = blobRightIntensity * 0.01f;
                 }
                 else
                 {
                     float spotPeriod = Saturate(Repeat(t, 0.9f) / 0.9f);
                     if (spotPeriod < 0.5f) spotLeftI = spotLeftIntensity;
-                    else                   spotRightI = spotRightIntensity;
+                    else spotRightI                  = spotRightIntensity;
 
                     float blobPeriod = Saturate(Repeat(t, 1.1f) / 1.1f);
                     blobRotAngle = (blobPeriod - 0.5f) * Mathf.PI * 2f;
-                    blobLeftI  = blobLeftIntensity;
-                    blobRightI = blobRightIntensity;
+                    blobLeftI    = blobLeftIntensity;
+                    blobRightI   = blobRightIntensity;
                 }
 
-                SetIntensity(spotLeft,  spotLeftI);
+                SetIntensity(spotLeft, spotLeftI);
                 SetIntensity(spotRight, spotRightI);
-                SetIntensity(blobLeft,  blobLeftI);
+                SetIntensity(blobLeft, blobLeftI);
                 SetIntensity(blobRight, blobRightI);
             }
             else
             {
-                SetIntensity(spotLeft,  0f);
+                SetIntensity(spotLeft, 0f);
                 SetIntensity(spotRight, 0f);
-                SetIntensity(blobLeft,  0f);
+                SetIntensity(blobLeft, 0f);
                 SetIntensity(blobRight, 0f);
             }
 
-            var spin = Quaternion.AngleAxis(blobRotAngle * Mathf.Rad2Deg, Vector3.right);
-            if (blobLeft  != null) blobLeft.transform.localRotation  = blobLeftRot  * spin;
+            var spin                                                 = Quaternion.AngleAxis(blobRotAngle * Mathf.Rad2Deg, Vector3.right);
+            if (blobLeft != null) blobLeft.transform.localRotation   = blobLeftRot * spin;
             if (blobRight != null) blobRight.transform.localRotation = blobRightRot * spin;
         }
 
-        private static void SetIntensity(Light l, float i) { if (l != null) l.intensity = i; }
+        private static void SetIntensity(Light l, float i)
+        {
+            if (l != null) l.intensity = i;
+        }
 
         // C fmodf(t, p) for t >= 0; Mathf.Repeat matches it on the non-negative animation timeline.
         private static float Repeat(float t, float p) => Mathf.Repeat(t, p);

@@ -57,7 +57,7 @@ namespace PathTracing
         {
             internal RayTracePipeline            BuildSP;
             internal NativeRayTraceDescriptorSet BuildDs;
-            internal RtxptPassContext      Ctx;
+            internal RtxptPassContext            Ctx;
             internal int2                        RenderRes;
         }
 

@@ -28,7 +28,10 @@ namespace PathTracing
             var asset = ScriptableObject.CreateInstance<RtxptMaterial>();
 
             string json;
-            try { json = File.ReadAllText(ctx.assetPath); }
+            try
+            {
+                json = File.ReadAllText(ctx.assetPath);
+            }
             catch (Exception ex)
             {
                 ctx.LogImportError($"Failed to read '{ctx.assetPath}': {ex.Message}");
@@ -71,8 +74,8 @@ namespace PathTracing
             if (!string.IsNullOrWhiteSpace(textureRoot))
                 return textureRoot.Replace('\\', '/').TrimEnd('/');
 
-            string dir = Path.GetDirectoryName(assetPath);                 // .../Materials
-            string parent = Path.GetDirectoryName(dir);                    // .../RTXPTAssets
+            string dir    = Path.GetDirectoryName(assetPath); // .../Materials
+            string parent = Path.GetDirectoryName(dir); // .../RTXPTAssets
             return (parent ?? dir ?? "Assets").Replace('\\', '/').TrimEnd('/');
         }
     }

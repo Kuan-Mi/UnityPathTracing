@@ -1,5 +1,3 @@
- 
-
 using System;
 
 namespace PathTracing.NativeInterop.NRI
@@ -10,37 +8,37 @@ namespace PathTracing.NativeInterop.NRI
         NONE = 0, // Mapped to "COMMON" (aka "GENERAL" access), if AgilitySDK is not available, leading to potential discrepancies with VK
 
         // Buffer                                // Access  Compatible "StageBits" (including ALL)
-        INDEX_BUFFER = (1 << 0), // R   INDEX_INPUT
-        VERTEX_BUFFER = (1 << 1), // R   VERTEX_SHADER
+        INDEX_BUFFER    = (1 << 0), // R   INDEX_INPUT
+        VERTEX_BUFFER   = (1 << 1), // R   VERTEX_SHADER
         CONSTANT_BUFFER = (1 << 2), // R   GRAPHICS_SHADERS, COMPUTE_SHADER, RAY_TRACING_SHADERS
         ARGUMENT_BUFFER = (1 << 3), // R   INDIRECT
-        SCRATCH_BUFFER = (1 << 4), // RW  ACCELERATION_STRUCTURE, MICROMAP
+        SCRATCH_BUFFER  = (1 << 4), // RW  ACCELERATION_STRUCTURE, MICROMAP
 
         // Attachment
-        COLOR_ATTACHMENT = (1 << 5), // RW  COLOR_ATTACHMENT
-        SHADING_RATE_ATTACHMENT = (1 << 6), // R   FRAGMENT_SHADER
-        DEPTH_STENCIL_ATTACHMENT_READ = (1 << 7), // R   DEPTH_STENCIL_ATTACHMENT
+        COLOR_ATTACHMENT               = (1 << 5), // RW  COLOR_ATTACHMENT
+        SHADING_RATE_ATTACHMENT        = (1 << 6), // R   FRAGMENT_SHADER
+        DEPTH_STENCIL_ATTACHMENT_READ  = (1 << 7), // R   DEPTH_STENCIL_ATTACHMENT
         DEPTH_STENCIL_ATTACHMENT_WRITE = (1 << 8), //  W  DEPTH_STENCIL_ATTACHMENT
 
         // Acceleration structure
-        ACCELERATION_STRUCTURE_READ = (1 << 9), // R   COMPUTE_SHADER, RAY_TRACING_SHADERS, ACCELERATION_STRUCTURE
+        ACCELERATION_STRUCTURE_READ  = (1 << 9), // R   COMPUTE_SHADER, RAY_TRACING_SHADERS, ACCELERATION_STRUCTURE
         ACCELERATION_STRUCTURE_WRITE = (1 << 10), //  W  ACCELERATION_STRUCTURE
 
         // Micromap
-        MICROMAP_READ = (1 << 11), // R   MICROMAP, ACCELERATION_STRUCTURE
+        MICROMAP_READ  = (1 << 11), // R   MICROMAP, ACCELERATION_STRUCTURE
         MICROMAP_WRITE = (1 << 12), //  W  MICROMAP
 
         // Shader resource
-        SHADER_RESOURCE = (1 << 13), // R   GRAPHICS_SHADERS, COMPUTE_SHADER, RAY_TRACING_SHADERS
+        SHADER_RESOURCE         = (1 << 13), // R   GRAPHICS_SHADERS, COMPUTE_SHADER, RAY_TRACING_SHADERS
         SHADER_RESOURCE_STORAGE = (1 << 14), // RW  GRAPHICS_SHADERS, COMPUTE_SHADER, RAY_TRACING_SHADERS, CLEAR_STORAGE + shaders
-        SHADER_BINDING_TABLE = (1 << 15), // R   RAY_TRACING_SHADERS
+        SHADER_BINDING_TABLE    = (1 << 15), // R   RAY_TRACING_SHADERS
 
         // Copy
-        COPY_SOURCE = (1 << 16), // R   COPY
+        COPY_SOURCE      = (1 << 16), // R   COPY
         COPY_DESTINATION = (1 << 17), //  W  COPY
 
         // Resolve
-        RESOLVE_SOURCE = (1 << 18), // R   RESOLVE
+        RESOLVE_SOURCE      = (1 << 18), // R   RESOLVE
         RESOLVE_DESTINATION = (1 << 19), //  W  RESOLVE
 
         // Clear storage
@@ -67,6 +65,4 @@ namespace PathTracing.NativeInterop.NRI
         RESOLVE_SOURCE, // RESOLVE_SOURCE
         RESOLVE_DESTINATION // RESOLVE_DESTINATION
     }
-    
 }
- 

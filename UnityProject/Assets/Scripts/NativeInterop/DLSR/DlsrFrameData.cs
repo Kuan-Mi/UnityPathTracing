@@ -13,8 +13,8 @@ namespace PathTracing.NativeInterop.DLSR
         public IntPtr outputTex;
         public IntPtr mvTex;
         public IntPtr depthTex;
-        public IntPtr exposureTex;   // optional, IntPtr.Zero if unused
-        public IntPtr reactiveTex;   // optional, IntPtr.Zero if unused
+        public IntPtr exposureTex; // optional, IntPtr.Zero if unused
+        public IntPtr reactiveTex; // optional, IntPtr.Zero if unused
 
         public ushort outputWidth;
         public ushort outputHeight;
@@ -26,7 +26,7 @@ namespace PathTracing.NativeInterop.DLSR
 
         public int          instanceId;
         public UpscalerMode upscalerMode;
-        public byte         preset;       // 0 = default
+        public byte         preset; // 0 = default
         public byte         resetHistory; // non-zero = reset accumulation
     }
 }

@@ -13,10 +13,17 @@ namespace PathTracing.Editor.Tools
     /// </summary>
     public sealed class ProfilerCaptureWindow : EditorWindow
     {
-        [SerializeField] private string loadedPath   = "";
-        [SerializeField] private int    frame        = -1;       // -1 = use last loaded frame
-        [SerializeField] private string threadFilter = "Main Thread, Render Thread";
-        [SerializeField] private float  minMs        = 0f;
+        [SerializeField]
+        private string loadedPath = "";
+
+        [SerializeField]
+        private int frame = -1; // -1 = use last loaded frame
+
+        [SerializeField]
+        private string threadFilter = "Main Thread, Render Thread";
+
+        [SerializeField]
+        private float minMs = 0f;
 
         [MenuItem("Tools/Profiler Capture/Window")]
         public static void Open() => GetWindow<ProfilerCaptureWindow>("Profiler Capture");
@@ -59,7 +66,7 @@ namespace PathTracing.Editor.Tools
             {
                 if (GUILayout.Button("List threads in frame"))
                 {
-                    int f = ResolveFrame(first, last);
+                    int f     = ResolveFrame(first, last);
                     var names = ProfilerCaptureExporter.GetThreadNames(f);
                     Debug.Log($"[ProfilerCapture] Threads in frame {f}:\n  {string.Join("\n  ", names)}");
                 }

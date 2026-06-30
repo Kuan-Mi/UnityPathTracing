@@ -2,7 +2,6 @@ using System;
 
 namespace PathTracing.NativeInterop.NRD
 {
-
     // -----------------------------------------------------------------------
     // SIGMA – shadow / translucency denoiser
     // -----------------------------------------------------------------------

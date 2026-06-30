@@ -68,17 +68,17 @@ namespace PathTracing
         // Pass 3 (tone-map apply) is a raster fullscreen draw — the verbatim donut tonemapping_ps.hlsl
         // is a PIXEL shader, so it runs through a graphics pipeline writing a color render target
         // (SV_Target) rather than a compute UAV.
-        private readonly NativeRasterPipeline       _tonemapRaster;
-        private readonly NativeRasterDescriptorSet  _tonemapDs;
+        private readonly NativeRasterPipeline      _tonemapRaster;
+        private readonly NativeRasterDescriptorSet _tonemapDs;
 
         // Output RT format (LdrColor is RGBA16F in both the NRD and RTXDI features). Used both to bake
         // the pipeline's RTV format and as the per-draw colorFormats entry.
-        private const uint kRGBA16F = (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
+        private const    uint     kRGBA16F  = (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
         private readonly uint[]   _colorFmt = { kRGBA16F };
         private readonly IntPtr[] _colorRes = new IntPtr[1]; // scratch length-1, refilled per draw
 
-        private readonly DeviceBuffer _histogramBuffer; // 256 x uint (DEFAULT heap, UAV-capable)
-        private readonly GraphicsBuffer  _exposureBuffer; // 1 x uint (float bits)
+        private readonly DeviceBuffer   _histogramBuffer; // 256 x uint (DEFAULT heap, UAV-capable)
+        private readonly GraphicsBuffer _exposureBuffer; // 1 x uint (float bits)
 
         private IntPtr expPtr;
 
@@ -90,7 +90,7 @@ namespace PathTracing
         public NativeToneMappingPass(
             NativeComputeShader histogramCs,
             NativeComputeShader exposureCs,
-            NativeRasterShader  tonemapShader)
+            NativeRasterShader tonemapShader)
         {
             _histogramCs = new NativeComputePipeline(histogramCs);
             _histogramDs = new NativeComputeDescriptorSet(_histogramCs);
@@ -100,12 +100,12 @@ namespace PathTracing
 
             _tonemapRaster = new NativeRasterPipeline(tonemapShader,
                 NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F));
-            _tonemapDs     = new NativeRasterDescriptorSet(_tonemapRaster);
+            _tonemapDs = new NativeRasterDescriptorSet(_tonemapRaster);
 
             _histogramBuffer = new DeviceBuffer(256 * sizeof(uint));
-            _exposureBuffer   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 1, sizeof(uint));
+            _exposureBuffer  = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 1, sizeof(uint));
 
-            expPtr  = _exposureBuffer.GetNativeBufferPtr();
+            expPtr = _exposureBuffer.GetNativeBufferPtr();
         }
 
         public void Dispose()
@@ -209,10 +209,10 @@ namespace PathTracing
             public uint[]                     ColorFmt;
             public IntPtr[]                   ColorRes;
 
-            public DeviceBuffer          HistogramBuffer;
-            public Resource                   Resource;
-            public Settings                   Settings;
-            public   IntPtr                     expPtr;
+            public DeviceBuffer HistogramBuffer;
+            public Resource     Resource;
+            public Settings     Settings;
+            public IntPtr       expPtr;
         }
 
         // ── Execution ─────────────────────────────────────────────────────────
@@ -251,7 +251,7 @@ namespace PathTracing
                     : float2.zero,
             };
 
-            var expPtr         = data.expPtr;
+            var expPtr = data.expPtr;
 
             uint renderW = (uint)s.RenderResolution.x;
             uint renderH = (uint)s.RenderResolution.y;
@@ -259,7 +259,7 @@ namespace PathTracing
             // ── Pass 1: Clear + Build Histogram ─────────────────────────────
             // Clear (GPU-side zero via ClearUnorderedAccessViewUint on the render thread)
             data.HistogramBuffer.Clear(context.cmd);
-            
+
             // Build
             data.HistogramDs.SetRootConstants("c_ToneMapping", &cb);
             data.HistogramDs.SetTexture("t_Source", res.SourceTexture);
@@ -310,19 +310,19 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeToneMappingPass", out var passData);
 
-            passData.HistogramCs      = _histogramCs;
-            passData.HistogramDs      = _histogramDs;
-            passData.ExposureCs       = _exposureCs;
-            passData.ExposureDs       = _exposureDs;
-            passData.TonemapRaster    = _tonemapRaster;
-            passData.TonemapDs        = _tonemapDs;
-            passData.ColorFmt         = _colorFmt;
-            passData.ColorRes         = _colorRes;
+            passData.HistogramCs   = _histogramCs;
+            passData.HistogramDs   = _histogramDs;
+            passData.ExposureCs    = _exposureCs;
+            passData.ExposureDs    = _exposureDs;
+            passData.TonemapRaster = _tonemapRaster;
+            passData.TonemapDs     = _tonemapDs;
+            passData.ColorFmt      = _colorFmt;
+            passData.ColorRes      = _colorRes;
 
-            passData.HistogramBuffer  = _histogramBuffer;
-            passData.Resource         = _resource;
-            passData.Settings         = _settings;
-            passData.expPtr           = expPtr;
+            passData.HistogramBuffer = _histogramBuffer;
+            passData.Resource        = _resource;
+            passData.Settings        = _settings;
+            passData.expPtr          = expPtr;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext ctx) => ExecutePass(data, ctx));

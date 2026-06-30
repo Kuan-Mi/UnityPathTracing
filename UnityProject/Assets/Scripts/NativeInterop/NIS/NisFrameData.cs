@@ -14,7 +14,7 @@ namespace PathTracing.NativeInterop.NIS
         public ushort outputHeight;
         public ushort currentWidth;
         public ushort currentHeight;
-        public float  sharpness;   // [0, 1]
+        public float  sharpness; // [0, 1]
 
         public int instanceId;
     }

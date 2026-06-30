@@ -57,7 +57,8 @@ namespace PathTracing
         /// submesh group — i.e. no scene-topology rebuild. Not serialized: resets to -1 on load/domain
         /// reload so authored brightness is the default.
         /// </summary>
-        [NonSerialized] public float EmissiveRuntimeIntensity = -1f;
+        [NonSerialized]
+        public float EmissiveRuntimeIntensity = -1f;
 
         [Header("Surface")]
         [Range(0f, 1f)]

@@ -125,7 +125,7 @@ namespace NativeRender
             if (_materialGpuBuf != null)
                 ds.SetStructuredBuffer("t_MaterialConstants", _materialGpuBuf.GetNativeBufferPtr(),
                     _materialGpuBuf.count, _materialGpuBuf.stride);
-            if (_sceneBuffers  != null) ds.SetBindlessBuffer("t_BindlessBuffers",  _sceneBuffers);
+            if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
             if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
 
@@ -142,7 +142,7 @@ namespace NativeRender
             if (_materialGpuBuf != null)
                 ds.SetStructuredBuffer("t_MaterialConstants", _materialGpuBuf.GetNativeBufferPtr(),
                     _materialGpuBuf.count, _materialGpuBuf.stride);
-            if (_sceneBuffers  != null) ds.SetBindlessBuffer("t_BindlessBuffers",  _sceneBuffers);
+            if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
             if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
 
@@ -188,10 +188,11 @@ namespace NativeRender
                 if (Application.isPlaying) UnityEngine.Object.Destroy(m);
                 else UnityEngine.Object.DestroyImmediate(m);
             }
+
             _ownedMeshes.Clear();
             _normalizedMeshCache.Clear();
         }
- 
+
         private void RebuildSceneGpuData(IReadOnlyList<NativeRayTracingTarget> targets)
         {
             DisposeSceneGpuBuffers();
@@ -413,7 +414,7 @@ namespace NativeRender
                         _instanceGpuBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, i - dirtyStart);
                         dirtyStart = -1;
                     }
-                
+
                     continue;
                 }
 
@@ -447,7 +448,11 @@ namespace NativeRender
             bool hasDestroyed = false;
             foreach (var target in _registeredTargets)
             {
-                if (target == null) { hasDestroyed = true; break; }
+                if (target == null)
+                {
+                    hasDestroyed = true;
+                    break;
+                }
             }
 
             if (hasDestroyed)
@@ -469,6 +474,7 @@ namespace NativeRender
                     if (ok)
                         _accelStructure.SetInstanceTransform(meshRenderer, target.transform.localToWorldMatrix);
                 }
+
                 return;
             }
 
@@ -514,11 +520,15 @@ namespace NativeRender
             if (_normalizedMeshCache.TryGetValue(id, out var cached) && cached != null)
                 return cached;
 
-            var attrs = src.GetVertexAttributes();
+            var  attrs       = src.GetVertexAttributes();
             bool multiStream = false;
             for (int i = 0; i < attrs.Length; i++)
             {
-                if (attrs[i].stream != 0) { multiStream = true; break; }
+                if (attrs[i].stream != 0)
+                {
+                    multiStream = true;
+                    break;
+                }
             }
 
             if (!multiStream)
@@ -533,10 +543,14 @@ namespace NativeRender
             var normals   = src.normals;
             var tangents  = src.tangents;
             var colors    = src.colors;
-            var uv0 = new List<Vector4>(); src.GetUVs(0, uv0);
-            var uv1 = new List<Vector4>(); src.GetUVs(1, uv1);
-            var uv2 = new List<Vector4>(); src.GetUVs(2, uv2);
-            var uv3 = new List<Vector4>(); src.GetUVs(3, uv3);
+            var uv0       = new List<Vector4>();
+            src.GetUVs(0, uv0);
+            var uv1 = new List<Vector4>();
+            src.GetUVs(1, uv1);
+            var uv2 = new List<Vector4>();
+            src.GetUVs(2, uv2);
+            var uv3 = new List<Vector4>();
+            src.GetUVs(3, uv3);
 
             var clone = UnityEngine.Object.Instantiate(src);
             clone.name = src.name + " (GPUScene SingleStream)";
@@ -548,13 +562,14 @@ namespace NativeRender
                 var a = attrs[i];
                 newDescs[i] = new VertexAttributeDescriptor(a.attribute, a.format, a.dimension, 0);
             }
+
             clone.SetVertexBufferParams(clone.vertexCount, newDescs);
 
             // Re-populate vertex data through managed setters so Unity packs them into the new layout.
             if (positions != null && positions.Length > 0) clone.vertices = positions;
-            if (normals   != null && normals.Length   > 0) clone.normals  = normals;
-            if (tangents  != null && tangents.Length  > 0) clone.tangents = tangents;
-            if (colors    != null && colors.Length    > 0) clone.colors   = colors;
+            if (normals != null && normals.Length > 0) clone.normals      = normals;
+            if (tangents != null && tangents.Length > 0) clone.tangents   = tangents;
+            if (colors != null && colors.Length > 0) clone.colors         = colors;
             if (uv0.Count > 0) clone.SetUVs(0, uv0);
             if (uv1.Count > 0) clone.SetUVs(1, uv1);
             if (uv2.Count > 0) clone.SetUVs(2, uv2);

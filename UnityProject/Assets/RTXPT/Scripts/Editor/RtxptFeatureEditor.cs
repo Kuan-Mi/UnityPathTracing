@@ -18,11 +18,11 @@ namespace PathTracing
     public class RtxptFeatureEditor : UnityEditor.Editor
     {
         // Mirror of shader-side limits (PathTracerConfig is internal to the runtime assembly).
-        private const int   kStablePlaneCount          = 3;   // PathTracerConfig.cStablePlaneCount
-        private const int   kStablePlaneMaxVertexIndex = 15;  // PathTracerConfig.cStablePlaneMaxVertexIndex
-        private const int   kMaxBounceCount            = 96;  // Config.h MAX_BOUNCE_COUNT
-        private const int   kMaxLightSamples           = 63;  // LightingConfig.h RTXPT_LIGHTING_MAX_SAMPLE_COUNT
-        private const int   LightingConfigMaxLights    = 512 * 1024; // LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS
+        private const int kStablePlaneCount          = 3; // PathTracerConfig.cStablePlaneCount
+        private const int kStablePlaneMaxVertexIndex = 15; // PathTracerConfig.cStablePlaneMaxVertexIndex
+        private const int kMaxBounceCount            = 96; // Config.h MAX_BOUNCE_COUNT
+        private const int kMaxLightSamples           = 63; // LightingConfig.h RTXPT_LIGHTING_MAX_SAMPLE_COUNT
+        private const int LightingConfigMaxLights    = 512 * 1024; // LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS
 
         private string GetKey(string headerName) =>
             $"PT_Rtxpt_Foldout_{target.GetInstanceID()}_{headerName}";
@@ -56,6 +56,7 @@ namespace PathTracing
             {
                 feature.TestEmissiveTriangles();
             }
+
             EditorGUILayout.HelpBox(
                 "Reads back the emissive-triangle range of LightBuffer from GPU and prints center, " +
                 "intensity, and type of the first non-zero entries to the Console. " +
@@ -67,6 +68,7 @@ namespace PathTracing
             {
                 feature.TestNeeAtReadback();
             }
+
             EditorGUILayout.HelpBox(
                 "Reads back LightingControl, weights, proxy counters, proxy lists, local sampling, " +
                 "and feedback textures. Set useNEE=true and neeType=NEEAT, then run for a few frames before clicking.",
@@ -96,19 +98,19 @@ namespace PathTracing
             EditorGUI.BeginChangeCheck();
             Undo.RecordObject(feature, "RTXPT Settings");
 
-            DrawEnvironmentMapSection(s);     // SampleUI.cpp:586  (Scene -> Environment Map)
-            DrawCameraSection(s);             // SampleUI.cpp:669
+            DrawEnvironmentMapSection(s); // SampleUI.cpp:586  (Scene -> Environment Map)
+            DrawCameraSection(s); // SampleUI.cpp:669
             DrawLightPreprocessingSection(s); // SampleUI.cpp:722
-            DrawPathTracerSection(s);         // SampleUI.cpp:794  (DefaultOpen in C++)
-            DrawDlssSection(s);               // SampleUI.cpp:1104
-            DrawStablePlanesSection(s);       // SampleUI.cpp:1207
-            DrawPostProcessSection(s);        // SampleUI.cpp:1273
-            DrawDebuggingSection(s);          // SampleUI.cpp:1371
+            DrawPathTracerSection(s); // SampleUI.cpp:794  (DefaultOpen in C++)
+            DrawDlssSection(s); // SampleUI.cpp:1104
+            DrawStablePlanesSection(s); // SampleUI.cpp:1207
+            DrawPostProcessSection(s); // SampleUI.cpp:1273
+            DrawDebuggingSection(s); // SampleUI.cpp:1371
             DrawUnitySpecificSection(s);
 
             EditorGUILayout.Space(2);
             EditorGUILayout.LabelField("Fields marked * are compile-time shader macros — use 'Apply Shader Macros' below.",
-                                       EditorStyles.miniLabel);
+                EditorStyles.miniLabel);
 
             if (EditorGUI.EndChangeCheck())
                 EditorUtility.SetDirty(feature);
@@ -250,22 +252,23 @@ namespace PathTracing
                     s.neeatDepthDisocclusionThreshold       = EditorGUILayout.FloatField("Depth disocclusion threshold", s.neeatDepthDisocclusionThreshold);
                     s.neeatReservoirHistoryDropoff          = EditorGUILayout.FloatField("Reservoir history dropoff", s.neeatReservoirHistoryDropoff);
                     s.neeatEnableMotionReprojection         = EditorGUILayout.Toggle("Motion reprojection", s.neeatEnableMotionReprojection);
-                    s.neeatSampleBakedEnvironment           = EditorGUILayout.Toggle(
+                    s.neeatSampleBakedEnvironment = EditorGUILayout.Toggle(
                         new GUIContent("Sample environment proxy lights *", "Bake the env map into sampling proxies instead of direct NEE sampling. Biased, faster, blurrier shadows in some cases."),
                         s.neeatSampleBakedEnvironment);
                     EditorGUILayout.LabelField("Importance boosts:", EditorStyles.miniBoldLabel);
                     using (new EditorGUI.IndentLevelScope())
                     {
-                        s.neeatImportanceBoostIntensityDelta    = EditorGUILayout.FloatField("...by light intensity change (mul)", s.neeatImportanceBoostIntensityDelta);
-                        s.neeatImportanceBoostFrustumMul        = EditorGUILayout.FloatField("...by light frustum proximity (mul)", s.neeatImportanceBoostFrustumMul);
+                        s.neeatImportanceBoostIntensityDelta = EditorGUILayout.FloatField("...by light intensity change (mul)", s.neeatImportanceBoostIntensityDelta);
+                        s.neeatImportanceBoostFrustumMul     = EditorGUILayout.FloatField("...by light frustum proximity (mul)", s.neeatImportanceBoostFrustumMul);
                         s.neeatImportanceBoostFrustumFadeDistance = EditorGUILayout.FloatField(
                             new GUIContent("fade distance", "How fast the boost fades outside of the frustum; bigger = slower fade."),
                             s.neeatImportanceBoostFrustumFadeDistance);
-                        s.neeatImportanceBoostPreFilter         = EditorGUILayout.Toggle(
+                        s.neeatImportanceBoostPreFilter = EditorGUILayout.Toggle(
                             new GUIContent("...by pre-filter merge", "Stronger feedback in a 3x3 kernel can 'overwhelm' neighbors. EXPERIMENTAL - SUPER-SLOW."),
                             s.neeatImportanceBoostPreFilter);
                     }
-                    s.neeatSceneAverageContentsDistance     = EditorGUILayout.FloatField("Scene average contents distance", s.neeatSceneAverageContentsDistance);
+
+                    s.neeatSceneAverageContentsDistance = EditorGUILayout.FloatField("Scene average contents distance", s.neeatSceneAverageContentsDistance);
                 }
             }
         }
@@ -277,7 +280,7 @@ namespace PathTracing
             using var _ = new EditorGUI.IndentLevelScope();
 
             int modeIndex = s.realtimeMode ? 1 : 0;
-            modeIndex = EditorGUILayout.Popup("Mode", modeIndex, new[] { "Reference", "Realtime" });
+            modeIndex      = EditorGUILayout.Popup("Mode", modeIndex, new[] { "Reference", "Realtime" });
             s.realtimeMode = modeIndex != 0;
 
             Category("Setup:");
@@ -336,7 +339,7 @@ namespace PathTracing
 
                 s.environmentMapDiffuseSampleMIPLevel = Mathf.Clamp(
                     EditorGUILayout.IntField(new GUIContent("Diffuse sample envmap MIP level", "MIP level for env-map light sampling and diffuse path termination into sky. Only 0 is unbiased."),
-                                             s.environmentMapDiffuseSampleMIPLevel),
+                        s.environmentMapDiffuseSampleMIPLevel),
                     0, 16);
 
                 s.enableRussianRoulette = EditorGUILayout.Toggle(
@@ -360,6 +363,7 @@ namespace PathTracing
                         s.upscalerMode = (UpscalerMode)EditorGUILayout.EnumPopup("DLSS Mode", s.upscalerMode);
                     }
                 }
+
                 s.enableToneMapping = EditorGUILayout.Toggle(
                     new GUIContent("Enable tone mapping", "Full tone mapping settings available under `Post-process -> Tone Mapping`."),
                     s.enableToneMapping);
@@ -416,6 +420,7 @@ namespace PathTracing
                         new GUIContent("RR brightness clamp", "RR doesn't handle too-bright areas well; clamps brightness at the expense of bloom."),
                         s.dlssrrBrightnessClampK);
                 }
+
                 s.denoiserRadianceClampK = EditorGUILayout.FloatField(
                     new GUIContent("Denoiser radiance clamp", "Radiance clamp K applied in the denoiser front-end (ptConsts.denoiserRadianceClampK)."),
                     s.denoiserRadianceClampK);
@@ -430,7 +435,8 @@ namespace PathTracing
                     using var ___ = new EditorGUI.IndentLevelScope();
                     s.dxMaybeReorderThreads = EditorGUILayout.Toggle("dx::MaybeReorderThreads *", s.dxMaybeReorderThreads);
                 }
-                s.useFp16Types          = EditorGUILayout.Toggle("Use explicit fp16 types *", s.useFp16Types);
+
+                s.useFp16Types           = EditorGUILayout.Toggle("Use explicit fp16 types *", s.useFp16Types);
                 s.enableLDSamplerForBSDF = EditorGUILayout.Toggle("Enable LD sampler for BSDF *", s.enableLDSamplerForBSDF);
             }
         }
@@ -443,11 +449,11 @@ namespace PathTracing
             using var _ = new EditorGUI.IndentLevelScope();
 
             s.upscalerMode = (UpscalerMode)EditorGUILayout.EnumPopup("DLSS Mode", s.upscalerMode);
-            s.dlssRRPreset =  (DlssRRPreset)EditorGUILayout.EnumPopup("DLSS-RR preset", s.dlssRRPreset);
+            s.dlssRRPreset = (DlssRRPreset)EditorGUILayout.EnumPopup("DLSS-RR preset", s.dlssRRPreset);
             if (s.realtimeAA == 3)
             {
                 s.dlssrrMicroJitter = EditorGUILayout.Slider("DLSS-RR micro jitter", s.dlssrrMicroJitter, 0.0f, 1.0f);
-                s.tmpDisableDlssRR  = EditorGUILayout.Toggle(
+                s.tmpDisableDlssRR = EditorGUILayout.Toggle(
                     new GUIContent("Temporarily disable DLSS-RR (Unity)", "Debug: skip the DLSS-RR dispatch and show the noisy input."),
                     s.tmpDisableDlssRR);
             }
@@ -529,11 +535,11 @@ namespace PathTracing
                 s.fNumber   = Mathf.Clamp(EditorGUILayout.FloatField("fNumber", s.fNumber), 0.1f, 100.0f);
                 s.shutter   = Mathf.Clamp(EditorGUILayout.FloatField("Shutter", s.shutter), 0.1f, 10000.0f);
 
-                s.toneMapWhiteBalance = EditorGUILayout.Toggle("Enable White Balance", s.toneMapWhiteBalance);
-                s.toneMapWhitePoint   = Mathf.Clamp(EditorGUILayout.FloatField("White Point", s.toneMapWhitePoint), 1905.0f, 25000.0f);
+                s.toneMapWhiteBalance      = EditorGUILayout.Toggle("Enable White Balance", s.toneMapWhiteBalance);
+                s.toneMapWhitePoint        = Mathf.Clamp(EditorGUILayout.FloatField("White Point", s.toneMapWhitePoint), 1905.0f, 25000.0f);
                 s.toneMapWhiteMaxLuminance = Mathf.Max(0.1f, EditorGUILayout.FloatField("White Max Luminance", s.toneMapWhiteMaxLuminance));
-                s.toneMapWhiteScale   = Mathf.Clamp(EditorGUILayout.FloatField("White Scale", s.toneMapWhiteScale), 0f, 100f);
-                s.toneMapClamped      = EditorGUILayout.Toggle("Enable Clamp", s.toneMapClamped);
+                s.toneMapWhiteScale        = Mathf.Clamp(EditorGUILayout.FloatField("White Scale", s.toneMapWhiteScale), 0f, 100f);
+                s.toneMapClamped           = EditorGUILayout.Toggle("Enable Clamp", s.toneMapClamped);
             }
         }
 
@@ -558,6 +564,7 @@ namespace PathTracing
                         new GUIContent("Freeze realtime noise seed", "Global noise seed will not change per frame. Useful for debugging transient issues hidden by noise."),
                         s.dbgFreezeRealtimeNoiseSeed);
                 }
+
                 s.dbgDisableSERTerminationHint = EditorGUILayout.Toggle(
                     new GUIContent("Disable SER path termination hint *", "Disable the path-termination hint passed to SER reordering."),
                     s.dbgDisableSERTerminationHint);
@@ -616,6 +623,7 @@ namespace PathTracing
                     if (v == new Vector4(-1, -1, -1, -1)) continue; // unwritten slot (DebugContext::Reset)
                     EditorGUILayout.LabelField($"debugPrint {i}: {v.x:0.####}, {v.y:0.####}, {v.z:0.####}, {v.w:0.####}", EditorStyles.miniLabel);
                 }
+
                 Repaint();
             }
         }
@@ -628,7 +636,7 @@ namespace PathTracing
 
             s.showMode = (RtxptShowMode)EditorGUILayout.EnumPopup(
                 new GUIContent("Show mode", "Which buffer the output blit pass displays."), s.showMode);
-            s.showValidation   = EditorGUILayout.Toggle(
+            s.showValidation = EditorGUILayout.Toggle(
                 new GUIContent("Show validation", "Show the DLSS validation overlay when available."), s.showValidation);
             s.skipRightEyeInVR = EditorGUILayout.Toggle("Skip right eye in VR", s.skipRightEyeInVR);
         }

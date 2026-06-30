@@ -111,10 +111,10 @@ namespace NativeRender
             if (string.IsNullOrEmpty(hlslPath))
                 hlslPath = GetHlslPath();
             string includeDirs = BuildIncludeDirs(hlslPath);
-            string entryPoint  = string.IsNullOrEmpty(_entryPoint)     ? "main"   : _entryPoint;
-            string target      = string.IsNullOrEmpty(_targetProfile)  ? "cs_6_6" : _targetProfile;
+            string entryPoint  = string.IsNullOrEmpty(_entryPoint) ? "main" : _entryPoint;
+            string target      = string.IsNullOrEmpty(_targetProfile) ? "cs_6_6" : _targetProfile;
 
-            string defines   = _defines   is { Length: > 0 } ? string.Join(";", _defines)   : null;
+            string defines   = _defines is { Length: > 0 } ? string.Join(";", _defines) : null;
             string extraArgs = _extraArgs is { Length: > 0 } ? string.Join(";", _extraArgs) : null;
 
             bool ok = NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_CompileCS(

@@ -8,10 +8,10 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential)]
     public struct PointLightData
     {
-        public Vector3 position;    // World-space position
-        public float   range;       // Maximum range (hard cutoff)
+        public Vector3 position; // World-space position
+        public float   range; // Maximum range (hard cutoff)
 
-        public Vector3 color;       // Pre-multiplied color * intensity
-        public float   radius;      // Sphere radius for soft shadows (0 = hard point light)
+        public Vector3 color; // Pre-multiplied color * intensity
+        public float   radius; // Sphere radius for soft shadows (0 = hard point light)
     }
 }

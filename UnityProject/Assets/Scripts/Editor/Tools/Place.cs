@@ -8,9 +8,9 @@ namespace PathTracing
         public GameObject prefab;
 
         public string objName;
-        
+
         // 将所有包含这个名字的物体替换成Prefab
-        
+
         [MenuItem("Tools/物体替换器")]
         public static void ShowWindow()
         {
@@ -20,7 +20,7 @@ namespace PathTracing
         private void OnGUI()
         {
             GUILayout.Label("将场景中包含指定名字的物体替换为预设", EditorStyles.boldLabel);
-            prefab = (GameObject)EditorGUILayout.ObjectField("预设体", prefab, typeof(GameObject), false);
+            prefab  = (GameObject)EditorGUILayout.ObjectField("预设体", prefab, typeof(GameObject), false);
             objName = EditorGUILayout.TextField("物体名称包含", objName);
 
             if (GUILayout.Button("替换物体"))
@@ -37,7 +37,7 @@ namespace PathTracing
                 return;
             }
 
-            var allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            var allObjects   = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
             int replaceCount = 0;
 
             foreach (var obj in allObjects)
@@ -45,19 +45,19 @@ namespace PathTracing
                 if (obj.name.Contains(objName))
                 {
                     var meshRenderer = obj.GetComponent<MeshRenderer>();
-                    
-                    Vector3 position = obj.transform.position; 
-                    
+
+                    Vector3 position = obj.transform.position;
+
                     if (meshRenderer != null)
                     {
-                         var bounds =  meshRenderer.bounds;
-                         position = bounds.center - new Vector3(0, bounds.extents.y, 0);
+                        var bounds = meshRenderer.bounds;
+                        position = bounds.center - new Vector3(0, bounds.extents.y, 0);
                     }
-                    
+
 
                     GameObject newObj = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                    newObj.transform.position = position; 
- 
+                    newObj.transform.position = position;
+
 
                     replaceCount++;
                 }

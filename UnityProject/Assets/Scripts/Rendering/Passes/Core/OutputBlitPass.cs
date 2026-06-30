@@ -60,25 +60,28 @@ namespace PathTracing
 
             // ── Rtxdi native GBuffer debug textures ──────────────────────────
             public RTHandle RtxdiViewDepth;
-            public RTHandle RtxdiDiffuseAlbedo;   // R32_UINT  R11G11B10_UFLOAT
-            public RTHandle RtxdiSpecularRough;   // R32_UINT  R8G8B8A8_Gamma_UFLOAT
-            public RTHandle RtxdiNormals;         // R32_UINT  oct32
-            public RTHandle RtxdiGeoNormals;      // R32_UINT  oct32            // ── Rtxdi PDF debug textures (R32_Float mip chain) ──────────────────
+            public RTHandle RtxdiDiffuseAlbedo; // R32_UINT  R11G11B10_UFLOAT
+            public RTHandle RtxdiSpecularRough; // R32_UINT  R8G8B8A8_Gamma_UFLOAT
+            public RTHandle RtxdiNormals; // R32_UINT  oct32
+            public RTHandle RtxdiGeoNormals; // R32_UINT  oct32            // ── Rtxdi PDF debug textures (R32_Float mip chain) ──────────────────
             public RTHandle RtxdiDirectLightingRaw;
             public RTHandle LocalLightPdfTexture;
-            public RTHandle EnvironmentPdfTexture;        }
+            public RTHandle EnvironmentPdfTexture;
+        }
 
         public class Settings
         {
             public ShowMode showMode;
-            public float resolutionScale;
-            public bool enableDlssRR;
-            public bool tmpDisableRR;
-            public bool showMV;
-            public bool showValidation;
-            public bool showReference;
+            public float    resolutionScale;
+            public bool     enableDlssRR;
+            public bool     tmpDisableRR;
+            public bool     showMV;
+            public bool     showValidation;
+            public bool     showReference;
+
             /// <summary>Mip level to display for Rtxdi_LocalLightPdf / Rtxdi_EnvironmentPdf modes.</summary>
-            public int   pdfMipLevel;
+            public int pdfMipLevel;
+
             /// <summary>Exposure in stops for the PDF heat-map visualisation.</summary>
             public float pdfExposureStops;
         }
@@ -209,7 +212,7 @@ namespace PathTracing
                 case ShowMode.ViewZ:
                     Blitter.BlitTexture(natCmd, data.Resource.ViewZ, scaleOffset, data.BlitMaterial, (int)ShowPass.ViewZ);
                     break;
-                
+
                 case ShowMode.Gradient:
                     Blitter.BlitTexture(natCmd, data.Resource.Gradient, scaleOffset, data.BlitMaterial, (int)ShowPass.Gradient);
                     break;
@@ -244,6 +247,7 @@ namespace PathTracing
                         data.BlitMaterial.SetFloat("_PdfExposureStops", data.Setting.pdfExposureStops);
                         Blitter.BlitTexture(natCmd, data.Resource.LocalLightPdfTexture, scaleOffset, data.BlitMaterial, (int)ShowPass.PdfTextureMip);
                     }
+
                     break;
                 case ShowMode.Rtxdi_EnvironmentPdf:
                     if (data.Resource.EnvironmentPdfTexture != null)
@@ -252,6 +256,7 @@ namespace PathTracing
                         data.BlitMaterial.SetFloat("_PdfExposureStops", data.Setting.pdfExposureStops);
                         Blitter.BlitTexture(natCmd, data.Resource.EnvironmentPdfTexture, scaleOffset, data.BlitMaterial, (int)ShowPass.PdfTextureMip);
                     }
+
                     break;
                 case ShowMode.Rtxdi_DirectLightingRaw:
                     Blitter.BlitTexture(natCmd, data.Resource.RtxdiDirectLightingRaw, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
@@ -306,7 +311,7 @@ namespace PathTracing
 
             passData.CameraTexture = resourceData.activeColorTexture;
 
-            passData.Setting = _settings;
+            passData.Setting  = _settings;
             passData.Resource = _resource;
 
             builder.UseTexture(passData.CameraTexture, AccessFlags.Write);

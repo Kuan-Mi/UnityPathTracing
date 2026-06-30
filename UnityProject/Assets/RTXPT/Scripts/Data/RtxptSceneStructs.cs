@@ -70,7 +70,7 @@ namespace PathTracing
     {
         // Row 0
         public Vector3 BaseOrDiffuseColor; // float3
-        public uint    Flags;              // PTMaterialFlags_* bitmask
+        public uint    Flags; // PTMaterialFlags_* bitmask
 
         // Row 1
         public Vector3 SpecularColor;
@@ -90,7 +90,7 @@ namespace PathTracing
         public float _padding1;
         public float AlphaCutoff;
         public float TransmissionFactor;
-        public uint  BaseOrDiffuseTextureIndex;  // bindless index, ~0u = none
+        public uint  BaseOrDiffuseTextureIndex; // bindless index, ~0u = none
 
         // Row 5
         public uint MetalRoughOrSpecularTextureIndex;
@@ -123,14 +123,14 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     public struct GeometryDebugData
     {
-        public uint OmmArrayDataBufferIndex;    // bindless index into t_BindlessBuffers
-        public uint OmmArrayDataBufferOffset;   // byte offset
-        public uint OmmDescArrayBufferIndex;    // bindless index
-        public uint OmmDescArrayBufferOffset;   // byte offset
+        public uint OmmArrayDataBufferIndex; // bindless index into t_BindlessBuffers
+        public uint OmmArrayDataBufferOffset; // byte offset
+        public uint OmmDescArrayBufferIndex; // bindless index
+        public uint OmmDescArrayBufferOffset; // byte offset
 
-        public uint OmmIndexBufferIndex;        // bindless index
-        public uint OmmIndexBufferOffset;       // byte offset
-        public uint OmmIndexBuffer16Bit;        // 1 = 16-bit indices, 0 = 32-bit
+        public uint OmmIndexBufferIndex; // bindless index
+        public uint OmmIndexBufferOffset; // byte offset
+        public uint OmmIndexBuffer16Bit; // 1 = 16-bit indices, 0 = 32-bit
         public uint _pad0;
     } // 32 bytes
 
@@ -180,11 +180,11 @@ namespace PathTracing
     /// </summary>
     public enum RtxptLightType : uint
     {
-        Sphere         = 0,
-        Triangle       = 1,
-        Directional    = 2,
-        Environment    = 3,
-        Point          = 4,
+        Sphere          = 0,
+        Triangle        = 1,
+        Directional     = 2,
+        Environment     = 3,
+        Point           = 4,
         EnvironmentQuad = 5,
     }
 
@@ -200,13 +200,13 @@ namespace PathTracing
         public float CenterX;
         public float CenterY;
         public float CenterZ;
-        public uint  ColorTypeAndFlags;  // R8G8B8 chroma | type<<24 | flags<<28
+        public uint  ColorTypeAndFlags; // R8G8B8 chroma | type<<24 | flags<<28
 
         // uint4[1]: direction / scalar encodings + log-radiance
-        public uint Direction1;    // oct-encoded normal (for triangles/directionals)
-        public uint Direction2;    // oct-encoded or fp16 cone angle pair (for spots)
-        public uint Scalars;       // fp16 pair: e.g. sphere radius
-        public uint LogRadiance;   // uint16 log2-encoded radiance magnitude
+        public uint Direction1; // oct-encoded normal (for triangles/directionals)
+        public uint Direction2; // oct-encoded or fp16 cone angle pair (for spots)
+        public uint Scalars; // fp16 pair: e.g. sphere radius
+        public uint LogRadiance; // uint16 log2-encoded radiance magnitude
     } // 32 bytes
 
     /// <summary>
@@ -218,9 +218,9 @@ namespace PathTracing
     public struct RtxptPolymorphicLightInfoEx
     {
         public uint IesProfileIndex;
-        public uint PrimaryAxis;               // oct-encoded spot/IES primary axis
-        public uint CosConeAngleAndSoftness;   // fp16 pair: cos(outerAngle) | softness
-        public uint UniqueID;                  // debug-only hash
+        public uint PrimaryAxis; // oct-encoded spot/IES primary axis
+        public uint CosConeAngleAndSoftness; // fp16 pair: cos(outerAngle) | softness
+        public uint UniqueID; // debug-only hash
     } // 16 bytes
 
     /// <summary>
@@ -231,13 +231,13 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential)]
     public struct RtxptEmissiveTrianglesProcTask
     {
-        public uint InstanceIndex;             // index into t_InstanceData
-        public uint GeometryIndex;             // sub-mesh index within the instance
-        public uint TriangleIndexFrom;         // first triangle (inclusive) in this task
-        public uint TriangleIndexTo;           // last  triangle (exclusive) in this task
-        public uint DestinationBufferOffset;   // write offset in lightsBuffer
-        public uint HistoricBufferOffset;      // last-frame block base, or 0xFFFFFFFF if new
-        public uint EmissiveLightMappingOffset;// = firstGeometryInstanceIndex + GeometryIndex
+        public uint InstanceIndex; // index into t_InstanceData
+        public uint GeometryIndex; // sub-mesh index within the instance
+        public uint TriangleIndexFrom; // first triangle (inclusive) in this task
+        public uint TriangleIndexTo; // last  triangle (exclusive) in this task
+        public uint DestinationBufferOffset; // write offset in lightsBuffer
+        public uint HistoricBufferOffset; // last-frame block base, or 0xFFFFFFFF if new
+        public uint EmissiveLightMappingOffset; // = firstGeometryInstanceIndex + GeometryIndex
         public uint Padding0;
     } // 32 bytes
 
@@ -251,15 +251,21 @@ namespace PathTracing
         // ROW_MAJOR float3x4 Transform (local → world)
         public Vector4 TransformRow0;
         public Vector4 TransformRow1;
+
         public Vector4 TransformRow2;
+
         // ROW_MAJOR float3x4 InvTransform (world → local)
         public Vector4 InvTransformRow0;
         public Vector4 InvTransformRow1;
+
         public Vector4 InvTransformRow2;
+
         // float3 ColorMultiplier (Tint × Intensity)
         public float ColorMultiplierR;
         public float ColorMultiplierG;
+
         public float ColorMultiplierB;
+
         // float Enabled: 1 if enabled, 0 if not
         public float Enabled;
     } // 112 bytes
@@ -271,48 +277,49 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     public unsafe struct RtxptLightsBakerConstants
     {
-        public float DistantVsLocalRelativeImportance;   // [0]
-        public uint  EnvMapImportanceMapMIPCount;         // [1]
-        public uint  EnvMapImportanceMapResolution;       // [2]
-        public uint  TriangleLightTaskCount;              // [3]
+        public float DistantVsLocalRelativeImportance; // [0]
+        public uint  EnvMapImportanceMapMIPCount; // [1]
+        public uint  EnvMapImportanceMapResolution; // [2]
+        public uint  TriangleLightTaskCount; // [3]
 
-        public uint  FeedbackResolutionX;                // [4]
-        public uint  FeedbackResolutionY;                // [5]
-        public uint  BlendedFeedbackResolutionX;         // [6]
-        public uint  BlendedFeedbackResolutionY;         // [7]
+        public uint FeedbackResolutionX; // [4]
+        public uint FeedbackResolutionY; // [5]
+        public uint BlendedFeedbackResolutionX; // [6]
+        public uint BlendedFeedbackResolutionY; // [7]
 
-        public uint  MouseCursorPosX;                    // [8]
-        public uint  MouseCursorPosY;                    // [9]
-        public float PrevOverCurrentViewportSizeX;       // [10]
-        public float PrevOverCurrentViewportSizeY;       // [11]
+        public uint  MouseCursorPosX; // [8]
+        public uint  MouseCursorPosY; // [9]
+        public float PrevOverCurrentViewportSizeX; // [10]
+        public float PrevOverCurrentViewportSizeY; // [11]
 
-        public int   DebugDrawType;                      // [12]
-        public uint  DebugDrawTileLights;                // [13]
-        public uint  UpdateCounter;                      // [14]
-        public uint  DebugDrawFrustum;                   // [15]
+        public int  DebugDrawType; // [12]
+        public uint DebugDrawTileLights; // [13]
+        public uint UpdateCounter; // [14]
+        public uint DebugDrawFrustum; // [15]
 
-        public float ImportanceBoostIntensityDelta;      // [16]
-        public float ImportanceBoostFrustumMul;          // [17]
+        public float ImportanceBoostIntensityDelta; // [16]
+        public float ImportanceBoostFrustumMul; // [17]
         public float ImportanceBoostFrustumFadeDistance; // [18]
-        public float _padding3;                          // [19]
+        public float _padding3; // [19]
 
-        public float SceneCameraPosX;                    // [20]
-        public float SceneCameraPosY;                    // [21]
-        public float SceneCameraPosZ;                    // [22]
-        public float SceneAverageContentsDistance;       // [23]
+        public float SceneCameraPosX; // [20]
+        public float SceneCameraPosY; // [21]
+        public float SceneCameraPosZ; // [22]
+        public float SceneAverageContentsDistance; // [23]
 
-        public float DepthDisocclusionThreshold;         // [24]
-        public uint  EnableMotionReprojection;           // [25]
-        public float ReservoirHistoryDropoff;            // [26]
-        public uint  _padding0;                          // [27]
+        public float DepthDisocclusionThreshold; // [24]
+        public uint  EnableMotionReprojection; // [25]
+        public float ReservoirHistoryDropoff; // [26]
+        public uint  _padding0; // [27]
 
-        public uint  CurrentWeightsBufferOffset;         // [28] 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
-        public uint  HistoricWeightsBufferOffset;        // [29] 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
-        public uint  _padding1;                          // [30]
-        public uint  _padding2;                          // [31]
+        public uint CurrentWeightsBufferOffset; // [28] 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
+        public uint HistoricWeightsBufferOffset; // [29] 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
+        public uint _padding1; // [30]
+        public uint _padding2; // [31]
 
         // float4 FrustumPlanes[6]  — Left Right Top Bottom Near Far (96 bytes, [32]..[55])
         public fixed float FrustumPlanes[24];
+
         // float4 FrustumCorners[8] — for debugging only (128 bytes, [56]..[87])
         public fixed float FrustumCorners[32];
 
@@ -329,20 +336,20 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     public unsafe struct RtxptLightingControlData
     {
-        public uint  TotalLightCount;
-        public uint  EnvmapQuadNodeCount;
-        public uint  AnalyticLightCount;
-        public uint  TriangleLightCount;
+        public uint TotalLightCount;
+        public uint EnvmapQuadNodeCount;
+        public uint AnalyticLightCount;
+        public uint TriangleLightCount;
 
-        public uint  SamplingProxyCount;
-        public uint  HistoricTotalLightCount;
-        public uint  LastFrameTemporalFeedbackAvailable;
-        public uint  LastFrameLocalSamplesAvailable;
+        public uint SamplingProxyCount;
+        public uint HistoricTotalLightCount;
+        public uint LastFrameTemporalFeedbackAvailable;
+        public uint LastFrameLocalSamplesAvailable;
 
-        public uint  ProxyBuildTaskCount;
-        public uint  WeightsSumUINT;
-        public uint  ImportanceSamplingType;   // 0=Uniform, 1=Power, 2=NEE-AT
-        public uint  _padding0;
+        public uint ProxyBuildTaskCount;
+        public uint WeightsSumUINT;
+        public uint ImportanceSamplingType; // 0=Uniform, 1=Power, 2=NEE-AT
+        public uint _padding0;
 
         public uint  TemporalFeedbackRequired;
         public uint  TotalMaxFeedbackCount;
@@ -354,15 +361,15 @@ namespace PathTracing
         public uint  LocalSamplingResolutionX;
         public uint  LocalSamplingResolutionY;
 
-        public uint  LocalSamplingTileJitterX;
-        public uint  LocalSamplingTileJitterY;
-        public uint  LocalSamplingTileJitterPrevX;
-        public uint  LocalSamplingTileJitterPrevY;
+        public uint LocalSamplingTileJitterX;
+        public uint LocalSamplingTileJitterY;
+        public uint LocalSamplingTileJitterPrevX;
+        public uint LocalSamplingTileJitterPrevY;
 
-        public uint  ValidFeedbackCount;
-        public uint  _padding1;
-        public uint  _padding2;
-        public uint  _padding3;
+        public uint ValidFeedbackCount;
+        public uint _padding1;
+        public uint _padding2;
+        public uint _padding3;
 
         // Mirrors LightsBakerConstants (NEEAT_BAKER_ONLY path); always present to keep struct size = 576 bytes.
         public RtxptLightsBakerConstants BakerConstants;

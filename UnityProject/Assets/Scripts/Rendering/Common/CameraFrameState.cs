@@ -138,7 +138,7 @@ namespace PathTracing
             return v;
         }
 
-        public static float Halton2(uint n) => ReverseBits32(n) * 2.3283064365386963e-10f;
+        public static float Halton2(uint n)  => ReverseBits32(n) * 2.3283064365386963e-10f;
         public static float Halton1D(uint n) => Halton2(n);
 
         public static float2 Halton2D(uint n) => new float2(Halton2(n), Halton(n, 3));

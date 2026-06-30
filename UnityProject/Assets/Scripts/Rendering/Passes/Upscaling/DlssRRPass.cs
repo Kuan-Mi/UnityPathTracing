@@ -8,7 +8,6 @@ using PathTracing.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
-
 using static PathTracing.ShaderIDs;
 
 namespace PathTracing
@@ -21,8 +20,7 @@ namespace PathTracing
     [Obsolete("Use SLDlssrrPass (Streamline) — the NRI DLSS-RR path cannot run concurrently with DLSS-G frame generation.")]
     public class DlssRRPass : ScriptableRenderPass
     {
-
-        private IntPtr DataPtr;
+        private IntPtr   DataPtr;
         private Settings _settings;
 
         public DlssRRPass()
@@ -32,9 +30,9 @@ namespace PathTracing
         public void Setup(IntPtr DataPtr, Settings settings)
         {
             this.DataPtr = DataPtr;
-            _settings = settings;
+            _settings    = settings;
         }
- 
+
 
         public class Resource
         {
@@ -48,7 +46,7 @@ namespace PathTracing
         class PassData
         {
             public Settings Setting;
-            public IntPtr RRDataPtr;
+            public IntPtr   RRDataPtr;
         }
 
         [DllImport("Denoiser")]
@@ -74,7 +72,7 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("DLSS RR", out var passData);
 
-            passData.Setting = _settings;
+            passData.Setting   = _settings;
             passData.RRDataPtr = DataPtr;
 
             builder.AllowPassCulling(false);

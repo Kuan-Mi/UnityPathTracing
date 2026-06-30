@@ -59,6 +59,7 @@ namespace NativeRender
                     Debug.LogWarning($"[NativeShaderProjectSettings] Failed to load {SettingsPath}: {e.Message}");
                 }
             }
+
             return settings;
         }
 
@@ -90,7 +91,10 @@ namespace NativeRender
             return new SettingsProvider(MenuPath, SettingsScope.Project)
             {
                 label = "Native Shader Settings",
-                activateHandler = (_, rootElement) => { /* UIElements mode, handled via OnGUI */ },
+                activateHandler = (_, rootElement) =>
+                {
+                    /* UIElements mode, handled via OnGUI */
+                },
                 guiHandler = _ => DrawGUI(),
                 keywords = new System.Collections.Generic.HashSet<string>
                     { "native", "shader", "hlsl", "define", "include", "dxc" }
@@ -98,7 +102,7 @@ namespace NativeRender
         }
 
         // Serialized-object wrapper so we get Unity's standard array drawers for free.
-        private static SerializedObject _so;
+        private static SerializedObject                   _so;
         private static NativeShaderProjectSettingsWrapper _wrapper;
 
         private static void DrawGUI()
@@ -113,9 +117,9 @@ namespace NativeRender
             EditorGUI.BeginChangeCheck();
 
             _so.Update();
-            EditorGUILayout.PropertyField(_so.FindProperty("globalDefines"),      new GUIContent("Global Defines"));
+            EditorGUILayout.PropertyField(_so.FindProperty("globalDefines"), new GUIContent("Global Defines"));
             EditorGUILayout.PropertyField(_so.FindProperty("globalIncludePaths"), new GUIContent("Global Include Paths"));
-            EditorGUILayout.PropertyField(_so.FindProperty("globalExtraArgs"),    new GUIContent("Global Extra Args"));
+            EditorGUILayout.PropertyField(_so.FindProperty("globalExtraArgs"), new GUIContent("Global Extra Args"));
             _so.ApplyModifiedProperties();
 
             if (EditorGUI.EndChangeCheck())
@@ -148,16 +152,16 @@ namespace NativeRender
 
         public void Sync(NativeShaderProjectSettings src)
         {
-            globalDefines      = src.globalDefines      ?? Array.Empty<string>();
+            globalDefines      = src.globalDefines ?? Array.Empty<string>();
             globalIncludePaths = src.globalIncludePaths ?? Array.Empty<string>();
-            globalExtraArgs    = src.globalExtraArgs    ?? Array.Empty<string>();
+            globalExtraArgs    = src.globalExtraArgs ?? Array.Empty<string>();
         }
 
         public void ApplyTo(NativeShaderProjectSettings dst)
         {
-            dst.globalDefines      = globalDefines      ?? Array.Empty<string>();
+            dst.globalDefines      = globalDefines ?? Array.Empty<string>();
             dst.globalIncludePaths = globalIncludePaths ?? Array.Empty<string>();
-            dst.globalExtraArgs    = globalExtraArgs    ?? Array.Empty<string>();
+            dst.globalExtraArgs    = globalExtraArgs ?? Array.Empty<string>();
         }
     }
 }

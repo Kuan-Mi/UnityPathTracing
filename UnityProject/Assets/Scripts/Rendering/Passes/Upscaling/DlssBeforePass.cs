@@ -8,7 +8,6 @@ using PathTracing.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
-
 using static PathTracing.ShaderIDs;
 
 namespace PathTracing
@@ -16,7 +15,7 @@ namespace PathTracing
     public class DlssBeforePass : ScriptableRenderPass
     {
         private readonly ComputeShader DlssBeforeCs;
- 
+
         private Resource _resource;
         private Settings _settings;
 
@@ -30,7 +29,7 @@ namespace PathTracing
             _resource = resource;
             _settings = settings;
         }
- 
+
 
         public class Resource
         {
@@ -39,27 +38,26 @@ namespace PathTracing
             public RTHandle NormalRoughness;
             public RTHandle BaseColorMetalness;
             public RTHandle Spec;
-            
+
             public RTHandle ViewZ;
             public RTHandle RRGuide_DiffAlbedo;
             public RTHandle RRGuide_SpecAlbedo;
             public RTHandle RRGuide_SpecHitDistance;
             public RTHandle RRGuide_Normal_Roughness;
-
         }
 
         public class Settings
         {
-            public int rectGridW;
-            public int rectGridH;
+            public int  rectGridW;
+            public int  rectGridH;
             public bool tmpDisableRR;
         }
 
         class PassData
         {
             public ComputeShader DlssBeforeCs;
-            public Resource Resource;
-            public Settings Setting;
+            public Resource      Resource;
+            public Settings      Setting;
         }
 
         [DllImport("Denoiser")]
@@ -70,7 +68,7 @@ namespace PathTracing
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             var dlssBeforeMarker = RenderPassMarkers.DlssBefore;
-            
+
             // dlss Before
             natCmd.BeginSample(dlssBeforeMarker);
             natCmd.SetComputeConstantBufferParam(data.DlssBeforeCs, paramsID, data.Resource.ConstantBuffer, 0, data.Resource.ConstantBuffer.stride);
@@ -95,8 +93,8 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("DLSS RR Before", out var passData);
 
             passData.DlssBeforeCs = DlssBeforeCs;
-            passData.Resource = _resource;
-            passData.Setting = _settings;
+            passData.Resource     = _resource;
+            passData.Setting      = _settings;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

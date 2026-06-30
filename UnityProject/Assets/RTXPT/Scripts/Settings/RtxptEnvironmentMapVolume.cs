@@ -29,7 +29,7 @@ namespace PathTracing
 
         /// <summary>Linear intensity multiplier applied to the environment radiance.</summary>
         public MinFloatParameter environmentMapIntensity = new MinFloatParameter(1.0f, 0f);
-        
+
         public ClampedFloatParameter environmentMapRotationY = new ClampedFloatParameter(0f, 0f, 360f);
 
         /// <summary>Color tint multiplied into the environment radiance.</summary>
@@ -70,12 +70,12 @@ namespace PathTracing
             if (ReferenceEquals(setting, authored))
                 setting = authored.Clone();
 
-            var s = setting;
-            if (v.environmentMapEnabled.overrideState)               s.environmentMapEnabled               = v.environmentMapEnabled.value;
-            if (v.environmentMap.overrideState)                      s.environmentMap                      = v.environmentMap.value;
-            if (v.environmentMapIntensity.overrideState)             s.environmentMapIntensity             = v.environmentMapIntensity.value;
-            if (v.environmentMapRotationY.overrideState)             s.environmentMapRotationY             = v.environmentMapRotationY.value;
-            if (v.environmentMapTint.overrideState)                  s.environmentMapTint                  = v.environmentMapTint.value;
+            var s                                                                                          = setting;
+            if (v.environmentMapEnabled.overrideState) s.environmentMapEnabled                             = v.environmentMapEnabled.value;
+            if (v.environmentMap.overrideState) s.environmentMap                                           = v.environmentMap.value;
+            if (v.environmentMapIntensity.overrideState) s.environmentMapIntensity                         = v.environmentMapIntensity.value;
+            if (v.environmentMapRotationY.overrideState) s.environmentMapRotationY                         = v.environmentMapRotationY.value;
+            if (v.environmentMapTint.overrideState) s.environmentMapTint                                   = v.environmentMapTint.value;
             if (v.environmentMapDiffuseSampleMIPLevel.overrideState) s.environmentMapDiffuseSampleMIPLevel = v.environmentMapDiffuseSampleMIPLevel.value;
         }
     }

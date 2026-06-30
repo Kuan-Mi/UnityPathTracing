@@ -51,7 +51,7 @@ namespace PathTracing
 
             return new Dictionary<string, string>
             {
-                ["ENABLE_DEBUG_SURFACE_VIZ"]                      = B(debugSurfaceViz),
+                ["ENABLE_DEBUG_SURFACE_VIZ"] = B(debugSurfaceViz),
                 // Sample.cpp:996 — picked-pixel debug-line writes (u_DebugLinesBuffer, u52).
                 ["ENABLE_DEBUG_LINES_VIZ"]                        = B(s.showDebugLines),
                 ["PT_ENABLE_RUSSIAN_ROULETTE"]                    = B(s.enableRussianRoulette),
@@ -71,8 +71,8 @@ namespace PathTracing
                 ["RTXPT_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF"] = B(s.enableLDSamplerForBSDF),
                 ["NEE_AT_SAMPLE_BAKED_ENVIRONMENT"]               = B(s.neeatSampleBakedEnvironment),
                 // Sample.cpp:1001-1002 — reorder only meaningful with the hit-object extension on.
-                ["USE_DX_HIT_OBJECT_EXTENSION"]                   = B(s.dxHitObjectExtension),
-                ["USE_DX_MAYBE_REORDER_THREADS"]                  = B(s.dxHitObjectExtension && s.dxMaybeReorderThreads),
+                ["USE_DX_HIT_OBJECT_EXTENSION"]  = B(s.dxHitObjectExtension),
+                ["USE_DX_MAYBE_REORDER_THREADS"] = B(s.dxHitObjectExtension && s.dxMaybeReorderThreads),
             };
         }
 
@@ -93,6 +93,7 @@ namespace PathTracing
                 if (Merge(GetDefines(importer), managed) != null)
                     stale.Add(asset.name);
             }
+
             return stale;
         }
 
@@ -131,6 +132,7 @@ namespace PathTracing
             {
                 AssetDatabase.StopAssetEditing();
             }
+
             return changedCount;
         }
 
@@ -139,15 +141,18 @@ namespace PathTracing
         private static IEnumerable<(Object asset, bool referencePipeline)> EnumerateShaderAssets(RtxptFeature f)
         {
             if (f.buildStablePlanesShader.asset != null) yield return (f.buildStablePlanesShader.asset, false);
-            if (f.fillStablePlanesShader.asset  != null) yield return (f.fillStablePlanesShader.asset,  false);
-            if (f.referenceShader.asset         != null) yield return (f.referenceShader.asset,         true);
+            if (f.fillStablePlanesShader.asset != null) yield return (f.fillStablePlanesShader.asset, false);
+            if (f.referenceShader.asset != null) yield return (f.referenceShader.asset, true);
 
-            foreach (var hg in f.buildHitGroups     ?? System.Array.Empty<LazyLoadReference<HitGroupShader>>())
-                if (hg.asset != null) yield return (hg.asset, false);
-            foreach (var hg in f.fillHitGroups      ?? System.Array.Empty<LazyLoadReference<HitGroupShader>>())
-                if (hg.asset != null) yield return (hg.asset, false);
+            foreach (var hg in f.buildHitGroups ?? System.Array.Empty<LazyLoadReference<HitGroupShader>>())
+                if (hg.asset != null)
+                    yield return (hg.asset, false);
+            foreach (var hg in f.fillHitGroups ?? System.Array.Empty<LazyLoadReference<HitGroupShader>>())
+                if (hg.asset != null)
+                    yield return (hg.asset, false);
             foreach (var hg in f.referenceHitGroups ?? System.Array.Empty<LazyLoadReference<HitGroupShader>>())
-                if (hg.asset != null) yield return (hg.asset, true);
+                if (hg.asset != null)
+                    yield return (hg.asset, true);
         }
 
         private static AssetImporter GetImporter(Object asset, out string path)
@@ -160,7 +165,7 @@ namespace PathTracing
         {
             RayTraceShaderImporter r => r.defines,
             HitGroupShaderImporter h => h.defines,
-            _                        => null,
+            _ => null,
         };
 
         private static void SetDefines(AssetImporter importer, string[] defines)
@@ -181,8 +186,8 @@ namespace PathTracing
             if (current == null)
                 return null;
 
-            var result  = new List<string>(current);
-            var missing = new Dictionary<string, string>(managed);
+            var  result  = new List<string>(current);
+            var  missing = new Dictionary<string, string>(managed);
             bool changed = false;
 
             for (int i = 0; i < result.Count; i++)

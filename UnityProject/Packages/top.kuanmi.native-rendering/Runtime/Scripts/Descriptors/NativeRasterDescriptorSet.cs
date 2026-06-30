@@ -15,8 +15,8 @@ namespace NativeRender
     /// </summary>
     public sealed class NativeRasterDescriptorSet : NativeDescriptorSetBase
     {
-        private readonly NativeRasterPipeline _pipeline;
-        private NativeArray<NativeRenderPlugin.RAS_RenderEventData>[] _headerRing;
+        private readonly NativeRasterPipeline                                  _pipeline;
+        private          NativeArray<NativeRenderPlugin.RAS_RenderEventData>[] _headerRing;
 
         public NativeRasterDescriptorSet(NativeRasterPipeline pipeline)
         {
@@ -24,8 +24,8 @@ namespace NativeRender
             _pipeline = pipeline;
             CopySlotLayout(pipeline);
             AllocateRingBuffers();
-            _descriptorSetHandle = NativeRenderPlugin.NR_RAS_CreateDescriptorSet(pipeline.Handle);
-            pipeline.OnRebuilt  += OnPipelineRebuilt;
+            _descriptorSetHandle =  NativeRenderPlugin.NR_RAS_CreateDescriptorSet(pipeline.Handle);
+            pipeline.OnRebuilt   += OnPipelineRebuilt;
         }
 
         private void CopySlotLayout(NativeRasterPipeline pipeline)
@@ -44,7 +44,8 @@ namespace NativeRender
             FreeRingBuffersCommon();
             if (_headerRing == null) return;
             for (int i = 0; i < RingSize; i++)
-                if (_headerRing[i].IsCreated) _headerRing[i].Dispose();
+                if (_headerRing[i].IsCreated)
+                    _headerRing[i].Dispose();
             _headerRing = null;
         }
 
@@ -55,6 +56,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_RAS_DestroyDescriptorSet(_descriptorSetHandle);
                 _descriptorSetHandle = 0;
             }
+
             FreeRingBuffers();
             CopySlotLayout(pipeline);
             AllocateRingBuffers();
@@ -69,6 +71,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_RAS_DestroyDescriptorSet(_descriptorSetHandle);
                 _descriptorSetHandle = 0;
             }
+
             FreeRingBuffers();
         }
 
@@ -82,26 +85,28 @@ namespace NativeRender
             if (ring < 0) return IntPtr.Zero;
 
             var hdr = (NativeRenderPlugin.RAS_RenderEventData*)_headerRing[ring].GetUnsafePtr();
-            *hdr = default;
+            *hdr                     = default;
             hdr->descriptorSetHandle = _descriptorSetHandle;
             hdr->bindingSlotsPtr     = (ulong)_slotRing[ring].GetUnsafePtr();
             hdr->bindingCount        = _slotCount;
 
-            uint numRT = draw.numRenderTargets;
+            uint numRT           = draw.numRenderTargets;
             if (numRT > 8) numRT = 8;
             hdr->numRenderTargets = numRT;
             for (uint i = 0; i < numRT; i++)
             {
                 hdr->rtvResources[i] = (draw.colorResources != null && i < draw.colorResources.Length)
-                    ? (ulong)draw.colorResources[i] : 0;
+                    ? (ulong)draw.colorResources[i]
+                    : 0;
                 hdr->rtvFormats[i] = (draw.colorFormats != null && i < draw.colorFormats.Length)
-                    ? draw.colorFormats[i] : 0;
+                    ? draw.colorFormats[i]
+                    : 0;
             }
 
             hdr->dsvResource = (ulong)draw.depthResource;
             hdr->dsvFormat   = draw.depthFormat;
 
-            uint clearFlags = 0;
+            uint clearFlags                 = 0;
             if (draw.clearColor) clearFlags |= 0x1u;
             if (draw.clearDepth) clearFlags |= 0x2u;
             hdr->clearFlags    = clearFlags;

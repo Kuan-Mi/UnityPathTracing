@@ -24,7 +24,7 @@ namespace PathTracing.NativeInterop.NRD
             if (!ValidDenoisers.Contains(denoiser))
                 throw new ArgumentException(
                     $"RelaxNrdDenoiser requires a RELAX_* denoiser, got {denoiser}.", nameof(denoiser));
-            _denoiser   = denoiser;
+            _denoiser = denoiser;
         }
     }
 }

@@ -18,7 +18,7 @@ namespace PathTracing
     {
         private string _assetFolder   = "Assets/RtxptMaterialOverrides";
         private bool   _recurse       = true;
-        private string _prefix        = "";     // e.g. "transparent-machines-pt0"
+        private string _prefix        = ""; // e.g. "transparent-machines-pt0"
         private bool   _selectedOnly  = false;
         private bool   _skipExisting  = true;
         private bool   _caseSensitive = false;
@@ -46,17 +46,18 @@ namespace PathTracing
                     else EditorUtility.DisplayDialog("Invalid folder", "Folder must be inside the project's Assets.", "OK");
                 }
             }
+
             EditorGUILayout.EndHorizontal();
 
             if (!string.IsNullOrWhiteSpace(_assetFolder) && System.IO.Path.IsPathRooted(_assetFolder))
             {
-                string rel = AbsToRelative(_assetFolder);
+                string rel                    = AbsToRelative(_assetFolder);
                 if (rel != null) _assetFolder = rel;
             }
 
             bool folderOk = !string.IsNullOrWhiteSpace(_assetFolder)
-                         && _assetFolder.StartsWith("Assets", StringComparison.OrdinalIgnoreCase)
-                         && AssetDatabase.IsValidFolder(_assetFolder.TrimEnd('/'));
+                            && _assetFolder.StartsWith("Assets", StringComparison.OrdinalIgnoreCase)
+                            && AssetDatabase.IsValidFolder(_assetFolder.TrimEnd('/'));
             if (!folderOk)
                 EditorGUILayout.HelpBox("Select a valid folder inside Assets/.", MessageType.Warning);
 
@@ -115,9 +116,10 @@ namespace PathTracing
                     if (!string.Equals(parent, _assetFolder.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
                         continue;
                 }
+
                 var asset = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(path);
                 if (asset == null) continue;
-                string key = System.IO.Path.GetFileNameWithoutExtension(path);
+                string key                                    = System.IO.Path.GetFileNameWithoutExtension(path);
                 if (!assetMap.ContainsKey(key)) assetMap[key] = asset;
             }
 
@@ -139,12 +141,12 @@ namespace PathTracing
             string prefix = _prefix.Trim();
 
             int renderersTouched = 0, slotsAssigned = 0, slotsUnmatched = 0;
-            var unmatched = new HashSet<string>(comparer);
+            var unmatched        = new HashSet<string>(comparer);
 
             foreach (var mr in renderers)
             {
-                var mf        = mr.GetComponent<MeshFilter>();
-                var mats      = mr.sharedMaterials ?? Array.Empty<Material>();
+                var mf   = mr.GetComponent<MeshFilter>();
+                var mats = mr.sharedMaterials ?? Array.Empty<Material>();
 
                 int slotCount = 0;
                 if (mf == null)
@@ -155,6 +157,7 @@ namespace PathTracing
                 {
                     slotCount = mf.sharedMesh.subMeshCount;
                 }
+
                 if (slotCount == 0) continue;
 
                 var comp = mr.GetComponent<RtxptRenderer>();
@@ -164,7 +167,7 @@ namespace PathTracing
                 Undo.RecordObject(comp, "Auto-Assign RTXPT Material Overrides");
 
                 while (comp.Slots.Count < slotCount) comp.Slots.Add(null);
-                if (comp.Slots.Count > slotCount)     comp.Slots.RemoveRange(slotCount, comp.Slots.Count - slotCount);
+                if (comp.Slots.Count > slotCount) comp.Slots.RemoveRange(slotCount, comp.Slots.Count - slotCount);
 
                 bool touched = false;
                 for (int s = 0; s < slotCount; s++)
@@ -188,7 +191,11 @@ namespace PathTracing
                     }
                 }
 
-                if (touched) { EditorUtility.SetDirty(comp); renderersTouched++; }
+                if (touched)
+                {
+                    EditorUtility.SetDirty(comp);
+                    renderersTouched++;
+                }
             }
 
             EditorSceneManager.MarkAllScenesDirty();
@@ -206,6 +213,7 @@ namespace PathTracing
                 sb.AppendLine("Unmatched material names:");
                 foreach (var name in unmatched) sb.AppendLine($"  • {name}");
             }
+
             _lastReport = sb.ToString().TrimEnd();
         }
 

@@ -10,11 +10,11 @@ using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
-    public class AccumulatePass: ScriptableRenderPass
+    public class AccumulatePass : ScriptableRenderPass
     {
         private readonly ComputeShader _accumulateCs;
-        private Resource _resource;
-        private Settings _settings;
+        private          Resource      _resource;
+        private          Settings      _settings;
 
 
         public AccumulatePass(ComputeShader accumulateCs)
@@ -44,8 +44,8 @@ namespace PathTracing
         class PassData
         {
             public ComputeShader AccCs;
-            public Resource Resource;
-            public Settings Settings;
+            public Resource      Resource;
+            public Settings      Settings;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -57,7 +57,7 @@ namespace PathTracing
             // 合成
             {
                 natCmd.BeginSample(compositionMarker);
-                 natCmd.SetComputeTextureParam(data.AccCs, 0, gIn_noiseID, data.Resource.noise);
+                natCmd.SetComputeTextureParam(data.AccCs, 0, gIn_noiseID, data.Resource.noise);
                 natCmd.SetComputeTextureParam(data.AccCs, 0, gIn_AccumulatedID, data.Resource.accumulation);
                 natCmd.SetComputeIntParam(data.AccCs, g_ConvergenceStepID, data.Settings.convergenceStep);
 
@@ -76,7 +76,7 @@ namespace PathTracing
 
             passData.Resource = _resource;
             passData.Settings = _settings;
-            
+
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
         }

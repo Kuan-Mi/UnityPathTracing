@@ -32,7 +32,7 @@ namespace PathTracing
                 isXR ? xrPass.GetProjMatrix() : cam.projectionMatrix, false);
 
             // ── SimpleViewConstants ───────────────────────────────────────────
-            var view     = BuildSimpleViewConstants(fs.worldToView, fs.viewToClip, fs.worldToClip,  renderRes, 1.0f, fs.viewportJitter);
+            var view     = BuildSimpleViewConstants(fs.worldToView, fs.viewToClip, fs.worldToClip, renderRes, 1.0f, fs.viewportJitter);
             var prevView = BuildSimpleViewConstants(fs.prevWorldToView, fs.prevViewToClip, fs.prevWorldToClip, renderRes, 1.0f, fs.prevViewportJitter);
 
             // ── Camera geometry ───────────────────────────────────────────────
@@ -46,7 +46,7 @@ namespace PathTracing
             // FarZ: primary-ray tMax only (no depth-precision role here). cam.farClipPlane exists
             // for raster depth precision and would clip distant geometry/env the reference still
             // traces; mirror RTXPT's effectively-unbounded far plane instead.
-            float farZ  = 1e7f;
+            float farZ = 1e7f;
 
             // Falcor-style ray-gen orthonormal frame
             var   viewInv     = fs.worldToView.inverse;
@@ -56,13 +56,13 @@ namespace PathTracing
             var   up          = new Vector3(viewInv.m01, viewInv.m11, viewInv.m21);
             var   fwd         = new Vector3(-viewInv.m02, -viewInv.m12, -viewInv.m22);
 
-            float focalDist   = math.max(setting.cameraFocalDistance, 1e-4f);
+            float focalDist = math.max(setting.cameraFocalDistance, 1e-4f);
             // Matches BridgeCamera (PathTracerShared.h:133): atan(2 * tan(fovY/2) / viewportHeight).
             float spreadAngle = math.atan(2.0f * tanHalfFovY / renderRes.y);
             // Aspect ratio in BridgeCamera is the *display* (output) aspect, not render aspect.
             float displayAspect = (float)displayRes.x / displayRes.y;
-            float ulen = focalDist * tanHalfFovY * displayAspect; // CameraU length
-            float vlen = focalDist * tanHalfFovY;                 // CameraV length
+            float ulen          = focalDist * tanHalfFovY * displayAspect; // CameraU length
+            float vlen          = focalDist * tanHalfFovY; // CameraV length
 
             var camera = new PathTracerCameraData
             {
@@ -81,7 +81,7 @@ namespace PathTracing
                 ApertureRadius       = setting.cameraAperture,
                 _padding0            = 0f,
                 JitterX              = -fs.viewportJitter.x,
-                JitterY              =  fs.viewportJitter.y,
+                JitterY              = fs.viewportJitter.y,
                 _padding1            = 0f,
                 _padding2            = 0f,
             };
@@ -95,8 +95,8 @@ namespace PathTracing
             var prevCamera = default(PathTracerCameraData);
 
             // DLSS upscaling MIP bias (Sample.cpp:1496) — sharpens textures to compensate for upscale.
-            float renderArea  = (float)renderRes.x   * renderRes.y;
-            float displayArea = (float)displayRes.x  * displayRes.y;
+            float renderArea  = (float)renderRes.x * renderRes.y;
+            float displayArea = (float)displayRes.x * displayRes.y;
             float dlssBias    = -math.log2(math.sqrt(displayArea / math.max(renderArea, 1f)));
 
             int spp = math.max(setting.realtimeSamplesPerPixel, 1);
@@ -118,6 +118,7 @@ namespace PathTracing
                     ? accumIndex + 4096
                     : math.min(accumIndex, math.max(setting.accumulationTarget - 1, 0)));
             }
+
             uint sampleBaseIndex = sampleIndex * (uint)spp;
 
             // preExposedGrayLuminance mirrors Sample.cpp:1508 (luminance(GetPreExposedGray(0)) when tone
@@ -143,62 +144,62 @@ namespace PathTracing
             // ── PathTracerConstants ───────────────────────────────────────────
             var ptConsts = new PathTracerConstants
             {
-                imageWidth                                   = (uint)renderRes.x,
-                imageHeight                                  = (uint)renderRes.y,
-                sampleBaseIndex                              = sampleBaseIndex,
-                perPixelJitterAAScale                        = fs.perPixelJitterAAScale,
-                bounceCount                                  = (uint)setting.bounceCount,
-                diffuseBounceCount                           = (uint)setting.diffuseBounceCount,
+                imageWidth            = (uint)renderRes.x,
+                imageHeight           = (uint)renderRes.y,
+                sampleBaseIndex       = sampleBaseIndex,
+                perPixelJitterAAScale = fs.perPixelJitterAAScale,
+                bounceCount           = (uint)setting.bounceCount,
+                diffuseBounceCount    = (uint)setting.diffuseBounceCount,
                 // Original (Sample.cpp:1539): sample a pre-filtered MIP for diffuse env lookups.
                 // Hardcoding 0 forced full-res env fetches on every diffuse bounce — noisier and
                 // higher bandwidth than the intended prefiltered level.
-                environmentMapDiffuseSampleMIPLevel          = (float)setting.environmentMapDiffuseSampleMIPLevel,
-                texLODBias                                   = setting.texLODBias + dlssBias,
-                invSubSampleCount                            = 1.0f / spp,
-                fireflyFilterThreshold                       = fireflyThreshold,
-                preExposedGrayLuminance                      = preExposedGrayLuminance,
+                environmentMapDiffuseSampleMIPLevel = (float)setting.environmentMapDiffuseSampleMIPLevel,
+                texLODBias                          = setting.texLODBias + dlssBias,
+                invSubSampleCount                   = 1.0f / spp,
+                fireflyFilterThreshold              = fireflyThreshold,
+                preExposedGrayLuminance             = preExposedGrayLuminance,
                 // Original (Sample.cpp:1521): hardcoded 0 — this is the legacy stable-planes / NRD
                 // guide flag and is unused by DLSS-RR (the entire RTXPT codebase never sets it non-zero).
                 // The fork's `realtimeAA==DLSS-RR ? 1 : 0` diverged from the DLSS-RR reference, which captures 0.
-                denoisingEnabled                             = 0u,
-                frameIndex                                   = fs.frameIndex,
-                useReSTIRDI                                  = 0u,
-                useReSTIRGI                                  = 0u,
-                _padding5                                    = 0u,
+                denoisingEnabled = 0u,
+                frameIndex       = fs.frameIndex,
+                useReSTIRDI      = 0u,
+                useReSTIRGI      = 0u,
+                _padding5        = 0u,
                 // Original (Sample.cpp:1526) reads these straight from the UI; the fork hardcoded
                 // them, silently ignoring the inspector and deviating from the original tuning.
-                stablePlanesSplitStopThreshold               = setting.stablePlanesSplitStopThreshold,
-                _padding3                                    = 0f,
-                _padding4                                    = 0u,
+                stablePlanesSplitStopThreshold = setting.stablePlanesSplitStopThreshold,
+                _padding3                      = 0f,
+                _padding4                      = 0u,
                 stablePlanesSuppressPrimaryIndirectSpecularK = setting.stablePlanesSuppressPrimaryIndirectSpecular
-                                                                   ? setting.stablePlanesSuppressPrimaryIndirectSpecularK
-                                                                   : 0f,
-                denoiserRadianceClampK                       = setting.denoiserRadianceClampK,
-                dlssRRBrightnessClampK                       = dlssRRClamp,
-                stablePlanesAntiAliasingFallthrough          = setting.stablePlanesAntiAliasingFallthrough,
-                activeStablePlaneCount                       = (uint)setting.stablePlanesActiveCount,
+                    ? setting.stablePlanesSuppressPrimaryIndirectSpecularK
+                    : 0f,
+                denoiserRadianceClampK              = setting.denoiserRadianceClampK,
+                dlssRRBrightnessClampK              = dlssRRClamp,
+                stablePlanesAntiAliasingFallthrough = setting.stablePlanesAntiAliasingFallthrough,
+                activeStablePlaneCount              = (uint)setting.stablePlanesActiveCount,
                 // Original (Sample.cpp:1524): min(StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex, BounceCount).
                 // Hardcoding 8 both ignored the inspector and skipped the BounceCount clamp, so lowering
                 // BounceCount no longer reduced stable-plane build depth as it does in the original.
-                maxStablePlaneVertexDepth                    = (uint)math.min(
-                                                                   math.min((uint)setting.stablePlanesMaxVertexDepth,
-                                                                            PathTracerConfig.cStablePlaneMaxVertexIndex),
-                                                                   (uint)setting.bounceCount),
-                allowPrimarySurfaceReplacement               = setting.allowPrimarySurfaceReplacement ? 1u : 0u,
+                maxStablePlaneVertexDepth = (uint)math.min(
+                    math.min((uint)setting.stablePlanesMaxVertexDepth,
+                        PathTracerConfig.cStablePlaneMaxVertexIndex),
+                    (uint)setting.bounceCount),
+                allowPrimarySurfaceReplacement = setting.allowPrimarySurfaceReplacement ? 1u : 0u,
                 // Tiled-swizzled addressing (TS_TILE_SIZE = 8 in Utils.hlsli).
                 // Strides must be rounded up to the tile size, not raw image dims.
-                genericTSLineStride                          = (uint)(((renderRes.x + 7) / 8) * 8),
-                genericTSPlaneStride                         = (uint)((((renderRes.x + 7) / 8) * 8) * (((renderRes.y + 7) / 8) * 8)),
-                neeEnabled                                   = setting.useNEE ? 1u : 0u,
-                neeType                                      = (uint)setting.neeType,
-                neeCandidateSamples                          = (uint)setting.neeCandidateSamples,
-                neeFullSamples                               = (uint)setting.neeFullSamples,
-                _padding6                                    = 0u,
-                stfMagnificationMethod                       = 0u,
-                stfFilterMode                                = 0u,
-                stfGaussianSigma                             = 0f,
-                camera                                       = camera,
-                prevCamera                                   = prevCamera,
+                genericTSLineStride    = (uint)(((renderRes.x + 7) / 8) * 8),
+                genericTSPlaneStride   = (uint)((((renderRes.x + 7) / 8) * 8) * (((renderRes.y + 7) / 8) * 8)),
+                neeEnabled             = setting.useNEE ? 1u : 0u,
+                neeType                = (uint)setting.neeType,
+                neeCandidateSamples    = (uint)setting.neeCandidateSamples,
+                neeFullSamples         = (uint)setting.neeFullSamples,
+                _padding6              = 0u,
+                stfMagnificationMethod = 0u,
+                stfFilterMode          = 0u,
+                stfGaussianSigma       = 0f,
+                camera                 = camera,
+                prevCamera             = prevCamera,
             };
 
             // ── EnvMapSceneParams ─────────────────────────────────────────────
@@ -210,27 +211,27 @@ namespace PathTracing
             // Original (Sample.cpp:1910-1925): when EnvironmentMapParams.Enabled is off, both
             // ColorMultiplier and Enabled are zeroed — all environment lighting stops, including
             // the directional lights baked into the env cube (analytic-light list is unaffected).
-            bool    envEnabled = setting.environmentMapEnabled;
-            Color   envTintLin = setting.environmentMapTint.linear;
-            float   envColMul  = envEnabled
+            bool  envEnabled = setting.environmentMapEnabled;
+            Color envTintLin = setting.environmentMapTint.linear;
+            float envColMul = envEnabled
                 ? setting.environmentMapIntensity / RtxptEnvMapBakerPass.EnvMapRadianceScale
                 : 0f;
- 
-            float rad       = setting.environmentMapRotationY * Mathf.Deg2Rad;
-            float s         = Mathf.Sin(rad);
-            float c         = Mathf.Cos(rad);
+
+            float rad = setting.environmentMapRotationY * Mathf.Deg2Rad;
+            float s   = Mathf.Sin(rad);
+            float c   = Mathf.Cos(rad);
 
             var envMapParams = new EnvMapSceneParams
             {
                 // Standard Y-axis rotation matrix (World Transform)
-                TransformRow0 = new Vector4(c,  0, s, 0),
-                TransformRow1 = new Vector4(0,  1, 0, 0),
+                TransformRow0 = new Vector4(c, 0, s, 0),
+                TransformRow1 = new Vector4(0, 1, 0, 0),
                 TransformRow2 = new Vector4(-s, 0, c, 0),
 
                 // Transpose of the rotation matrix (Inverse Transform)
                 InvTransformRow0 = new Vector4(c, 0, -s, 0),
-                InvTransformRow1 = new Vector4(0, 1, 0,  0),
-                InvTransformRow2 = new Vector4(s, 0, c,  0),
+                InvTransformRow1 = new Vector4(0, 1, 0, 0),
+                InvTransformRow2 = new Vector4(s, 0, c, 0),
                 colorMultiplier  = new Vector3(envTintLin.r, envTintLin.g, envTintLin.b) * envColMul,
                 enabled          = envEnabled ? 1f : 0f,
             };
@@ -241,7 +242,7 @@ namespace PathTracing
             {
                 importanceInvDimX = 1.0f / importanceMapDim,
                 importanceInvDimY = 1.0f / importanceMapDim,
-                importanceBaseMip = 10u,   // log2(1024) = 10, i.e. mip 10 is 1×1
+                importanceBaseMip = 10u, // log2(1024) = 10, i.e. mip 10 is 1×1
                 _padding0         = 0u,
             };
 
@@ -251,25 +252,25 @@ namespace PathTracing
             bool debugPick = setting.enableShaderDebug && setting.continuousDebugFeedback;
             var debug = new DebugConstants
             {
-                pickX                     = debugPick ? setting.debugPixelX : -1,
-                pickY                     = debugPick ? setting.debugPixelY : -1,
-                pick                      = debugPick ? 1 : 0,
-                debugLineScale            = setting.showDebugLines ? setting.debugLineScale : 0f,
-                showWireframe             = 0u,
-                debugViewType             = (int)(setting.showMode == RtxptShowMode.NEELightColor
-                                                ? RtxptDebugViewType.NEELightColor
-                                                : setting.debugViewType),
+                pickX          = debugPick ? setting.debugPixelX : -1,
+                pickY          = debugPick ? setting.debugPixelY : -1,
+                pick           = debugPick ? 1 : 0,
+                debugLineScale = setting.showDebugLines ? setting.debugLineScale : 0f,
+                showWireframe  = 0u,
+                debugViewType = (int)(setting.showMode == RtxptShowMode.NEELightColor
+                    ? RtxptDebugViewType.NEELightColor
+                    : setting.debugViewType),
                 // Original (Sample.cpp:2114): forced to plane 0 when only one plane is active.
                 debugViewStablePlaneIndex = setting.stablePlanesActiveCount == 1
-                                                ? 0
-                                                : setting.debugViewStablePlaneIndex,
-                exploreDeltaTree          = 0,
-                imageWidth                = renderRes.x,
-                imageHeight               = renderRes.y,
-                mouseX                    = 0,
-                mouseY                    = 0,
-                cameraPosW                = new Vector3(fs.camPos.x, fs.camPos.y, fs.camPos.z),
-                _padding0                 = 0f,
+                    ? 0
+                    : setting.debugViewStablePlaneIndex,
+                exploreDeltaTree = 0,
+                imageWidth       = renderRes.x,
+                imageHeight      = renderRes.y,
+                mouseX           = 0,
+                mouseY           = 0,
+                cameraPosW       = new Vector3(fs.camPos.x, fs.camPos.y, fs.camPos.z),
+                _padding0        = 0f,
             };
 
             return new SampleConstants
@@ -284,11 +285,11 @@ namespace PathTracing
                 // denoiser front-end packing (PostProcess.hlsl:544, #else branch), which never
                 // runs under DLSS-RR — so it's a dead value there. The fork hardcoded the NRD
                 // ReBLUR default {3, 0.1, 20, -25}; matching the source keeps DLSS-RR parity.
-                denoisingHitParamConsts        = Vector4.zero,
-                materialCount                  = materialCount,
-                _padding0                      = 0u,
-                _padding1                      = 0u,
-                _padding2                      = 0u,
+                denoisingHitParamConsts = Vector4.zero,
+                materialCount           = materialCount,
+                _padding0               = 0u,
+                _padding1               = 0u,
+                _padding2               = 0u,
             };
         }
 
@@ -301,14 +302,14 @@ namespace PathTracing
             float resolutionScale,
             float2 jitter)
         {
-            var w = renderResolution.x * resolutionScale;
-            var h = renderResolution.y * resolutionScale;
+            var w     = renderResolution.x * resolutionScale;
+            var h     = renderResolution.y * resolutionScale;
             var vSize = new float2(w, h);
-            
+
             // 1. 计算偏移矩阵 (NDC 空间平移)
             float offsetX = 2f * jitter.x / w;
             float offsetY = -2f * jitter.y / h;
-            
+
             // Unity Matrix4x4.Translate 创建的是列主序平移矩阵
             Matrix4x4 pixelOffsetMatrix    = Matrix4x4.Translate(new Vector3(offsetX, offsetY, 0));
             Matrix4x4 pixelOffsetMatrixInv = Matrix4x4.Translate(new Vector3(-offsetX, -offsetY, 0));
@@ -323,7 +324,7 @@ namespace PathTracing
             // 在 Unity 中 A * B 的逆是 B.inv * A.inv
             // var clipToViewNoOffset  = viewToClipNoOffset.inverse;
             var clipToWorldNoOffset = worldToClipNoOffset.inverse;
-            
+
             var ctw_scale = new float2(0.5f * w, -0.5f * h);
             var ctw_bias  = new float2(0.5f * w, 0.5f * h);
 

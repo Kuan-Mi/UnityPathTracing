@@ -13,19 +13,19 @@ namespace NativeRender
     /// </summary>
     public struct RasterDrawDesc
     {
-        public uint    numRenderTargets;
-        public IntPtr[] colorResources;   // ID3D12Resource* per RT (length >= numRenderTargets)
-        public uint[]   colorFormats;     // DXGI_FORMAT per RT (must match the pipeline state)
-        public IntPtr  depthResource;     // ID3D12Resource* or IntPtr.Zero
-        public uint    depthFormat;       // DXGI_FORMAT for the depth view
-        public bool    clearColor;
-        public bool    clearDepth;
-        public Color   clearColorValue;
-        public float   clearDepthValue;
-        public Rect    viewport;          // in pixels (x, y, width, height)
-        public uint    vertexCount;       // e.g. 3 for a fullscreen triangle
-        public uint    instanceCount;     // 0 => 1
-        public float   blendFactor;       // OMSetBlendFactor constant; only used by blendMode==4 (constant-color)
+        public uint     numRenderTargets;
+        public IntPtr[] colorResources; // ID3D12Resource* per RT (length >= numRenderTargets)
+        public uint[]   colorFormats; // DXGI_FORMAT per RT (must match the pipeline state)
+        public IntPtr   depthResource; // ID3D12Resource* or IntPtr.Zero
+        public uint     depthFormat; // DXGI_FORMAT for the depth view
+        public bool     clearColor;
+        public bool     clearDepth;
+        public Color    clearColorValue;
+        public float    clearDepthValue;
+        public Rect     viewport; // in pixels (x, y, width, height)
+        public uint     vertexCount; // e.g. 3 for a fullscreen triangle
+        public uint     instanceCount; // 0 => 1
+        public float    blendFactor; // OMSetBlendFactor constant; only used by blendMode==4 (constant-color)
     }
 
     /// <summary>
@@ -38,15 +38,15 @@ namespace NativeRender
     /// </summary>
     public sealed class NativeRasterPipeline : IDisposable
     {
-        private ulong _handle;
-        private NativeRasterShader _shader;
+        private ulong                                      _handle;
+        private NativeRasterShader                         _shader;
         private NativeRenderPlugin.RasterPipelineStateDesc _state;
-        private RootConstantsHint[] _rootConstantsHints;
-        private string[]            _rootSRVHints;
-        private SamplerHint[]       _samplerHints;
+        private RootConstantsHint[]                        _rootConstantsHints;
+        private string[]                                   _rootSRVHints;
+        private SamplerHint[]                              _samplerHints;
 
         private Dictionary<string, uint> _nameToSlot;
-        private uint _slotCount;
+        private uint                     _slotCount;
 
         public bool IsValid => _handle != 0;
 
@@ -57,15 +57,17 @@ namespace NativeRender
         internal event Action<NativeRasterPipeline> OnRebuilt;
 
         public NativeRasterPipeline(NativeRasterShader shader,
-                                    NativeRenderPlugin.RasterPipelineStateDesc state)
+            NativeRenderPlugin.RasterPipelineStateDesc state)
             : this(shader, state,
-                   shader != null ? shader.RootConstantsHints : null,
-                   shader != null ? shader.RootSRVHints        : null) { }
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null)
+        {
+        }
 
         public NativeRasterPipeline(NativeRasterShader shader,
-                                    NativeRenderPlugin.RasterPipelineStateDesc state,
-                                    RootConstantsHint[] rootConstantsHints,
-                                    string[] rootSRVHints)
+            NativeRenderPlugin.RasterPipelineStateDesc state,
+            RootConstantsHint[] rootConstantsHints,
+            string[] rootSRVHints)
         {
             if (shader == null) throw new ArgumentNullException(nameof(shader));
             _shader             = shader;
@@ -100,9 +102,9 @@ namespace NativeRender
         }
 
         private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-                                             SamplerHint[] samplerHints)
+            SamplerHint[] samplerHints)
         {
-            bool hasRC   = rcHints  != null && rcHints.Length  > 0;
+            bool hasRC   = rcHints != null && rcHints.Length > 0;
             bool hasSRV  = srvHints != null && srvHints.Length > 0;
             bool hasSamp = SamplerHintJson.Has(samplerHints);
             if (!hasRC && !hasSRV && !hasSamp) return null;
@@ -118,9 +120,11 @@ namespace NativeRender
                     if (i > 0) sb.Append(',');
                     sb.Append("{\"name\":\"").Append(rcHints[i].Name).Append("\",\"count\":").Append(rcHints[i].Count).Append('}');
                 }
+
                 sb.Append(']');
                 any = true;
             }
+
             if (hasSRV)
             {
                 if (any) sb.Append(',');
@@ -130,14 +134,17 @@ namespace NativeRender
                     if (i > 0) sb.Append(',');
                     sb.Append('"').Append(srvHints[i]).Append('"');
                 }
+
                 sb.Append(']');
                 any = true;
             }
+
             if (hasSamp)
             {
                 if (any) sb.Append(',');
                 SamplerHintJson.Append(sb, samplerHints);
             }
+
             sb.Append('}');
             return sb.ToString();
         }
@@ -169,6 +176,7 @@ namespace NativeRender
                             if (idx != uint.MaxValue)
                                 _nameToSlot[name] = idx;
                         }
+
                         pos = objEnd + 1;
                     }
                 }
@@ -188,6 +196,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_DestroyRasterShader(_handle);
                 _handle = 0;
             }
+
             try
             {
                 BuildNativeHandle();
@@ -195,7 +204,10 @@ namespace NativeRender
                 Debug.Log($"[NativeRasterPipeline] Rebuilt pipeline for: {shader.name}");
                 OnRebuilt?.Invoke(this);
             }
-            catch (Exception e) { Debug.LogError(e.Message); }
+            catch (Exception e)
+            {
+                Debug.LogError(e.Message);
+            }
         }
 
         public void Dispose()
@@ -230,7 +242,7 @@ namespace NativeRender
         private static string ExtractJsonString(string obj, string key)
         {
             string search = "\"" + key + "\"";
-            int ki = obj.IndexOf(search, StringComparison.Ordinal);
+            int    ki     = obj.IndexOf(search, StringComparison.Ordinal);
             if (ki < 0) return null;
             int colon = obj.IndexOf(':', ki + search.Length);
             if (colon < 0) return null;

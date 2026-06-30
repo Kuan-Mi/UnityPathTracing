@@ -42,9 +42,10 @@ namespace PathTracing
             {
                 if (feature == null)
                 {
-                    var all = Resources.FindObjectsOfTypeAll<RtxptFeature>();
+                    var all                     = Resources.FindObjectsOfTypeAll<RtxptFeature>();
                     if (all.Length > 0) feature = all[0];
                 }
+
                 return feature;
             }
         }
@@ -54,10 +55,10 @@ namespace PathTracing
         {
             if (!Application.isPlaying) return;
 
-            var keyboard = Keyboard.current;
+            var  keyboard = Keyboard.current;
             bool ctrlHeld = keyboard?.leftCtrlKey.isPressed == true || keyboard?.rightCtrlKey.isPressed == true;
             bool trigger = followMouse
-                ? (!requireCtrl || ctrlHeld)                                       // hover/scrub mode
+                ? (!requireCtrl || ctrlHeld) // hover/scrub mode
                 : IsMouseButtonPressedThisFrame(pickButton) && (!requireCtrl || ctrlHeld); // click mode
             if (!trigger) return;
 
@@ -66,7 +67,7 @@ namespace PathTracing
 
             // Input.mousePosition is bottom-left origin; debug-pixel coords are top-left.
             Vector2 mp = Mouse.current?.position.ReadValue() ?? Vector2.zero;
-            var uv = new Vector2(mp.x / cam.pixelWidth, 1f - mp.y / cam.pixelHeight);
+            var     uv = new Vector2(mp.x / cam.pixelWidth, 1f - mp.y / cam.pixelHeight);
             Pick(cam, uv, log: !followMouse);
         }
 
@@ -119,7 +120,7 @@ namespace PathTracing
 
             // Event.mousePosition: GUI points, top-left origin → scale to pixels.
             Vector2 mp = e.mousePosition * UnityEditor.EditorGUIUtility.pixelsPerPoint;
-            var uv = new Vector2(mp.x / cam.pixelWidth, mp.y / cam.pixelHeight);
+            var     uv = new Vector2(mp.x / cam.pixelWidth, mp.y / cam.pixelHeight);
 
             Pick(cam, uv, log: isClick);
             if (isClick)

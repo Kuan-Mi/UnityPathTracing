@@ -30,14 +30,18 @@ namespace PathTracing
         public class Entry
         {
             public RtxptMaterial material;
+
             [Tooltip("Emitted intensity while on (the source's step value, e.g. Red=8, Orange=20).")]
             public float onIntensity = 1f;
+
             [Tooltip("Seconds within the loop when this colour turns on (step).")]
             public float onStart;
+
             [Tooltip("Seconds within the loop when this colour turns off (step). May wrap past onEnd<onStart.")]
             public float onEnd;
 
-            [NonSerialized] public int lastState; // -1 = unknown, 0 = off, 1 = on
+            [NonSerialized]
+            public int lastState; // -1 = unknown, 0 = off, 1 = on
         }
 
         [Tooltip("Loop length in seconds (RTXPT StringLights = 4s).")]
@@ -50,7 +54,9 @@ namespace PathTracing
 
         private void OnEnable()
         {
-            foreach (var e in entries) if (e != null) e.lastState = -1;
+            foreach (var e in entries)
+                if (e != null)
+                    e.lastState = -1;
 #if UNITY_EDITOR
             if (!Application.isPlaying)
                 EditorApplication.update += EditorTick;
@@ -96,11 +102,11 @@ namespace PathTracing
                 if (e?.material == null) continue;
 
                 int state = IsOn(phase, e.onStart, e.onEnd) ? 1 : 0;
-                if (state == e.lastState) continue;          // only push on change
+                if (state == e.lastState) continue; // only push on change
                 e.lastState = state;
 
                 e.material.EmissiveRuntimeIntensity = state == 1 ? e.onIntensity : 0f;
-                e.material.MarkModified();                   // → cheap per-frame material re-upload
+                e.material.MarkModified(); // → cheap per-frame material re-upload
             }
         }
 
@@ -108,7 +114,7 @@ namespace PathTracing
         private static bool IsOn(float phase, float onStart, float onEnd)
         {
             if (onStart <= onEnd) return phase >= onStart && phase < onEnd;
-            return phase >= onStart || phase < onEnd;        // wrapped
+            return phase >= onStart || phase < onEnd; // wrapped
         }
 
         private static double GameTime()

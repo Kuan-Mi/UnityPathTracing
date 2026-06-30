@@ -4,7 +4,7 @@ using UnityEngine;
 namespace PathTracing
 {
     public class MatHelperWindow : EditorWindow
-    { 
+    {
         public Material targetMaterial;
 
         [MenuItem("Tools/材质替换器")]
@@ -16,7 +16,7 @@ namespace PathTracing
         private void OnGUI()
         {
             GUILayout.Label("批量替换材质", EditorStyles.boldLabel);
-        
+
             // 目标材质选择框
             targetMaterial = (Material)EditorGUILayout.ObjectField("目标材质", targetMaterial, typeof(Material), false);
 
@@ -38,7 +38,7 @@ namespace PathTracing
 
             // 获取选中的所有物体
             GameObject[] selectedObjects = Selection.gameObjects;
-            int count = 0;
+            int          count           = 0;
 
             foreach (GameObject obj in selectedObjects)
             {
@@ -51,14 +51,14 @@ namespace PathTracing
                     // 在编辑器脚本中，必须先获取 sharedMaterials 数组
                     // 修改数组后再重新赋值回去，否则修改不会生效
                     Material[] materials = renderer.sharedMaterials;
-                    bool changed = false;
+                    bool       changed   = false;
 
                     for (int i = 0; i < materials.Length; i++)
                     {
                         if (materials[i] != null && materials[i].name == "Lit")
                         {
                             materials[i] = targetMaterial;
-                            changed = true;
+                            changed      = true;
                         }
                     }
 

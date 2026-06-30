@@ -30,7 +30,7 @@ namespace PathTracing.Rendering.Data.RTXDI
         public float4x4 transform;
 
         public float3 emissiveColor;
-        public uint emissiveTextureIndex;
+        public uint   emissiveTextureIndex;
     }
 
 
@@ -52,7 +52,7 @@ namespace PathTracing.Rendering.Data.RTXDI
     {
         // uint4[0]
         public float3 center;
-        public uint colorTypeAndFlags; // RGB8 + uint8 (see the kPolymorphicLight... constants above)
+        public uint   colorTypeAndFlags; // RGB8 + uint8 (see the kPolymorphicLight... constants above)
 
         // uint4[1]
         public uint direction1; // oct-encoded
@@ -70,7 +70,7 @@ namespace PathTracing.Rendering.Data.RTXDI
         {
             const float kMinLog2Radiance = -8f;
             const float kMaxLog2Radiance = 40f;
-            const uint kTypeShift = 24u;
+            const uint  kTypeShift       = 24u;
 
             float intensity = math.max(color.r, math.max(color.g, color.b));
             if (intensity > 0f)
@@ -94,7 +94,7 @@ namespace PathTracing.Rendering.Data.RTXDI
             }
             else
             {
-                logRadiance = 0;
+                logRadiance       = 0;
                 colorTypeAndFlags = ((uint)typeCode) << (int)kTypeShift;
             }
         }

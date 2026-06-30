@@ -11,7 +11,8 @@ namespace PathTracing
     /// </summary>
     public sealed class SLPclRenderSubmitFeature : ScriptableRendererFeature
     {
-        [SerializeField] private bool playerOnly = true;
+        [SerializeField]
+        private bool playerOnly = true;
 
         private SLPclRenderSubmitStartPass _startPass;
         private SLPclRenderSubmitEndPass   _endPass;
@@ -34,13 +35,13 @@ namespace PathTracing
             if (playerOnly && !Application.isPlaying) return;
 
             var cameraData = renderingData.cameraData;
-            var cam = cameraData.camera;
+            var cam        = cameraData.camera;
             if (cam == null) return;
             if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
             if (cameraData.xr.enabled && cameraData.xr.multipassId != 0) return;
             if (cameraData.renderType != CameraRenderType.Base) return;
 
-            var token = SLStreamlineFrameLoop.CurrentFrameTokenPtr;
+            var token         = SLStreamlineFrameLoop.CurrentFrameTokenPtr;
             var frameSequence = SLStreamlineFrameLoop.CurrentFrameSequence;
             if (token == IntPtr.Zero || frameSequence == _lastQueuedFrameSequence) return;
 
@@ -57,8 +58,8 @@ namespace PathTracing
 
         protected override void Dispose(bool disposing)
         {
-            _startPass = null;
-            _endPass = null;
+            _startPass               = null;
+            _endPass                 = null;
             _lastQueuedFrameSequence = 0;
         }
     }

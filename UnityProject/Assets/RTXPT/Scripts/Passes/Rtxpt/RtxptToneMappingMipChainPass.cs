@@ -41,11 +41,11 @@ namespace PathTracing
         [StructLayout(LayoutKind.Sequential)]
         private struct ToneMappingConstants
         {
-            public float   whiteScale, whiteMaxLuminance;
-            public uint    toneMapOperator, clamped, autoExposure;
-            public float   avgLuminance, autoExposureLumValueMin, autoExposureLumValueMax;
-            public Vector4 colorTransform0, colorTransform1, colorTransform2;
-            public uint    enabled, _padding0, _padding1, _padding2;
+            public float   whiteScale,      whiteMaxLuminance;
+            public uint    toneMapOperator, clamped,                 autoExposure;
+            public float   avgLuminance,    autoExposureLumValueMin, autoExposureLumValueMax;
+            public Vector4 colorTransform0, colorTransform1,         colorTransform2;
+            public uint    enabled,         _padding0,               _padding1, _padding2;
         }
 
         // donut MipmmapGenConstants (mipmapgen_cb.h): { uint dispatch; uint numLODs; uint padding[2]; }.
@@ -53,8 +53,8 @@ namespace PathTracing
         [StructLayout(LayoutKind.Sequential)]
         private struct MipMapGenCB
         {
-            public uint dispatch;   // pass index
-            public uint numLODs;    // output mips this pass (1..NUM_LODS)
+            public uint dispatch; // pass index
+            public uint numLODs; // output mips this pass (1..NUM_LODS)
             public uint padding0, padding1;
         }
 
@@ -69,17 +69,17 @@ namespace PathTracing
         // ── Pipelines (built once) ──
         private readonly NativeRasterPipeline       _lumRaster;
         private readonly NativeRasterDescriptorSet  _lumDs;
-        private readonly NativeComputePipeline       _mipCs;
-        private readonly NativeComputeDescriptorSet  _mipDs;     // donut runs ≤4 passes/frame (< ring depth)
-        private readonly NativeComputePipeline       _captureCs;
-        private readonly NativeComputeDescriptorSet  _captureDs;
-        private readonly NativeRasterPipeline        _applyRaster;
-        private readonly NativeRasterDescriptorSet   _applyDs;
+        private readonly NativeComputePipeline      _mipCs;
+        private readonly NativeComputeDescriptorSet _mipDs; // donut runs ≤4 passes/frame (< ring depth)
+        private readonly NativeComputePipeline      _captureCs;
+        private readonly NativeComputeDescriptorSet _captureDs;
+        private readonly NativeRasterPipeline       _applyRaster;
+        private readonly NativeRasterDescriptorSet  _applyDs;
 
-        private readonly UploadBuffer           _avgLumBuffer;   // 1 × float, DEFAULT heap + UAV + readback
+        private readonly UploadBuffer           _avgLumBuffer; // 1 × float, DEFAULT heap + UAV + readback
         private readonly VolatileConstantBuffer _applyCb;
         private readonly float[]                _avgLumReadback = new float[1];
-        private float                           _avgLumLog2;     // last captured log2(avg luminance)
+        private          float                  _avgLumLog2; // last captured log2(avg luminance)
 
         private readonly IntPtr[] _applyColorRes = new IntPtr[1];
         private readonly uint[]   _applyColorFmt = { kRGBA16F };
@@ -88,28 +88,28 @@ namespace PathTracing
 
         // ── Resolution-dependent ──
         private NriTextureResource _lumTex;
-        private int  _lumW, _lumH, _mipCount;
+        private int                _lumW, _lumH, _mipCount;
 
         private RtxptPassContext _ctx;
-        private IntPtr                 _sourcePtr;
-        private IntPtr                 _outputPtr;
+        private IntPtr           _sourcePtr;
+        private IntPtr           _outputPtr;
 
         public RtxptToneMappingMipChainPass(
-            NativeRasterShader  luminanceRasterShader,
+            NativeRasterShader luminanceRasterShader,
             NativeComputeShader mipMapGenCs,
             NativeComputeShader captureCs,
-            NativeRasterShader  toneMapRasterShader)
+            NativeRasterShader toneMapRasterShader)
         {
-            _lumRaster   = new NativeRasterPipeline(luminanceRasterShader,
-                               NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kR16F));
-            _lumDs       = new NativeRasterDescriptorSet(_lumRaster);
-            _mipCs       = new NativeComputePipeline(mipMapGenCs);
-            _mipDs       = new NativeComputeDescriptorSet(_mipCs);
-            _captureCs   = new NativeComputePipeline(captureCs);
-            _captureDs   = new NativeComputeDescriptorSet(_captureCs);
+            _lumRaster = new NativeRasterPipeline(luminanceRasterShader,
+                NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kR16F));
+            _lumDs     = new NativeRasterDescriptorSet(_lumRaster);
+            _mipCs     = new NativeComputePipeline(mipMapGenCs);
+            _mipDs     = new NativeComputeDescriptorSet(_mipCs);
+            _captureCs = new NativeComputePipeline(captureCs);
+            _captureDs = new NativeComputeDescriptorSet(_captureCs);
             _applyRaster = new NativeRasterPipeline(toneMapRasterShader,
-                               NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F));
-            _applyDs     = new NativeRasterDescriptorSet(_applyRaster);
+                NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F));
+            _applyDs = new NativeRasterDescriptorSet(_applyRaster);
 
             // UAV-capable + readback-capable single-float buffer for the capture target.
             // Names mirror the original RTXPT ToneMappingPasses.cpp debugName strings for PIX parity.
@@ -119,10 +119,14 @@ namespace PathTracing
 
         public void Dispose()
         {
-            _lumDs?.Dispose();        _lumRaster?.Dispose();
-            _mipDs?.Dispose();        _mipCs?.Dispose();
-            _captureDs?.Dispose();    _captureCs?.Dispose();
-            _applyDs?.Dispose();      _applyRaster?.Dispose();
+            _lumDs?.Dispose();
+            _lumRaster?.Dispose();
+            _mipDs?.Dispose();
+            _mipCs?.Dispose();
+            _captureDs?.Dispose();
+            _captureCs?.Dispose();
+            _applyDs?.Dispose();
+            _applyRaster?.Dispose();
             _avgLumBuffer?.Dispose();
             _applyCb?.Dispose();
             _lumTex?.Release();
@@ -161,14 +165,18 @@ namespace PathTracing
             if (_lumTex != null && _lumTex.IsCreated && w == _lumW && h == _lumH)
                 return;
 
-            _lumW = w; _lumH = h;
+            _lumW = w;
+            _lumH = h;
 
             // Single-channel R16_FLOAT log-luminance pyramid — the format ToneMappingPasses.cpp picks
             // for non-RGBA32F sources. luminance_ps writes float4(logLum,0,0,1) → only .r is stored;
             // mipmapgen_cs's typed views and capture_cs's Texture2D<float> read it back component-wise.
             _lumTex ??= new NriTextureResource("Luminance Texture", GraphicsFormat.R16_SFloat,
-                            new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE,
-                                                   layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 });
+                new NriResourceState
+                {
+                    accessBits = AccessBits.SHADER_RESOURCE_STORAGE,
+                    layout     = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10
+                });
             _lumTex.Allocate(new int2(w, h), 1, useMipMap: true);
             _mipCount = _lumTex.rt.mipmapCount;
         }
@@ -185,6 +193,7 @@ namespace PathTracing
                 float shutter = Mathf.Clamp(Mathf.Pow(2f, ev) / (s.fNumber * s.fNumber), 0.001f, 10000f);
                 manualExposureScale = (s.filmSpeed / 100f) / (shutter * s.fNumber * s.fNumber);
             }
+
             return exposureScale * manualExposureScale;
         }
 
@@ -209,21 +218,21 @@ namespace PathTracing
         // Mirrors SetParameters / Update* and the CPU avgLuminance feed (exp2 of the read-back log2 value).
         private static ToneMappingConstants BuildConstants(RtxptSetting s, float avgLumLog2)
         {
-            bool auto = s.autoExposure;
-            float k = ExposureScale(s);
+            bool  auto   = s.autoExposure;
+            float k      = ExposureScale(s);
             float lumMin = Mathf.Pow(2f, auto ? s.exposureValueMin : -16f);
-            float lumMax = Mathf.Pow(2f, auto ? s.exposureValueMax :  16f);
+            float lumMax = Mathf.Pow(2f, auto ? s.exposureValueMax : 16f);
             return new ToneMappingConstants
             {
-                whiteScale = s.toneMapWhiteScale, whiteMaxLuminance = s.toneMapWhiteMaxLuminance,
-                toneMapOperator = (uint)s.toneMapOperator, clamped = s.toneMapClamped ? 1u : 0u,
-                autoExposure = auto ? 1u : 0u,
-                avgLuminance = Mathf.Pow(2f, avgLumLog2), // exp2(log2 avg) = linear avg, fed to main_ps CPU path
+                whiteScale              = s.toneMapWhiteScale, whiteMaxLuminance = s.toneMapWhiteMaxLuminance,
+                toneMapOperator         = (uint)s.toneMapOperator, clamped       = s.toneMapClamped ? 1u : 0u,
+                autoExposure            = auto ? 1u : 0u,
+                avgLuminance            = Mathf.Pow(2f, avgLumLog2), // exp2(log2 avg) = linear avg, fed to main_ps CPU path
                 autoExposureLumValueMin = lumMin, autoExposureLumValueMax = lumMax,
-                colorTransform0 = new Vector4(k, 0, 0, 0),
-                colorTransform1 = new Vector4(0, k, 0, 0),
-                colorTransform2 = new Vector4(0, 0, k, 0),
-                enabled = s.enableToneMapping ? 1u : 0u,
+                colorTransform0         = new Vector4(k, 0, 0, 0),
+                colorTransform1         = new Vector4(0, k, 0, 0),
+                colorTransform2         = new Vector4(0, 0, k, 0),
+                enabled                 = s.enableToneMapping ? 1u : 0u,
             };
         }
 
@@ -231,40 +240,50 @@ namespace PathTracing
         {
             internal NativeRasterPipeline       LumRaster;
             internal NativeRasterDescriptorSet  LumDs;
-            internal NativeComputePipeline       MipCs;
-            internal NativeComputeDescriptorSet  MipDs;
-            internal NativeComputePipeline       CaptureCs;
-            internal NativeComputeDescriptorSet  CaptureDs;
-            internal NativeRasterPipeline        ApplyRaster;
-            internal NativeRasterDescriptorSet   ApplyDs;
-            internal UploadBuffer                AvgLumBuffer;
-            internal VolatileConstantBuffer      ApplyCb;
-            internal ToneMappingConstants        Cb;
-            internal IntPtr SourcePtr, OutputPtr, LumTexPtr;
-            internal int2   Resolution;
-            internal int    LumW, LumH, MipCount;
-            internal bool   AutoExposure;
-            internal IntPtr[] ApplyColorRes, LumColorRes;
-            internal uint[]   ApplyColorFmt, LumColorFmt;
+            internal NativeComputePipeline      MipCs;
+            internal NativeComputeDescriptorSet MipDs;
+            internal NativeComputePipeline      CaptureCs;
+            internal NativeComputeDescriptorSet CaptureDs;
+            internal NativeRasterPipeline       ApplyRaster;
+            internal NativeRasterDescriptorSet  ApplyDs;
+            internal UploadBuffer               AvgLumBuffer;
+            internal VolatileConstantBuffer     ApplyCb;
+            internal ToneMappingConstants       Cb;
+            internal IntPtr                     SourcePtr, OutputPtr, LumTexPtr;
+            internal int2                       Resolution;
+            internal int                        LumW, LumH, MipCount;
+            internal bool                       AutoExposure;
+            internal IntPtr[]                   ApplyColorRes, LumColorRes;
+            internal uint[]                     ApplyColorFmt, LumColorFmt;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("ToneMapping", out var pd);
 
-            pd.LumRaster = _lumRaster; pd.LumDs = _lumDs;
-            pd.MipCs = _mipCs; pd.MipDs = _mipDs;
-            pd.CaptureCs = _captureCs; pd.CaptureDs = _captureDs;
-            pd.ApplyRaster = _applyRaster; pd.ApplyDs = _applyDs;
-            pd.AvgLumBuffer = _avgLumBuffer; pd.ApplyCb = _applyCb;
-            pd.Cb = BuildConstants(_ctx.Setting, _avgLumLog2);
-            pd.SourcePtr = _sourcePtr; pd.OutputPtr = _outputPtr;
-            pd.LumTexPtr = _lumTex != null ? _lumTex.NativePtr : IntPtr.Zero;
-            pd.Resolution = _ctx.DisplayResolution;
-            pd.LumW = _lumW; pd.LumH = _lumH; pd.MipCount = _mipCount;
-            pd.AutoExposure = _ctx.Setting.autoExposure;
-            pd.ApplyColorRes = _applyColorRes; pd.ApplyColorFmt = _applyColorFmt;
-            pd.LumColorRes = _lumColorRes; pd.LumColorFmt = _lumColorFmt;
+            pd.LumRaster     = _lumRaster;
+            pd.LumDs         = _lumDs;
+            pd.MipCs         = _mipCs;
+            pd.MipDs         = _mipDs;
+            pd.CaptureCs     = _captureCs;
+            pd.CaptureDs     = _captureDs;
+            pd.ApplyRaster   = _applyRaster;
+            pd.ApplyDs       = _applyDs;
+            pd.AvgLumBuffer  = _avgLumBuffer;
+            pd.ApplyCb       = _applyCb;
+            pd.Cb            = BuildConstants(_ctx.Setting, _avgLumLog2);
+            pd.SourcePtr     = _sourcePtr;
+            pd.OutputPtr     = _outputPtr;
+            pd.LumTexPtr     = _lumTex != null ? _lumTex.NativePtr : IntPtr.Zero;
+            pd.Resolution    = _ctx.DisplayResolution;
+            pd.LumW          = _lumW;
+            pd.LumH          = _lumH;
+            pd.MipCount      = _mipCount;
+            pd.AutoExposure  = _ctx.Setting.autoExposure;
+            pd.ApplyColorRes = _applyColorRes;
+            pd.ApplyColorFmt = _applyColorFmt;
+            pd.LumColorRes   = _lumColorRes;
+            pd.LumColorFmt   = _lumColorFmt;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -285,9 +304,9 @@ namespace PathTracing
                 data.LumColorRes[0] = data.LumTexPtr;
                 var lumDraw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.LumColorRes, colorFormats = data.LumColorFmt,
-                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.LumW, data.LumH),
-                    vertexCount = 4, instanceCount = 1,   // donut fullscreen_vs.hlsl = 4-vertex triangle strip
+                    numRenderTargets = 1, colorResources     = data.LumColorRes, colorFormats = data.LumColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = new Rect(0, 0, data.LumW, data.LumH),
+                    vertexCount      = 4, instanceCount      = 1, // donut fullscreen_vs.hlsl = 4-vertex triangle strip
                 };
                 data.LumRaster.Draw(cmd, lds, in lumDraw);
 
@@ -315,6 +334,7 @@ namespace PathTracing
                     mds.SetRootConstants("c_MipMapgen", &mc, 4);
                     data.MipCs.Dispatch(cmd, mds, groupsX, groupsY, 1);
                 }
+
                 cmd.EndSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
 
                 // 3. capture top mip → 1-float UAV buffer (verbatim capture_cs).
@@ -341,9 +361,9 @@ namespace PathTracing
             data.ApplyColorRes[0] = data.OutputPtr;
             var applyDraw = new RasterDrawDesc
             {
-                numRenderTargets = 1, colorResources = data.ApplyColorRes, colorFormats = data.ApplyColorFmt,
-                depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.Resolution.x, data.Resolution.y),
-                vertexCount = 4, instanceCount = 1,   // donut fullscreen_vs.hlsl = 4-vertex triangle strip
+                numRenderTargets = 1, colorResources     = data.ApplyColorRes, colorFormats = data.ApplyColorFmt,
+                depthResource    = IntPtr.Zero, viewport = new Rect(0, 0, data.Resolution.x, data.Resolution.y),
+                vertexCount      = 4, instanceCount      = 1, // donut fullscreen_vs.hlsl = 4-vertex triangle strip
             };
             data.ApplyRaster.Draw(cmd, ads, in applyDraw);
             cmd.EndSample(RenderPassMarkers.RtxptToneMapping);

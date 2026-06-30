@@ -32,7 +32,7 @@ namespace PathTracing
         // never collide (the previous scheme packed the renderer instance ID into 28 bits).
         private readonly Dictionary<(int rendererId, int groupIndex), uint> _handleByKey = new();
         private readonly Dictionary<uint, (int rendererId, int groupIndex)> _keyByHandle = new();
-        private uint _nextHandle = 1; // 0 is never used (doubles as "no handle")
+        private          uint                                               _nextHandle  = 1; // 0 is never used (doubles as "no handle")
 
         private readonly HashSet<uint> _desiredScratch = new();
         private readonly List<uint>    _staleScratch   = new();
@@ -86,10 +86,11 @@ namespace PathTracing
                 var key = (rec.RendererId, rec.GroupIndex);
                 if (!_handleByKey.TryGetValue(key, out uint handle))
                 {
-                    handle              = _nextHandle++;
-                    _handleByKey[key]   = handle;
+                    handle               = _nextHandle++;
+                    _handleByKey[key]    = handle;
                     _keyByHandle[handle] = key;
                 }
+
                 rec.Handle = handle;
 
                 bool isRegistered = _registeredHandles.TryGetValue(handle, out ulong oldHash);

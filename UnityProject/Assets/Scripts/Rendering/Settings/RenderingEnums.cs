@@ -76,7 +76,7 @@ namespace PathTracing
 
     public enum ForceMaterial
     {
-        Null = 0,
+        Null   = 0,
         Gypsum = 1,
         Cobalt = 2,
     }
@@ -180,6 +180,7 @@ namespace PathTracing
         // ── Gradient Texture2DArray debug ─────────────────────────────────
         /// <summary>Slice 0 of the gradient Texture2DArray (FilterGradientsPass input/output).</summary>
         GradientArraySlice0,
+
         /// <summary>Slice 1 of the gradient Texture2DArray.</summary>
         GradientArraySlice1,
     }
@@ -193,8 +194,10 @@ namespace PathTracing
         // ── Final outputs ──────────────────────────────────────────────────
         /// <summary>DLSS-RR denoised + upscaled output (realtime mode).</summary>
         DlssRrOutput,
+
         /// <summary>Post-accumulation tone-mapped output (reference mode).</summary>
         ProcessedOutput,
+
         /// <summary>Raw PT output color before denoising.</summary>
         OutputColor,
 

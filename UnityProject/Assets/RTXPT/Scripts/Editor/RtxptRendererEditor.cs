@@ -29,8 +29,10 @@ namespace PathTracing
                     c.BakeFromRenderer();
                     EditorUtility.SetDirty(c);
                     foreach (var asset in c.Slots)
-                        if (asset != null) EditorUtility.SetDirty(asset);
+                        if (asset != null)
+                            EditorUtility.SetDirty(asset);
                 }
+
                 AssetDatabase.SaveAssets();
             }
 
@@ -100,14 +102,15 @@ namespace PathTracing
                     {
                         var assetSO = new SerializedObject(assetRef);
                         assetSO.Update();
-                        SerializedProperty prop = assetSO.GetIterator();
-                        bool enterChildren = true;
+                        SerializedProperty prop          = assetSO.GetIterator();
+                        bool               enterChildren = true;
                         while (prop.NextVisible(enterChildren))
                         {
                             enterChildren = false;
                             if (prop.name == "m_Script") continue;
                             EditorGUILayout.PropertyField(prop, includeChildren: true);
                         }
+
                         if (assetSO.ApplyModifiedProperties())
                             EditorUtility.SetDirty(assetRef);
                     }
@@ -136,14 +139,14 @@ namespace PathTracing
             var mf = comp.GetComponent<MeshFilter>();
             if (mr == null) return;
 
-            var  mats      = mr.sharedMaterials ?? Array.Empty<Material>();
-            int  slotCount = mf?.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
+            var mats      = mr.sharedMaterials ?? Array.Empty<Material>();
+            int slotCount = mf?.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
 
             if (comp.Slots.Count == slotCount) return;
 
             Undo.RecordObject(comp, "Sync RTXPT Slot Count");
             while (comp.Slots.Count < slotCount) comp.Slots.Add(null);
-            if (comp.Slots.Count > slotCount)    comp.Slots.RemoveRange(slotCount, comp.Slots.Count - slotCount);
+            if (comp.Slots.Count > slotCount) comp.Slots.RemoveRange(slotCount, comp.Slots.Count - slotCount);
             EditorUtility.SetDirty(comp);
         }
 

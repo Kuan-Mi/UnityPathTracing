@@ -8,7 +8,7 @@ namespace PathTracing.NativeInterop.NRI
     public struct NriResourceState
     {
         public AccessBits accessBits;
-        public Layout layout;
-        public uint stageBits;
+        public Layout     layout;
+        public uint       stageBits;
     }
 }

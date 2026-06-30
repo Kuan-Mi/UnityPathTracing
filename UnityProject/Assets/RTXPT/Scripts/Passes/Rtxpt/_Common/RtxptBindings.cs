@@ -50,14 +50,14 @@ namespace PathTracing
 
         private static void BindOutputUAVs(NativeComputeDescriptorSet ds, RtxptPassContext ctx)
         {
-            if (ctx.OutputColorPtr        != IntPtr.Zero) ds.SetRWTexture("u_OutputColor",        ctx.OutputColorPtr);
+            if (ctx.OutputColorPtr != IntPtr.Zero) ds.SetRWTexture("u_OutputColor", ctx.OutputColorPtr);
             if (ctx.ProcessedOutputColorPtr != IntPtr.Zero) ds.SetRWTexture("u_ProcessedOutputColor", ctx.ProcessedOutputColorPtr);
-            if (ctx.ThroughputPtr         != IntPtr.Zero) ds.SetRWTexture("u_Throughput",         ctx.ThroughputPtr);
-            if (ctx.MotionVectorsPtr      != IntPtr.Zero) ds.SetRWTexture("u_MotionVectors",      ctx.MotionVectorsPtr);
-            if (ctx.DepthPtr              != IntPtr.Zero) ds.SetRWTexture("u_Depth",              ctx.DepthPtr);
-            if (ctx.SpecularHitTPtr       != IntPtr.Zero) ds.SetRWTexture("u_SpecularHitT",       ctx.SpecularHitTPtr);
-            if (ctx.ScratchFloat1Ptr      != IntPtr.Zero) ds.SetRWTexture("u_ScratchFloat1",      ctx.ScratchFloat1Ptr);
-            if (ctx.ShaderDebugVizPtr     != IntPtr.Zero) ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
+            if (ctx.ThroughputPtr != IntPtr.Zero) ds.SetRWTexture("u_Throughput", ctx.ThroughputPtr);
+            if (ctx.MotionVectorsPtr != IntPtr.Zero) ds.SetRWTexture("u_MotionVectors", ctx.MotionVectorsPtr);
+            if (ctx.DepthPtr != IntPtr.Zero) ds.SetRWTexture("u_Depth", ctx.DepthPtr);
+            if (ctx.SpecularHitTPtr != IntPtr.Zero) ds.SetRWTexture("u_SpecularHitT", ctx.SpecularHitTPtr);
+            if (ctx.ScratchFloat1Ptr != IntPtr.Zero) ds.SetRWTexture("u_ScratchFloat1", ctx.ScratchFloat1Ptr);
+            if (ctx.ShaderDebugVizPtr != IntPtr.Zero) ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
         }
 
         private static void BindStablePlanes(NativeComputeDescriptorSet ds, RtxptPassContext ctx)
@@ -77,8 +77,8 @@ namespace PathTracing
 
         private static void BindDlssRrGuides(NativeComputeDescriptorSet ds, RtxptPassContext ctx)
         {
-            if (ctx.DlssRrDiffAlbedoPtr      != IntPtr.Zero) ds.SetRWTexture("u_RRDiffuseAlbedo",      ctx.DlssRrDiffAlbedoPtr);
-            if (ctx.DlssRrSpecAlbedoPtr      != IntPtr.Zero) ds.SetRWTexture("u_RRSpecAlbedo",         ctx.DlssRrSpecAlbedoPtr);
+            if (ctx.DlssRrDiffAlbedoPtr != IntPtr.Zero) ds.SetRWTexture("u_RRDiffuseAlbedo", ctx.DlssRrDiffAlbedoPtr);
+            if (ctx.DlssRrSpecAlbedoPtr != IntPtr.Zero) ds.SetRWTexture("u_RRSpecAlbedo", ctx.DlssRrSpecAlbedoPtr);
             if (ctx.DlssRrNormalRoughnessPtr != IntPtr.Zero) ds.SetRWTexture("u_RRNormalsAndRoughness", ctx.DlssRrNormalRoughnessPtr);
         }
     }

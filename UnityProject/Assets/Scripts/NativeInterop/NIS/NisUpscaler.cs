@@ -15,10 +15,10 @@ namespace PathTracing.NativeInterop.NIS
         [DllImport("Denoiser")]
         private static extern void DestroyNISInstance(int id);
 
-        private readonly int _instanceId;
-        private NativeArray<NisFrameData> _buffer;
-        private const int BufferCount = 3;
-        private readonly string _cameraName;
+        private readonly int                       _instanceId;
+        private          NativeArray<NisFrameData> _buffer;
+        private const    int                       BufferCount = 3;
+        private readonly string                    _cameraName;
 
         /// <summary>Per-frame camera data.</summary>
         public struct NisFrameInput
@@ -33,8 +33,8 @@ namespace PathTracing.NativeInterop.NIS
         /// <summary>NIS textures passed each frame.</summary>
         public struct NisResources
         {
-            public NriTextureResource input;   // color input (DlssOutput or TaaHistory)
-            public NriTextureResource output;  // sharpened output (UAV) → PreFinal
+            public NriTextureResource input; // color input (DlssOutput or TaaHistory)
+            public NriTextureResource output; // sharpened output (UAV) → PreFinal
         }
 
         /// <summary>Per-dispatch settings.</summary>

@@ -13,8 +13,8 @@ namespace PathTracing.NativeInterop.Streamline
         private static IntPtr _renderSubmitStartFunc;
         private static IntPtr _renderSubmitEndFunc;
         private static IntPtr _frameToken;
-        private static int _frameSequence;
-        private static bool _playerLoopInstalled;
+        private static int    _frameSequence;
+        private static bool   _playerLoopInstalled;
 
         // Distinct profiler markers so the two PlayerLoop delegates don't both aggregate under the
         // generic "UpdateFunction.Invoke()" sample. The FrameBegin marker's time is dominated by
@@ -22,8 +22,13 @@ namespace PathTracing.NativeInterop.Streamline
         private static readonly ProfilerMarker s_frameBeginMarker = new ProfilerMarker("SL Reflex FrameBegin (Sleep+SimStart)");
         private static readonly ProfilerMarker s_simEndMarker     = new ProfilerMarker("SL Reflex SimulationEnd");
 
-        private struct SLReflexFrameBegin { }
-        private struct SLReflexSimulationEnd { }
+        private struct SLReflexFrameBegin
+        {
+        }
+
+        private struct SLReflexSimulationEnd
+        {
+        }
 
         // This frame's Streamline token. In the PLAYER it is minted once per frame at EarlyUpdate
         // (OnPlayerLoopFrameBegin) and shared by Reflex, the RR/SR evaluate and DLSS-G present
@@ -38,8 +43,15 @@ namespace PathTracing.NativeInterop.Streamline
         {
             if (!SLNative.Available) return IntPtr.Zero;
             if (_renderSubmitStartFunc != IntPtr.Zero) return _renderSubmitStartFunc;
-            try { _renderSubmitStartFunc = SLNative.GetSLRenderSubmitStartEventFunc(); }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            try
+            {
+                _renderSubmitStartFunc = SLNative.GetSLRenderSubmitStartEventFunc();
+            }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+            }
+
             return _renderSubmitStartFunc;
         }
 
@@ -47,8 +59,15 @@ namespace PathTracing.NativeInterop.Streamline
         {
             if (!SLNative.Available) return IntPtr.Zero;
             if (_renderSubmitEndFunc != IntPtr.Zero) return _renderSubmitEndFunc;
-            try { _renderSubmitEndFunc = SLNative.GetSLRenderSubmitEndEventFunc(); }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            try
+            {
+                _renderSubmitEndFunc = SLNative.GetSLRenderSubmitEndEventFunc();
+            }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+            }
+
             return _renderSubmitEndFunc;
         }
 
@@ -98,8 +117,14 @@ namespace PathTracing.NativeInterop.Streamline
             if (Application.isPlaying) return;
             if (!SLNative.Available) return;
             if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
-            try { _frameToken = SLNative.SL_GetNewFrameToken(); }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            try
+            {
+                _frameToken = SLNative.SL_GetNewFrameToken();
+            }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+            }
         }
 #endif
 
@@ -167,14 +192,21 @@ namespace PathTracing.NativeInterop.Streamline
                 {
                     SLPclLatencyPing.ResetFrameState();
                     _frameToken = SLNative.SL_GetNewFrameToken();
-                    unchecked { _frameSequence++; }
+                    unchecked
+                    {
+                        _frameSequence++;
+                    }
+
                     if (_frameToken != IntPtr.Zero)
                     {
                         SLNative.SL_ReflexSleep(_frameToken);
                         SLNative.SL_MarkSimulationStart(_frameToken);
                     }
                 }
-                catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+                catch (DllNotFoundException)
+                {
+                    SLNative.MarkUnavailable();
+                }
             }
         }
 
@@ -185,8 +217,14 @@ namespace PathTracing.NativeInterop.Streamline
 
             using (s_simEndMarker.Auto())
             {
-                try { SLNative.SL_MarkSimulationEnd(_frameToken); }
-                catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+                try
+                {
+                    SLNative.SL_MarkSimulationEnd(_frameToken);
+                }
+                catch (DllNotFoundException)
+                {
+                    SLNative.MarkUnavailable();
+                }
             }
         }
 
@@ -217,7 +255,7 @@ namespace PathTracing.NativeInterop.Streamline
                     if (insertIndex < 0) return false;
 
                     children.Insert(insertIndex + 1, node);
-                    child.subSystemList = children.ToArray();
+                    child.subSystemList   = children.ToArray();
                     root.subSystemList[i] = child;
                     return true;
                 }
@@ -230,8 +268,8 @@ namespace PathTracing.NativeInterop.Streamline
         {
             if (root.subSystemList == null) return false;
 
-            bool removed = false;
-            var children = new List<PlayerLoopSystem>(root.subSystemList);
+            bool removed  = false;
+            var  children = new List<PlayerLoopSystem>(root.subSystemList);
             removed |= children.RemoveAll(s => s.type == type) > 0;
 
             for (int i = 0; i < children.Count; ++i)
@@ -240,7 +278,7 @@ namespace PathTracing.NativeInterop.Streamline
                 if (RemoveSystem(ref child, type))
                 {
                     children[i] = child;
-                    removed = true;
+                    removed     = true;
                 }
             }
 

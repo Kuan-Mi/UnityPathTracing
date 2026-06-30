@@ -54,10 +54,10 @@ namespace NativeRender
         public override void OnImportAsset(AssetImportContext ctx)
         {
             var asset = ScriptableObject.CreateInstance<NativeRasterShader>();
-            var so = new SerializedObject(asset);
+            var so    = new SerializedObject(asset);
 
-            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            var globalSettings = NativeShaderProjectSettings.instance;
+            string projectRoot    = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            var    globalSettings = NativeShaderProjectSettings.instance;
 
             // ── Include paths: globalIncludePaths + additionalIncludePaths (resolved to absolute) ──
             var allIncludeSources = new string[additionalIncludePaths.Length + globalSettings.globalIncludePaths.Length];
@@ -74,11 +74,12 @@ namespace NativeRender
                     p = Path.GetFullPath(Path.Combine(projectRoot, p));
                 allPaths[i] = p;
             }
+
             WriteStringArray(so, "additionalIncludePaths", allPaths);
 
             // ── Extra args / defines: globals + per-asset ──
             WriteStringArray(so, "_extraArgs", Concat(globalSettings.globalExtraArgs, extraArgs));
-            WriteStringArray(so, "_defines",   Concat(globalSettings.globalDefines,   defines));
+            WriteStringArray(so, "_defines", Concat(globalSettings.globalDefines, defines));
 
             so.FindProperty("_vsEntryPoint").stringValue    = string.IsNullOrEmpty(vsEntryPoint) ? "VSMain" : vsEntryPoint;
             so.FindProperty("_psEntryPoint").stringValue    = string.IsNullOrEmpty(psEntryPoint) ? "PSMain" : psEntryPoint;
@@ -93,6 +94,7 @@ namespace NativeRender
                 elem.FindPropertyRelative("Name").stringValue = rootConstantsHints[i].Name ?? "";
                 elem.FindPropertyRelative("Count").intValue   = (int)rootConstantsHints[i].Count;
             }
+
             WriteStringArray(so, "_rootSRVHints", rootSRVHints ?? Array.Empty<string>());
             SamplerBindingSerialization.Write(so.FindProperty("_samplerBindings"), samplerBindings);
             SamplerBindingSerialization.RegisterDependencies(ctx, samplerBindings);
@@ -109,8 +111,12 @@ namespace NativeRender
         {
             var r = new string[(a?.Length ?? 0) + (b?.Length ?? 0)];
             int k = 0;
-            if (a != null) foreach (var s in a) r[k++] = s;
-            if (b != null) foreach (var s in b) r[k++] = s;
+            if (a != null)
+                foreach (var s in a)
+                    r[k++] = s;
+            if (b != null)
+                foreach (var s in b)
+                    r[k++] = s;
             return r;
         }
 
@@ -129,7 +135,10 @@ namespace NativeRender
         protected override bool TryGetStatus(string assetPath,
             out bool hasCompiledBytes, out int byteCount, out string reflectionJson, out string shaderHash)
         {
-            hasCompiledBytes = false; byteCount = 0; reflectionJson = ""; shaderHash = "";
+            hasCompiledBytes = false;
+            byteCount        = 0;
+            reflectionJson   = "";
+            shaderHash       = "";
             var shader = AssetDatabase.LoadAssetAtPath<NativeRasterShader>(assetPath);
             if (shader == null) return false;
 
@@ -165,7 +174,7 @@ namespace NativeRender
     {
         static void OnPostprocessAllAssets(
             string[] importedAssets, string[] deletedAssets,
-            string[] movedAssets,    string[] movedFromAssetPaths)
+            string[] movedAssets, string[] movedFromAssetPaths)
         {
             foreach (string path in importedAssets)
             {

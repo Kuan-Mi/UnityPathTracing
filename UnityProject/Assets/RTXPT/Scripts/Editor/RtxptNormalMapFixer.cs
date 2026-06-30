@@ -41,10 +41,10 @@ namespace PathTracing
             string[] guids = AssetDatabase.FindAssets("t:RtxptMaterial");
 
             // Dedupe by texture asset path: many materials may share one normal map.
-            var checkedPaths = new HashSet<string>();
-            var wrong        = new List<string>(); // "<texPath>  (used by <materialName>)"
-            int fixedCount   = 0;
-            int okCount      = 0;
+            var checkedPaths    = new HashSet<string>();
+            var wrong           = new List<string>(); // "<texPath>  (used by <materialName>)"
+            int fixedCount      = 0;
+            int okCount         = 0;
             int missingImporter = 0;
 
             try
@@ -148,6 +148,7 @@ namespace PathTracing
                             conflicts.Add($"{texPath}  (used as both metal-rough and spec-gloss — review by hand; last seen: {mat.name})");
                         continue; // already processed this texture
                     }
+
                     desiredByPath.Add(texPath, desiredSrgb);
 
                     EditorUtility.DisplayProgressBar(

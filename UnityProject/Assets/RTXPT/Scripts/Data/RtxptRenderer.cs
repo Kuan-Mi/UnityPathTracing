@@ -319,8 +319,8 @@ namespace PathTracing
             // (PathTracerBridgeDonut.hlsli:353), so it must NOT be pre-baked here. Store the dielectric
             // term that fades to 0 as the surface turns metallic, matching RTXPT (all its metals carry
             // SpecularColor=0, dielectrics ~0.04). The old lerp double-counted baseColor for metals.
-            float met          = slot.Metalness;
-            float dielF0       = 0.04f * (1f - met);
+            float met    = slot.Metalness;
+            float dielF0 = 0.04f * (1f - met);
             slot.SpecularColor = new Color(dielF0, dielF0, dielF0, 1f);
 
             slot.UseSpecularGlossModel = false;

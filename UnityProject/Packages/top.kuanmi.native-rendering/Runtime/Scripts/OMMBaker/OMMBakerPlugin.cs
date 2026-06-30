@@ -5,9 +5,8 @@ namespace NativeRender
 {
     public static class OMMBakerPlugin
     {
-        
-        private const string BakerDllName  = "OMMBakerPlugin";
-        
+        private const string BakerDllName = "OMMBakerPlugin";
+
         // ================================================================
         // OMM CPU Bake API (Editor-time; does not require D3D12 device)
         // ================================================================
@@ -37,16 +36,16 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct NR_BakeResultDesc
         {
-            public IntPtr  arrayData;          // OMM array data blob
-            public uint    arrayDataSize;       // bytes
-            public IntPtr  descArray;           // ommCpuOpacityMicromapDesc[] blob
-            public uint    descArrayByteCount;  // bytes (descArrayCount * 8)
-            public uint    descArrayCount;      // number of desc entries
-            public IntPtr  indexBuffer;         // per-triangle OMM index blob
-            public uint    indexCount;          // number of indices
-            public uint    indexStride;         // 1, 2, or 4
-            public IntPtr  histogramFlat;       // uint32[histogramCount * 3]: [count, subdivLevel, format]
-            public uint    histogramCount;      // number of histogram entries
+            public IntPtr arrayData; // OMM array data blob
+            public uint   arrayDataSize; // bytes
+            public IntPtr descArray; // ommCpuOpacityMicromapDesc[] blob
+            public uint   descArrayByteCount; // bytes (descArrayCount * 8)
+            public uint   descArrayCount; // number of desc entries
+            public IntPtr indexBuffer; // per-triangle OMM index blob
+            public uint   indexCount; // number of indices
+            public uint   indexStride; // 1, 2, or 4
+            public IntPtr histogramFlat; // uint32[histogramCount * 3]: [count, subdivLevel, format]
+            public uint   histogramCount; // number of histogram entries
         }
 
         /// <summary>
@@ -58,6 +57,7 @@ namespace NativeRender
         public static extern int NR_GetBakeResult(out NR_BakeResultDesc result);
 
         /// <summary>Frees the static bake result storage in the plugin.</summary>
-        [DllImport(BakerDllName)] public static extern void NR_FreeBakeResult();
+        [DllImport(BakerDllName)]
+        public static extern void NR_FreeBakeResult();
     }
 }

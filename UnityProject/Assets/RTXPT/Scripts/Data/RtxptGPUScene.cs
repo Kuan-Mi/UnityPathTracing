@@ -30,8 +30,8 @@ namespace PathTracing
     public sealed class RtxptGPUScene : IDisposable
     {
         // Acceleration structure + incremental TLAS registration
-        private RayTracingAccelerationStructure _accelStructure;
-        private readonly RtxptAccelRegistry     _accelRegistry = new();
+        private          RayTracingAccelerationStructure _accelStructure;
+        private readonly RtxptAccelRegistry              _accelRegistry = new();
 
         // Scene layout of the last topology change — the single source of truth that both the
         // AS registration and the GPU-buffer build derive from.
@@ -51,8 +51,8 @@ namespace PathTracing
         // t_SubInstanceData (t1): emissive-light mapping offsets are recomputed per frame, so
         // this uses UploadBuffer for a stable NativePtr. SRV-only — never bound as a UAV.
         private UploadBuffer   _subInstanceGpuBuf; // t_SubInstanceData    (t1)
-        private GraphicsBuffer _ptMaterialGpuBuf;  // t_PTMaterialData     (t5)
-        private GraphicsBuffer _geomDebugGpuBuf;   // t_GeometryDebugData  (t4)
+        private GraphicsBuffer _ptMaterialGpuBuf; // t_PTMaterialData     (t5)
+        private GraphicsBuffer _geomDebugGpuBuf; // t_GeometryDebugData  (t4)
 
         // _instanceGpuBuf / _subInstanceGpuBuf are UploadBuffers — bound by handle (no cached ptr).
         private IntPtr _geometryGpuBufPtr;
@@ -83,9 +83,9 @@ namespace PathTracing
         private sealed class RendererEntry
         {
             public Transform transform; // skinned: the root bone (vertices are in root-bone space)
-            public bool wasMoving = true; // start true so first frame always syncs prev = current
-            public int firstInstanceIdx;
-            public int instanceCount;
+            public bool      wasMoving = true; // start true so first frame always syncs prev = current
+            public int       firstInstanceIdx;
+            public int       instanceCount;
 
             // Skinned instances deform every frame: transforms update unconditionally from the
             // root bone, with last frame's root kept for prevTransform (motion vectors).
@@ -104,13 +104,13 @@ namespace PathTracing
 
         // One repack dispatch per skinned renderer, rebuilt on topology change and consumed by
         // RtxptBuildTlasPass every frame before the TLAS/BLAS build.
-        private readonly List<RtxptSkinnedDispatch> _skinnedDispatches   = new();
-        private readonly HashSet<int>               _skinnedSeenScratch  = new();
+        private readonly List<RtxptSkinnedDispatch> _skinnedDispatches  = new();
+        private readonly HashSet<int>               _skinnedSeenScratch = new();
 
         internal IReadOnlyList<RtxptSkinnedDispatch> SkinnedDispatches => _skinnedDispatches;
 
-        private readonly List<RtxptRenderer> _registeredTargets = new();
-        private int _lastTopologyVersion = -1;
+        private readonly List<RtxptRenderer> _registeredTargets   = new();
+        private          int                 _lastTopologyVersion = -1;
 
         public bool ShaderTableDirty => _accelRegistry.ShaderTableDirty;
 
@@ -137,11 +137,13 @@ namespace PathTracing
 
         // Max task count: MaxLights / LLB_MAX_TRIANGLES_PER_TASK * 2
         private const int MaxEmissiveProcTasks = RtxptBufferResources.MaxLights / 32 * 2;
+
         private static readonly RtxptEmissiveTrianglesProcTask[] s_emissiveTaskStaging =
             new RtxptEmissiveTrianglesProcTask[MaxEmissiveProcTasks];
 
         /// <summary>Number of tasks produced by the last <see cref="PrepareEmissiveTriangleTasks"/> call.</summary>
-        public int  LastEmissiveTaskCount     { get; private set; }
+        public int LastEmissiveTaskCount { get; private set; }
+
         /// <summary>Total triangle-light count produced by the last <see cref="PrepareEmissiveTriangleTasks"/> call.</summary>
         public uint LastEmissiveTriangleCount { get; private set; }
 
@@ -227,8 +229,8 @@ namespace PathTracing
                 _registeredTargets.AddRange(targets);
                 // Captured AFTER Build: it may invoke RebuildGroups, which can bump the version.
                 _lastTopologyVersion = RtxptRenderer.TopologyVersion;
-                _forceRebuild  = false;
-                _sceneGpuDirty = true;
+                _forceRebuild        = false;
+                _sceneGpuDirty       = true;
             }
 
             if (_sceneGpuDirty)
@@ -280,21 +282,23 @@ namespace PathTracing
                     continue;
                 }
 
-                int stride  = mesh.GetVertexBufferStride(0);
-                int posOff  = mesh.GetVertexAttributeOffset(VertexAttribute.Position);
+                int stride = mesh.GetVertexBufferStride(0);
+                int posOff = mesh.GetVertexAttributeOffset(VertexAttribute.Position);
                 int normOff = mesh.HasVertexAttribute(VertexAttribute.Normal) &&
                               mesh.GetVertexAttributeStream(VertexAttribute.Normal) == 0 &&
                               mesh.GetVertexAttributeFormat(VertexAttribute.Normal) == VertexAttributeFormat.Float32
-                    ? mesh.GetVertexAttributeOffset(VertexAttribute.Normal) : -1;
-                int tanOff  = mesh.HasVertexAttribute(VertexAttribute.Tangent) &&
-                              mesh.GetVertexAttributeStream(VertexAttribute.Tangent) == 0 &&
-                              mesh.GetVertexAttributeFormat(VertexAttribute.Tangent) == VertexAttributeFormat.Float32
-                    ? mesh.GetVertexAttributeOffset(VertexAttribute.Tangent) : -1;
+                    ? mesh.GetVertexAttributeOffset(VertexAttribute.Normal)
+                    : -1;
+                int tanOff = mesh.HasVertexAttribute(VertexAttribute.Tangent) &&
+                             mesh.GetVertexAttributeStream(VertexAttribute.Tangent) == 0 &&
+                             mesh.GetVertexAttributeFormat(VertexAttribute.Tangent) == VertexAttributeFormat.Float32
+                    ? mesh.GetVertexAttributeOffset(VertexAttribute.Tangent)
+                    : -1;
 
-                var streams = new RtxptMeshStreamOffsets(mesh, withPrevPosition: true);
-                uint flags = 0;
-                if (normOff >= 0 && streams.HasNormal)  flags |= RtxptSkinnedDispatch.FlagHasNormal;
-                if (tanOff  >= 0 && streams.HasTangent) flags |= RtxptSkinnedDispatch.FlagHasTangent;
+                var  streams                                 = new RtxptMeshStreamOffsets(mesh, withPrevPosition: true);
+                uint flags                                   = 0;
+                if (normOff >= 0 && streams.HasNormal) flags |= RtxptSkinnedDispatch.FlagHasNormal;
+                if (tanOff >= 0 && streams.HasTangent) flags |= RtxptSkinnedDispatch.FlagHasTangent;
 
 
                 _skinnedDispatches.Add(new RtxptSkinnedDispatch
@@ -392,15 +396,15 @@ namespace PathTracing
             _instanceGpuBuf?.Dispose();
             _instanceGpuBuf = null;
             _geometryGpuBuf?.Release();
-            _geometryGpuBuf = null;
+            _geometryGpuBuf    = null;
             _geometryGpuBufPtr = IntPtr.Zero;
             _subInstanceGpuBuf?.Dispose();
             _subInstanceGpuBuf = null;
             _ptMaterialGpuBuf?.Release();
-            _ptMaterialGpuBuf = null;
+            _ptMaterialGpuBuf    = null;
             _ptMaterialGpuBufPtr = IntPtr.Zero;
             _geomDebugGpuBuf?.Release();
-            _geomDebugGpuBuf = null;
+            _geomDebugGpuBuf    = null;
             _geomDebugGpuBufPtr = IntPtr.Zero;
             _sceneBuffers?.Dispose();
             _sceneBuffers = null;
@@ -488,7 +492,7 @@ namespace PathTracing
                 // its sub-meshes, so create it on the renderer's first record.
                 if (!_overrideMaterialIndices.TryGetValue(rec.RendererId, out int[] overrideMatIndices))
                 {
-                    overrideMatIndices = new int[mesh.subMeshCount];
+                    overrideMatIndices                       = new int[mesh.subMeshCount];
                     _overrideMaterialIndices[rec.RendererId] = overrideMatIndices;
                     _overrideCache.Add((rec.Renderer, overrideMatIndices));
                 }
@@ -632,12 +636,12 @@ namespace PathTracing
 
             geomList.Add(new DonutGeometryData
             {
-                numIndices         = (uint)sub.indexCount,
-                numVertices        = (uint)mesh.vertexCount,
-                indexBufferIndex   = slots.ib,
-                indexOffset        = (uint)sub.indexStart * 4u, // donut IB is always uint32
-                vertexBufferIndex  = slots.vb,
-                positionOffset     = streams.Pos,
+                numIndices        = (uint)sub.indexCount,
+                numVertices       = (uint)mesh.vertexCount,
+                indexBufferIndex  = slots.ib,
+                indexOffset       = (uint)sub.indexStart * 4u, // donut IB is always uint32
+                vertexBufferIndex = slots.vb,
+                positionOffset    = streams.Pos,
                 // Skinned buffers carry a real PrevPosition stream (repack copies last frame's
                 // positions there, donut SkinningPass model); static buffers alias positions.
                 prevPositionOffset = streams.PrevPos,
@@ -650,15 +654,15 @@ namespace PathTracing
             });
 
             // --- SubInstanceData (RTXPT t1) ---
-            bool  isAlphaTested  = slot.EnableAlphaTesting;
-            float aCutoff        = isAlphaTested ? slot.AlphaCutoff : 0f;
-            uint  alphaU8        = (uint)Mathf.RoundToInt(Mathf.Clamp01(aCutoff) * 255f);
+            bool  isAlphaTested = slot.EnableAlphaTesting;
+            float aCutoff       = isAlphaTested ? slot.AlphaCutoff : 0f;
+            uint  alphaU8       = (uint)Mathf.RoundToInt(Mathf.Clamp01(aCutoff) * 255f);
             // AlphaTextureIndex in lo16: use base texture slot if alpha-tested, else 0
             uint alphaTexIdx = isAlphaTested && matTable.Materials[matIdx].BaseOrDiffuseTextureIndex != 0xFFFFFFFFu
                 ? matTable.Materials[matIdx].BaseOrDiffuseTextureIndex
                 : 0u;
-            uint siFlags = alphaTexIdx & 0xFFFFu;
-            if (isAlphaTested)       siFlags |= SubInstanceFlags.AlphaTested;
+            uint siFlags                     = alphaTexIdx & 0xFFFFu;
+            if (isAlphaTested) siFlags       |= SubInstanceFlags.AlphaTested;
             if (slot.ExcludeFromNEE) siFlags |= SubInstanceFlags.ExcludeFromNEE;
             siFlags |= (alphaU8 << SubInstanceFlags.AlphaOffsetOffset);
 
@@ -685,11 +689,11 @@ namespace PathTracing
                 // shader only performs for EnableAsAnalyticLightProxy materials; 0u would alias
                 // env-quad light 0). For proxy materials this is overwritten each frame by
                 // ResolveAnalyticProxyLights once the analytic light global indices are known.
-                AnalyticProxyLightIndex                 = 0xFFFFFFFFu,
-                IndexBufferIndex_VertexBufferIndex      = ((uint)slots.ib << 16) | ((uint)slots.vb & 0xFFFFu),
-                IndexOffset                             = (uint)sub.indexStart * 4u,
-                TexCoord1Offset                         = streams.Uv,
-                padding0                                = 0u,
+                AnalyticProxyLightIndex            = 0xFFFFFFFFu,
+                IndexBufferIndex_VertexBufferIndex = ((uint)slots.ib << 16) | ((uint)slots.vb & 0xFFFFu),
+                IndexOffset                        = (uint)sub.indexStart * 4u,
+                TexCoord1Offset                    = streams.Uv,
+                padding0                           = 0u,
             });
 
             // --- GeometryDebugData (RTXPT t4, all zero = no OMM) ---
@@ -820,7 +824,7 @@ namespace PathTracing
                     continue;
                 }
 
-                bool moved = entry.transform.hasChanged;
+                bool moved                            = entry.transform.hasChanged;
                 if (moved) entry.transform.hasChanged = false;
 
                 if (!moved && !entry.wasMoving) continue;
@@ -880,6 +884,7 @@ namespace PathTracing
                 if (light != null && (light.type == LightType.Spot || light.type == LightType.Point))
                     return light;
             }
+
             return null;
         }
 
@@ -908,7 +913,7 @@ namespace PathTracing
                 if (_subInstanceCpu[subIdx].AnalyticProxyLightIndex != globalIndex)
                 {
                     _subInstanceCpu[subIdx].AnalyticProxyLightIndex = globalIndex;
-                    _subInstanceCpuDirty = true;
+                    _subInstanceCpuDirty                            = true;
                 }
             }
         }
@@ -970,7 +975,7 @@ namespace PathTracing
                     _subInstanceCpu[siIdx].EmissiveLightMappingOffset != destBase)
                 {
                     _subInstanceCpu[siIdx].EmissiveLightMappingOffset = destBase;
-                    _subInstanceCpuDirty = true;
+                    _subInstanceCpuDirty                              = true;
                 }
 
                 // Split into tasks of at most MaxTriPerTask triangles.
@@ -985,15 +990,15 @@ namespace PathTracing
                         GeometryIndex              = (uint)e.GeometrySubIndex,
                         TriangleIndexFrom          = from,
                         TriangleIndexTo            = to,
-                        DestinationBufferOffset    = destBase + from,   // each task owns its own 32-slot window
+                        DestinationBufferOffset    = destBase + from, // each task owns its own 32-slot window
                         HistoricBufferOffset       = (historicBase != Invalid) ? historicBase + from : Invalid,
                         EmissiveLightMappingOffset = (uint)siIdx,
                         Padding0                   = 0u,
                     };
                 }
 
-                newHistoric[(e.InstanceIndex, e.GeometrySubIndex)] = destBase;
-                accumTriangles += triCount;
+                newHistoric[(e.InstanceIndex, e.GeometrySubIndex)] =  destBase;
+                accumTriangles                                     += triCount;
             }
 
             // Swap historic offsets for next frame (no per-frame dictionary allocation).

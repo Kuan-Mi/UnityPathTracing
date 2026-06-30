@@ -2,5 +2,7 @@ namespace PathTracing
 {
     using UnityEngine;
 
-public class ToggleAttribute : PropertyAttribute { }
+    public class ToggleAttribute : PropertyAttribute
+    {
+    }
 }

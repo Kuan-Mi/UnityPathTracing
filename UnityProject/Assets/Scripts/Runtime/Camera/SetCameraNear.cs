@@ -2,18 +2,18 @@ namespace PathTracing
 {
     using UnityEngine;
 
-[ExecuteInEditMode] // 让脚本在编辑模式下也能生效
-public class SetCameraNear : MonoBehaviour
-{
-    public float nearValue = 0.001f;
-
-    void Update()
+    [ExecuteInEditMode] // 让脚本在编辑模式下也能生效
+    public class SetCameraNear : MonoBehaviour
     {
-        Camera cam = GetComponent<Camera>();
-        if (cam != null)
+        public float nearValue = 0.001f;
+
+        void Update()
         {
-            cam.nearClipPlane = nearValue;
+            Camera cam = GetComponent<Camera>();
+            if (cam != null)
+            {
+                cam.nearClipPlane = nearValue;
+            }
         }
     }
-}
 }

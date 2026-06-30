@@ -32,9 +32,9 @@ namespace NativeRender
     /// </summary>
     public sealed class BindlessBuffer : IDisposable
     {
-        private ulong   _handle;
-        private IntPtr[] _buffers;   // tracks native buffer pointers for non-owning reference
-        private bool    _disposed;
+        private ulong    _handle;
+        private IntPtr[] _buffers; // tracks native buffer pointers for non-owning reference
+        private bool     _disposed;
 
         /// <summary>Opaque native handle. Used internally by RayTraceShader.SetBindlessBuffer.</summary>
         public ulong Handle => _handle;
@@ -134,6 +134,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_DestroyBindlessBuffer(_handle);
                 _handle = 0;
             }
+
             _disposed = true;
         }
     }

@@ -40,12 +40,12 @@ namespace PathTracing
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _pingDs;
         private readonly NativeComputeDescriptorSet _pongDs;
-        private          RtxptPassContext     _ctx;
+        private          RtxptPassContext           _ctx;
 
         public RtxptDenoisingGuidesBakePass(NativeComputeShader shader)
         {
             // Root-constant hints (g_denoisingConstants) live on the .computeshader asset (the importer).
-            _cs = new NativeComputePipeline(shader);
+            _cs     = new NativeComputePipeline(shader);
             _pingDs = new NativeComputeDescriptorSet(_cs);
             _pongDs = new NativeComputeDescriptorSet(_cs);
         }
@@ -63,10 +63,10 @@ namespace PathTracing
 
         private class PassData
         {
-            internal NativeComputePipeline           Cs;
-            internal NativeComputeDescriptorSet      PingDs;
-            internal NativeComputeDescriptorSet      PongDs;
-            internal RtxptPassContext          Ctx;
+            internal NativeComputePipeline      Cs;
+            internal NativeComputeDescriptorSet PingDs;
+            internal NativeComputeDescriptorSet PongDs;
+            internal RtxptPassContext           Ctx;
         }
 
         // ── RenderGraph ───────────────────────────────────────────────────────
@@ -74,10 +74,10 @@ namespace PathTracing
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("Denoising Guides Bake", out var passData);
-            passData.Cs         = _cs;
-            passData.PingDs     = _pingDs;
-            passData.PongDs     = _pongDs;
-            passData.Ctx        = _ctx;
+            passData.Cs     = _cs;
+            passData.PingDs = _pingDs;
+            passData.PongDs = _pongDs;
+            passData.Ctx    = _ctx;
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData d, UnsafeGraphContext c) => ExecutePass(d, c));
         }

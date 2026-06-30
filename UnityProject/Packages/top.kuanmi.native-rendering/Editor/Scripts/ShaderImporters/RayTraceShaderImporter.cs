@@ -124,7 +124,7 @@ namespace NativeRender
             {
                 var elem = hintsProp.GetArrayElementAtIndex(i);
                 elem.FindPropertyRelative("Name").stringValue = rootConstantsHints[i].Name ?? "";
-                elem.FindPropertyRelative("Count").intValue    = (int)rootConstantsHints[i].Count;
+                elem.FindPropertyRelative("Count").intValue   = (int)rootConstantsHints[i].Count;
             }
 
             var srvHintsProp = so.FindProperty("_rootSRVHints");
@@ -150,7 +150,10 @@ namespace NativeRender
         protected override bool TryGetStatus(string assetPath,
             out bool hasCompiledBytes, out int byteCount, out string reflectionJson, out string shaderHash)
         {
-            hasCompiledBytes = false; byteCount = 0; reflectionJson = ""; shaderHash = "";
+            hasCompiledBytes = false;
+            byteCount        = 0;
+            reflectionJson   = "";
+            shaderHash       = "";
             var shader = AssetDatabase.LoadAssetAtPath<RayTraceShader>(assetPath);
             if (shader == null) return false;
 
@@ -188,7 +191,7 @@ namespace NativeRender
     {
         static void OnPostprocessAllAssets(
             string[] importedAssets, string[] deletedAssets,
-            string[] movedAssets,    string[] movedFromAssetPaths)
+            string[] movedAssets, string[] movedFromAssetPaths)
         {
             foreach (string path in importedAssets)
             {

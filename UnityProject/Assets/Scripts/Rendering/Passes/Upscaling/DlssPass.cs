@@ -8,14 +8,13 @@ using PathTracing.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
-
 using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
     public class DlssPass : ScriptableRenderPass
     {
-        private IntPtr _dataPtr;
+        private IntPtr   _dataPtr;
         private Settings _settings;
 
         public DlssPass()
@@ -36,7 +35,7 @@ namespace PathTracing
         class PassData
         {
             public Settings Setting;
-            public IntPtr    DataPtr;
+            public IntPtr   DataPtr;
         }
 
         [DllImport("Denoiser")]

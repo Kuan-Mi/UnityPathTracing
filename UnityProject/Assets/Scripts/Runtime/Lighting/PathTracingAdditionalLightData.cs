@@ -6,24 +6,23 @@ namespace PathTracing
 // Currently exposes 'radius' (sphere/disk light radius for soft shadows).
 // Future properties (e.g. IES profile, light temperature) can be added here.
 
-using UnityEngine;
+    using UnityEngine;
 
-[DisallowMultipleComponent]
-[RequireComponent(typeof(Light))]
-public class PathTracingAdditionalLightData : MonoBehaviour
-{
-    [Min(0f)]
-    [Tooltip("Light source radius in world units.\n" +
-             "0  = ideal hard point/spot light (delta light, no area).\n" +
-             "> 0 = sphere area light (soft shadows via stochastic sampling).")]
-    public float radius = 0f;
+    [DisallowMultipleComponent]
+    [RequireComponent(typeof(Light))]
+    public class PathTracingAdditionalLightData : MonoBehaviour
+    {
+        [Min(0f)]
+        [Tooltip("Light source radius in world units.\n" +
+                 "0  = ideal hard point/spot light (delta light, no area).\n" +
+                 "> 0 = sphere area light (soft shadows via stochastic sampling).")]
+        public float radius = 0f;
 
 #if UNITY_EDITOR
-    private void OnValidate()
-    {
-        if (radius < 0f) radius = 0f;
-    }
+        private void OnValidate()
+        {
+            if (radius < 0f) radius = 0f;
+        }
 #endif
-}
-
+    }
 }

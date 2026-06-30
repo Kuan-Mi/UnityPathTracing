@@ -22,7 +22,7 @@ namespace PathTracing
     {
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
-        private          RtxptPassContext     _ctx;
+        private          RtxptPassContext           _ctx;
 
         public RtxptNoDenoiserFinalMergePass(NativeComputeShader shader)
         {
@@ -44,7 +44,7 @@ namespace PathTracing
         {
             internal NativeComputePipeline      Cs;
             internal NativeComputeDescriptorSet Ds;
-            internal RtxptPassContext     Ctx;
+            internal RtxptPassContext           Ctx;
         }
 
         // ── RenderGraph ───────────────────────────────────────────────────────

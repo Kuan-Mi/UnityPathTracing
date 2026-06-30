@@ -23,11 +23,11 @@ namespace PathTracing
         private static readonly (string lmbr, string colour, float onIntensity, float onStart, float onEnd)[] kSchedule =
         {
             ("000019c", "Yellow", 10.0f, 0.0f, 2.0f),
-            ("000019a", "Pink",   12.8f, 0.4f, 2.4f),
-            ("0000197", "Red",     8.0f, 0.8f, 2.8f),
-            ("0000199", "Green",  11.4f, 1.2f, 3.2f),
+            ("000019a", "Pink", 12.8f, 0.4f, 2.4f),
+            ("0000197", "Red", 8.0f, 0.8f, 2.8f),
+            ("0000199", "Green", 11.4f, 1.2f, 3.2f),
             ("000019b", "Orange", 20.0f, 1.6f, 3.6f),
-            ("0000198", "Blue",    9.0f, 1.6f, 3.6f),
+            ("0000198", "Blue", 9.0f, 1.6f, 3.6f),
         };
 
         [MenuItem("RTXPT/Setup String Light Blink")]
@@ -38,7 +38,7 @@ namespace PathTracing
             foreach (var guid in AssetDatabase.FindAssets("t:RtxptMaterial"))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
-                var mat = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(path);
+                var    mat  = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(path);
                 if (mat != null) byPath.Add((path.ToLowerInvariant(), mat));
             }
 
@@ -47,11 +47,20 @@ namespace PathTracing
             foreach (var (lmbr, colour, onIntensity, onStart, onEnd) in kSchedule)
             {
                 RtxptMaterial found = null;
-                string key = lmbr.ToLowerInvariant();
+                string        key   = lmbr.ToLowerInvariant();
                 foreach (var (path, mat) in byPath)
-                    if (path.Contains(key) && path.Contains("stringlights")) { found = mat; break; }
+                    if (path.Contains(key) && path.Contains("stringlights"))
+                    {
+                        found = mat;
+                        break;
+                    }
 
-                if (found == null) { missing.Add($"{colour} (LMBR_{lmbr})"); continue; }
+                if (found == null)
+                {
+                    missing.Add($"{colour} (LMBR_{lmbr})");
+                    continue;
+                }
+
                 entries.Add(new RtxptStringLightBlink.Entry
                 {
                     material = found, onIntensity = onIntensity, onStart = onStart, onEnd = onEnd
@@ -64,11 +73,12 @@ namespace PathTracing
                 go = new GameObject("StringLightBlink");
                 Undo.RegisterCreatedObjectUndo(go, "Create StringLightBlink");
             }
-            var blink = go.GetComponent<RtxptStringLightBlink>();
+
+            var blink                = go.GetComponent<RtxptStringLightBlink>();
             if (blink == null) blink = Undo.AddComponent<RtxptStringLightBlink>(go);
 
             blink.loopDuration = 4f;
-            blink.entries = entries;
+            blink.entries      = entries;
             EditorUtility.SetDirty(go);
             EditorSceneManager.MarkAllScenesDirty();
 

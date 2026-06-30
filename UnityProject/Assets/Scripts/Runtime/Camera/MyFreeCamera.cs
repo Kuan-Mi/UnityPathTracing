@@ -1,4 +1,5 @@
 // #if ENABLE_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM_PACKAGE
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
@@ -41,11 +42,11 @@ namespace PathTracing
         public float m_Turbo = 10.0f;
 
         InputActionMap inputMap;
-        InputAction mouseLookAction;
-        InputAction gamepadLookAction;
-        InputAction moveAction;
-        InputAction speedAction;
-        InputAction yMoveAction;
+        InputAction    mouseLookAction;
+        InputAction    gamepadLookAction;
+        InputAction    moveAction;
+        InputAction    speedAction;
+        InputAction    yMoveAction;
 
         void OnEnable()
         {
@@ -56,11 +57,11 @@ namespace PathTracing
         {
             inputMap = new InputActionMap("Free Camera");
 
-            mouseLookAction = inputMap.AddAction("mouseLook", binding: "<Mouse>/delta");
+            mouseLookAction   = inputMap.AddAction("mouseLook", binding: "<Mouse>/delta");
             gamepadLookAction = inputMap.AddAction("gamepadLook", binding: "<Gamepad>/rightStick");
-            moveAction = inputMap.AddAction("move", binding: "<Gamepad>/leftStick");
-            speedAction = inputMap.AddAction("speed", binding: "<Gamepad>/dpad");
-            yMoveAction = inputMap.AddAction("yMove");
+            moveAction        = inputMap.AddAction("move", binding: "<Gamepad>/leftStick");
+            speedAction       = inputMap.AddAction("speed", binding: "<Gamepad>/dpad");
+            yMoveAction       = inputMap.AddAction("yMove");
 
             moveAction.AddCompositeBinding("Dpad")
                 .With("Up", "<Keyboard>/w")
@@ -93,25 +94,25 @@ namespace PathTracing
         void OnDestroy()
         {
             inputMap?.Dispose();
-            inputMap = null;
-            mouseLookAction = null;
+            inputMap          = null;
+            mouseLookAction   = null;
             gamepadLookAction = null;
-            moveAction = null;
-            speedAction = null;
-            yMoveAction = null;
+            moveAction        = null;
+            speedAction       = null;
+            yMoveAction       = null;
         }
 
         float inputRotateAxisX, inputRotateAxisY;
         float inputChangeSpeed;
-        float inputVertical, inputHorizontal, inputYAxis;
-        bool leftShiftBoost, leftShift, fire1;
+        float inputVertical,  inputHorizontal, inputYAxis;
+        bool  leftShiftBoost, leftShift,       fire1;
 
         void UpdateInputs()
         {
             inputRotateAxisX = 0.0f;
             inputRotateAxisY = 0.0f;
-            leftShiftBoost = false;
-            fire1 = false;
+            leftShiftBoost   = false;
+            fire1            = false;
 
             if (Mouse.current?.rightButton?.isPressed == true)
             {
@@ -126,14 +127,14 @@ namespace PathTracing
             inputRotateAxisY += gamepadLookDelta.y * m_LookSpeedController * k_MouseSensitivityMultiplier;
 
             leftShift = Keyboard.current?.leftShiftKey?.isPressed ?? false;
-            fire1 = Mouse.current?.leftButton?.isPressed == true || Gamepad.current?.xButton?.isPressed == true;
+            fire1     = Mouse.current?.leftButton?.isPressed == true || Gamepad.current?.xButton?.isPressed == true;
 
             inputChangeSpeed = speedAction.ReadValue<Vector2>().y;
 
             var moveDelta = moveAction.ReadValue<Vector2>();
-            inputVertical = moveDelta.y;
+            inputVertical   = moveDelta.y;
             inputHorizontal = moveDelta.x;
-            inputYAxis = yMoveAction.ReadValue<Vector2>().y;
+            inputYAxis      = yMoveAction.ReadValue<Vector2>().y;
         }
 
         void Update()
@@ -153,7 +154,7 @@ namespace PathTracing
             bool moved = inputRotateAxisX != 0.0f || inputRotateAxisY != 0.0f || inputVertical != 0.0f || inputHorizontal != 0.0f || inputYAxis != 0.0f;
             if (moved)
             {
-                float rotationX = transform.localEulerAngles.x;
+                float rotationX    = transform.localEulerAngles.x;
                 float newRotationY = transform.localEulerAngles.y + inputRotateAxisX;
 
                 // Weird clamping code due to weird Euler angle mapping...

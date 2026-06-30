@@ -47,8 +47,10 @@ namespace NativeRender
         {
             /// <summary>Silent — no output (default, zero runtime cost).</summary>
             None = 0,
+
             /// <summary>Log only errors and capacity changes (Reset, GrowTo).</summary>
             Structural,
+
             /// <summary>Log every Allocate and Free call as well.</summary>
             Verbose,
         }
@@ -107,7 +109,8 @@ namespace NativeRender
             {
                 uint best = 0;
                 for (int i = 0; i < _freeBlocks.Count; i++)
-                    if (_freeBlocks[i].Count > best) best = _freeBlocks[i].Count;
+                    if (_freeBlocks[i].Count > best)
+                        best = _freeBlocks[i].Count;
                 return best;
             }
         }
@@ -134,7 +137,9 @@ namespace NativeRender
         // ------------------------------------------------------------------ //
 
         /// <summary>Creates an allocator with zero capacity. Call <see cref="Reset"/> or <see cref="GrowTo"/> before use.</summary>
-        public PrimitiveSlotAllocator() { }
+        public PrimitiveSlotAllocator()
+        {
+        }
 
         /// <summary>
         /// Resets the allocator to a single fully-free block of <paramref name="capacity"/> elements.
@@ -200,8 +205,8 @@ namespace NativeRender
             {
                 if (LogLevel >= Verbosity.Verbose)
                     Debug.Log($"{Prefix} Allocate({count}) FAILED — no block large enough" +
-                        $"  capacity={Capacity}  used={UsedCount}  freeBlocks={_freeBlocks.Count}" +
-                        $"  largestFree={LargestFreeBlock}");
+                              $"  capacity={Capacity}  used={UsedCount}  freeBlocks={_freeBlocks.Count}" +
+                              $"  largestFree={LargestFreeBlock}");
                 return InvalidOffset;
             }
 
@@ -221,7 +226,7 @@ namespace NativeRender
             UsedCount += need;
             if (LogLevel >= Verbosity.Verbose)
                 Debug.Log($"{Prefix} Allocate({count}) → offset={offset}" +
-                    $"  used={UsedCount}/{Capacity}  freeBlocks={_freeBlocks.Count}");
+                          $"  used={UsedCount}/{Capacity}  freeBlocks={_freeBlocks.Count}");
             return offset;
         }
 
@@ -251,8 +256,9 @@ namespace NativeRender
             {
                 int mid = (lo + hi) >> 1;
                 if (_freeBlocks[mid].Offset <= offset) lo = mid + 1;
-                else hi = mid;
+                else hi                                   = mid;
             }
+
             int insertAt = lo; // _freeBlocks[insertAt].Offset > offset (or insertAt == Count)
 
             // Merge with predecessor.
@@ -263,10 +269,10 @@ namespace NativeRender
                 if (prev.Offset + prev.Count == offset)
                 {
                     // Extend prev block to cover the freed range.
-                    _freeBlocks[insertAt - 1] = new FreeBlock { Offset = prev.Offset, Count = prev.Count + ucount };
-                    offset  = prev.Offset;
-                    ucount += prev.Count;
-                    mergedPrev = true;
+                    _freeBlocks[insertAt - 1] =  new FreeBlock { Offset = prev.Offset, Count = prev.Count + ucount };
+                    offset                    =  prev.Offset;
+                    ucount                    += prev.Count;
+                    mergedPrev                =  true;
                     insertAt--;
                 }
             }
@@ -291,7 +297,7 @@ namespace NativeRender
             UsedCount -= (uint)count;
             if (LogLevel >= Verbosity.Verbose)
                 Debug.Log($"{Prefix} Free(offset={offset - (mergedPrev ? _freeBlocks[insertAt].Count - ucount : 0)},count={count})" +
-                    $"  used={UsedCount}/{Capacity}  freeBlocks={_freeBlocks.Count}");
+                          $"  used={UsedCount}/{Capacity}  freeBlocks={_freeBlocks.Count}");
         }
 
         // ------------------------------------------------------------------ //
@@ -325,9 +331,10 @@ namespace NativeRender
             {
                 _freeBlocks.Add(new FreeBlock { Offset = oldCap, Count = delta });
             }
+
             if (LogLevel >= Verbosity.Structural)
                 Debug.Log($"{Prefix} GrowTo  {oldCap} → {newCapacity}" +
-                    $"  used={UsedCount}  freeBlocks={_freeBlocks.Count}  largestFree={LargestFreeBlock}");
+                          $"  used={UsedCount}  freeBlocks={_freeBlocks.Count}  largestFree={LargestFreeBlock}");
         }
 
         // ------------------------------------------------------------------ //
@@ -357,9 +364,10 @@ namespace NativeRender
                 {
                     var b = _freeBlocks[i];
                     sb.AppendLine($"  [{i,4}]  offset={b.Offset,8}  count={b.Count,8}" +
-                        $"  end={b.Offset + b.Count - 1,8}");
+                                  $"  end={b.Offset + b.Count - 1,8}");
                 }
             }
+
             Debug.Log(sb.ToString());
         }
     }

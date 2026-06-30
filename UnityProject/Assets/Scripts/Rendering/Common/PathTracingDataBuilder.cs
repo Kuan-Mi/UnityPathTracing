@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
@@ -39,8 +39,8 @@ namespace PathTracing
         public half4 emissionAndRoughnessScale;
 
         public half2 normalUvScale;
-        public uint textureOffsetAndFlags;
-        public uint primitiveOffset;
+        public uint  textureOffsetAndFlags;
+        public uint  primitiveOffset;
         public float scale;
 
         public uint morphPrimitiveOffset;
@@ -59,18 +59,18 @@ namespace PathTracing
         }
 
         // 位偏移定义
-        private const int FLAG_FIRST_BIT = 24;
-        private const uint NON_FLAG_MASK = (1u << FLAG_FIRST_BIT) - 1;
+        private const int  FLAG_FIRST_BIT = 24;
+        private const uint NON_FLAG_MASK  = (1u << FLAG_FIRST_BIT) - 1;
 
 // 具体的 Flag 位定义 (对应 HLSL 的 0x01, 0x02...)
         private const uint FLAG_NON_TRANSPARENT = 0x01;
-        private const uint FLAG_TRANSPARENT = 0x02;
+        private const uint FLAG_TRANSPARENT     = 0x02;
         private const uint FLAG_FORCED_EMISSION = 0x04;
-        private const uint FLAG_STATIC = 0x08;
-        private const uint FLAG_HAIR = 0x10;
-        private const uint FLAG_LEAF = 0x20;
-        private const uint FLAG_SKIN = 0x40;
-        private const uint FLAG_MORPH = 0x80;
+        private const uint FLAG_STATIC          = 0x08;
+        private const uint FLAG_HAIR            = 0x10;
+        private const uint FLAG_LEAF            = 0x20;
+        private const uint FLAG_SKIN            = 0x40;
+        private const uint FLAG_MORPH           = 0x80;
 
 
         // 预定义默认纹理，防止材质缺失纹理导致索引错位
@@ -122,16 +122,16 @@ namespace PathTracing
         public ComputeBuffer _instanceBuffer;
         public ComputeBuffer _primitiveBuffer;
 
-        public List<InstanceData> instanceDataList = new List<InstanceData>();
+        public List<InstanceData>  instanceDataList  = new List<InstanceData>();
         public List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
 
         [ContextMenu("Build RTAS and Buffers")]
         public void Build(RayTracingAccelerationStructure accelerationStructure)
         {
-            defaultWhite = Texture2D.whiteTexture;
-            defaultBlack = Texture2D.blackTexture;
+            defaultWhite  = Texture2D.whiteTexture;
+            defaultBlack  = Texture2D.blackTexture;
             defaultNormal = Texture2D.normalTexture;
-            defaultMask = Texture2D.whiteTexture;
+            defaultMask   = Texture2D.whiteTexture;
 
             instanceDataList.Clear();
             primitiveDataList.Clear();
@@ -159,26 +159,26 @@ namespace PathTracing
                 if (mf == null || mf.sharedMesh == null)
                     continue;
 
-                Mesh mesh = mf.sharedMesh;
-                int subMeshCount = mesh.subMeshCount;
-                int meshInstanceID = mesh.GetInstanceID(); // 获取 Mesh 唯一 ID
+                Mesh mesh           = mf.sharedMesh;
+                int  subMeshCount   = mesh.subMeshCount;
+                int  meshInstanceID = mesh.GetInstanceID(); // 获取 Mesh 唯一 ID
 
                 Matrix4x4 localToWorld = r.transform.localToWorldMatrix;
 
-                bool isMeshCached = meshPrimitiveCache.TryGetValue(meshInstanceID, out List<uint> cachedOffsets);
+                bool       isMeshCached       = meshPrimitiveCache.TryGetValue(meshInstanceID, out List<uint> cachedOffsets);
                 List<uint> currentMeshOffsets = isMeshCached ? cachedOffsets : new List<uint>();
 
                 Vector3[] vertices = mesh.vertices;
-                Vector2[] uvs = mesh.uv;
-                Vector3[] normals = mesh.normals;
+                Vector2[] uvs      = mesh.uv;
+                Vector3[] normals  = mesh.normals;
 
                 mesh.RecalculateTangents();
-                Vector4[] tangents = mesh.tangents;
+                Vector4[]  tangents        = mesh.tangents;
                 Material[] sharedMaterials = r.sharedMaterials;
 
-                uint instanceID = (uint)globalInstanceIndexCounter;
+                uint                     instanceID   = (uint)globalInstanceIndexCounter;
                 RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
-                uint mask = 0;
+                uint                     mask         = 0;
 
                 // 【关键修改 3】遍历 SubMesh
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
@@ -212,9 +212,9 @@ namespace PathTracing
                         for (int t = 0; t < subMeshTriangles.Length; t += 3)
                         {
                             PrimitiveData prim = new PrimitiveData();
-                            int i0 = subMeshTriangles[t];
-                            int i1 = subMeshTriangles[t + 1];
-                            int i2 = subMeshTriangles[t + 2];
+                            int           i0   = subMeshTriangles[t];
+                            int           i1   = subMeshTriangles[t + 1];
+                            int           i2   = subMeshTriangles[t + 2];
 
                             prim.n0 = EncodeUnitVector(normals[i0], true);
                             prim.n1 = EncodeUnitVector(normals[i1], true);
@@ -240,9 +240,9 @@ namespace PathTracing
                             Vector3 p1 = vertices[i1];
                             Vector3 p2 = vertices[i2];
 
-                            Vector3 edge20 = p2 - p0;
-                            Vector3 edge10 = p1 - p0;
-                            float worldArea = Vector3.Cross(edge20, edge10).magnitude * 0.5f;
+                            Vector3 edge20    = p2 - p0;
+                            Vector3 edge10    = p1 - p0;
+                            float   worldArea = Vector3.Cross(edge20, edge10).magnitude * 0.5f;
                             prim.worldArea = Math.Max(worldArea, 1e-9f);
 
                             // UV 面积
@@ -251,7 +251,7 @@ namespace PathTracing
                                 // 3. 计算 UV 面积 (原版代码逻辑)
                                 Vector3 uvEdge20 = uvs[i2] - uvs[i0];
                                 Vector3 uvEdge10 = uvs[i1] - uvs[i0];
-                                float uvArea = Vector3.Cross(uvEdge20, uvEdge10).magnitude * 0.5f;
+                                float   uvArea   = Vector3.Cross(uvEdge20, uvEdge10).magnitude * 0.5f;
                                 prim.uvArea = Math.Max(uvArea, 1e-9f);
                             }
                             else
@@ -266,9 +266,9 @@ namespace PathTracing
                                 Vector3 tang2 = tangents[i2];
 
 
-                                prim.t0 = EncodeUnitVector(tang0, true);
-                                prim.t1 = EncodeUnitVector(tang1, true);
-                                prim.t2 = EncodeUnitVector(tang2, true);
+                                prim.t0            = EncodeUnitVector(tang0, true);
+                                prim.t1            = EncodeUnitVector(tang1, true);
+                                prim.t2            = EncodeUnitVector(tang2, true);
                                 prim.bitangentSign = tangents[i0].w;
                             }
 
@@ -286,7 +286,7 @@ namespace PathTracing
                     inst.mOverloadedMatrix1 = new float4(localToWorld.m10, localToWorld.m11, localToWorld.m12, localToWorld.m13);
                     inst.mOverloadedMatrix2 = new float4(localToWorld.m20, localToWorld.m21, localToWorld.m22, localToWorld.m23);
 
-                    inst.primitiveOffset = thisSubMeshPrimitiveOffset;
+                    inst.primitiveOffset      = thisSubMeshPrimitiveOffset;
                     inst.morphPrimitiveOffset = 0;
 
                     // 获取当前 SubMesh 对应的材质
@@ -303,15 +303,15 @@ namespace PathTracing
                     uint baseTextureIndex = GetTextureGroupIndex(mat);
 
                     // 处理 Flags
-                    uint currentFlags = 0;
-                    RayTracingSubMeshFlags subMeshFlag = RayTracingSubMeshFlags.Enabled;
+                    uint                   currentFlags = 0;
+                    RayTracingSubMeshFlags subMeshFlag  = RayTracingSubMeshFlags.Enabled;
                     // if (mat != null)
 
                     if (mat == null)
                     {
                         Debug.LogError($"Renderer {r.name} SubMesh {subIdx} has no material assigned. Using defaults.");
                     }
-                    
+
                     bool isTransparent = mat.renderQueue >= 3000 || mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT");
 
 
@@ -352,8 +352,8 @@ namespace PathTracing
                     else
                     {
                         inst.baseColorAndMetalnessScale = new half4(new float4(1, 1, 1, 0));
-                        inst.emissionAndRoughnessScale = new half4(new float4(0, 0, 0, 0.5f));
-                        inst.normalUvScale = new half2(new half(1), new half(1));
+                        inst.emissionAndRoughnessScale  = new half4(new float4(0, 0, 0, 0.5f));
+                        inst.normalUvScale              = new half2(new half(1), new half(1));
                     }
 
                     inst.scale = r.transform.lossyScale.x;

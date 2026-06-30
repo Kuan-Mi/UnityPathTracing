@@ -13,7 +13,7 @@ namespace PathTracing.NativeInterop.Streamline
     public static class SLPclLatencyPing
     {
         private const string PclStatsPingMessageName = "PC_Latency_Stats_Ping";
-        private const uint QuitMessage = 0x8000 + 0x0D11;
+        private const uint   QuitMessage             = 0x8000 + 0x0D11;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct PclPingState : IInputStateTypeInfo
@@ -40,54 +40,54 @@ namespace PathTracing.NativeInterop.Streamline
         [StructLayout(LayoutKind.Sequential)]
         private struct MSG
         {
-            public IntPtr hwnd;
-            public uint message;
+            public IntPtr  hwnd;
+            public uint    message;
             public UIntPtr wParam;
-            public IntPtr lParam;
-            public uint time;
-            public int ptX;
-            public int ptY;
+            public IntPtr  lParam;
+            public uint    time;
+            public int     ptX;
+            public int     ptY;
         }
 
         public static bool LastFrameHadPing { get; private set; }
         public static uint LastFramePingCount { get; private set; }
 
-        private static PclPingDevice _device;
-        private static Thread _messageThread;
-        private static volatile bool _messageThreadRunning;
-        private static uint _messageThreadId;
-        private static uint _pclStatsPingMessage;
-        private static uint _processedPingCountThisUpdate;
-        private static bool _layoutRegistered;
+        private static          PclPingDevice _device;
+        private static          Thread        _messageThread;
+        private static volatile bool          _messageThreadRunning;
+        private static          uint          _messageThreadId;
+        private static          uint          _pclStatsPingMessage;
+        private static          uint          _processedPingCountThisUpdate;
+        private static          bool          _layoutRegistered;
 
         internal static void Register()
         {
             EnsureDevice();
             StartMessageThread();
             InputSystem.onBeforeUpdate -= OnBeforeInputUpdate;
-            InputSystem.onAfterUpdate -= OnAfterInputUpdate;
-            InputSystem.onEvent -= OnInputEvent;
+            InputSystem.onAfterUpdate  -= OnAfterInputUpdate;
+            InputSystem.onEvent        -= OnInputEvent;
             InputSystem.onBeforeUpdate += OnBeforeInputUpdate;
-            InputSystem.onAfterUpdate += OnAfterInputUpdate;
-            InputSystem.onEvent += OnInputEvent;
+            InputSystem.onAfterUpdate  += OnAfterInputUpdate;
+            InputSystem.onEvent        += OnInputEvent;
         }
 
         internal static void Unregister()
         {
             InputSystem.onBeforeUpdate -= OnBeforeInputUpdate;
-            InputSystem.onAfterUpdate -= OnAfterInputUpdate;
-            InputSystem.onEvent -= OnInputEvent;
+            InputSystem.onAfterUpdate  -= OnAfterInputUpdate;
+            InputSystem.onEvent        -= OnInputEvent;
             StopMessageThread();
             if (_device != null && HasDevice(_device))
                 InputSystem.RemoveDevice(_device);
-            _device = null;
+            _device                       = null;
             _processedPingCountThisUpdate = 0;
         }
 
         internal static void ResetFrameState()
         {
             LastFramePingCount = 0;
-            LastFrameHadPing = false;
+            LastFrameHadPing   = false;
         }
 
         private static void OnBeforeInputUpdate()
@@ -122,13 +122,16 @@ namespace PathTracing.NativeInterop.Streamline
             try
             {
                 LastFramePingCount = _processedPingCountThisUpdate;
-                LastFrameHadPing = LastFramePingCount != 0;
+                LastFrameHadPing   = LastFramePingCount != 0;
                 if (LastFramePingCount != 0)
                 {
                     SLNative.SL_MarkPclLatencyPing(token, LastFramePingCount);
                 }
             }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+            }
         }
 
         private static void EnsureDevice()
@@ -150,6 +153,7 @@ namespace PathTracing.NativeInterop.Streamline
                 if (ReferenceEquals(existing, device))
                     return true;
             }
+
             return false;
         }
 
@@ -160,7 +164,7 @@ namespace PathTracing.NativeInterop.Streamline
             _messageThread = new Thread(MessageThreadMain)
             {
                 IsBackground = true,
-                Name = "SL PCL Ping Message Thread",
+                Name         = "SL PCL Ping Message Thread",
             };
             _messageThread.Start();
         }
@@ -186,11 +190,17 @@ namespace PathTracing.NativeInterop.Streamline
 
             if (_messageThread != null && _messageThread.IsAlive)
                 _messageThread.Join(500);
-            _messageThread = null;
+            _messageThread   = null;
             _messageThreadId = 0;
 
-            try { SLNative.SL_SetPclPingThreadId(0); }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            try
+            {
+                SLNative.SL_SetPclPingThreadId(0);
+            }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+            }
         }
 
         private static void MessageThreadMain()
@@ -200,8 +210,14 @@ namespace PathTracing.NativeInterop.Streamline
             PeekMessageW(out _, IntPtr.Zero, 0, 0, 0);
             _messageThreadId = threadId;
 
-            try { SLNative.SL_SetPclPingThreadId(threadId); }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            try
+            {
+                SLNative.SL_SetPclPingThreadId(threadId);
+            }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+            }
 
             while (_messageThreadRunning)
             {
@@ -212,8 +228,14 @@ namespace PathTracing.NativeInterop.Streamline
                     QueuePingInputEvent();
             }
 
-            try { SLNative.SL_SetPclPingThreadId(0); }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            try
+            {
+                SLNative.SL_SetPclPingThreadId(0);
+            }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+            }
         }
 
         private static void QueuePingInputEvent()
@@ -226,7 +248,9 @@ namespace PathTracing.NativeInterop.Streamline
                 InputSystem.QueueStateEvent(device, new PclPingState { buttons = 1u });
                 InputSystem.QueueStateEvent(device, default(PclPingState));
             }
-            catch (InvalidOperationException) { }
+            catch (InvalidOperationException)
+            {
+            }
         }
 
         [DllImport("kernel32.dll")]

@@ -9,16 +9,16 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential)]
     public struct AreaLightData
     {
-        public Vector3 position;    // World-space centre
-        public float   halfWidth;   // Rect: half-extent along right. Disc: radius.
+        public Vector3 position; // World-space centre
+        public float   halfWidth; // Rect: half-extent along right. Disc: radius.
 
-        public Vector3 right;       // Unit right vector (world-space)
-        public float   halfHeight;  // Rect: half-extent along up. Disc: unused (0).
+        public Vector3 right; // Unit right vector (world-space)
+        public float   halfHeight; // Rect: half-extent along up. Disc: unused (0).
 
-        public Vector3 up;          // Unit up vector (world-space)
-        public float   lightType;   // 0 = rectangle, 1 = disc
+        public Vector3 up; // Unit up vector (world-space)
+        public float   lightType; // 0 = rectangle, 1 = disc
 
-        public Vector3 color;       // Pre-multiplied color * intensity
+        public Vector3 color; // Pre-multiplied color * intensity
         public float   pad2;
     }
 }

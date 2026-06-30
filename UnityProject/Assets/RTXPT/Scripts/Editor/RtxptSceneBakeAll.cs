@@ -18,10 +18,10 @@ namespace PathTracing
     public class RtxptSceneBakeAll : EditorWindow
     {
         // ---- Settings ----
-        private string _outputFolder  = "Assets/RtxptMaterialOverrides";
-        private bool   _selectedOnly  = false;
-        private bool   _skipExisting  = true;   // skip slots that already have an asset assigned
-        private bool   _reBakeValues  = true;   // call BakeSlotFromMaterial on existing assets too
+        private string _outputFolder = "Assets/RtxptMaterialOverrides";
+        private bool   _selectedOnly = false;
+        private bool   _skipExisting = true; // skip slots that already have an asset assigned
+        private bool   _reBakeValues = true; // call BakeSlotFromMaterial on existing assets too
 
         private Vector2 _scroll;
         private string  _lastReport = "";
@@ -47,21 +47,23 @@ namespace PathTracing
                 {
                     string rel = AbsToRelative(picked);
                     if (rel != null) _outputFolder = rel;
-                    else EditorUtility.DisplayDialog("Invalid folder",
-                             "Destination must be inside the project's Assets folder.", "OK");
+                    else
+                        EditorUtility.DisplayDialog("Invalid folder",
+                            "Destination must be inside the project's Assets folder.", "OK");
                 }
             }
+
             EditorGUILayout.EndHorizontal();
 
             // Normalise if the user typed an absolute path.
             if (System.IO.Path.IsPathRooted(_outputFolder))
             {
-                string rel = AbsToRelative(_outputFolder);
+                string rel                     = AbsToRelative(_outputFolder);
                 if (rel != null) _outputFolder = rel;
             }
 
             bool folderOk = !string.IsNullOrWhiteSpace(_outputFolder)
-                         && _outputFolder.StartsWith("Assets", StringComparison.OrdinalIgnoreCase);
+                            && _outputFolder.StartsWith("Assets", StringComparison.OrdinalIgnoreCase);
             if (!folderOk)
                 EditorGUILayout.HelpBox("Must be a path starting with 'Assets'.", MessageType.Warning);
 
@@ -126,6 +128,7 @@ namespace PathTracing
                 // Store keyed by the asset's own instance ID (sentinel: negative) so we can look
                 // it up later by the deterministic name we would generate.
             }
+
             // Build a name → asset map for name-based reuse.
             var nameToAsset = new Dictionary<string, RtxptMaterial>(StringComparer.OrdinalIgnoreCase);
             foreach (string guid in existingGuids)
@@ -133,7 +136,7 @@ namespace PathTracing
                 string path  = AssetDatabase.GUIDToAssetPath(guid);
                 var    asset = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(path);
                 if (asset == null) continue;
-                string assetName = System.IO.Path.GetFileNameWithoutExtension(path);
+                string assetName                                                = System.IO.Path.GetFileNameWithoutExtension(path);
                 if (!nameToAsset.ContainsKey(assetName)) nameToAsset[assetName] = asset;
             }
 
@@ -144,20 +147,20 @@ namespace PathTracing
 
             foreach (var mr in renderers)
             {
-                
-                var mf        = mr.GetComponent<MeshFilter>();
-                var mats      = mr.sharedMaterials ?? Array.Empty<Material>();
+                var mf   = mr.GetComponent<MeshFilter>();
+                var mats = mr.sharedMaterials ?? Array.Empty<Material>();
 
 
                 int slotCount = 0;
                 if (mf != null)
                 {
                     slotCount = mf.sharedMesh.subMeshCount;
-                } 
+                }
                 else
                 {
                     slotCount = mats.Length;
-                } 
+                }
+
                 if (slotCount == 0) continue;
 
                 // Ensure RtxptRenderer exists.
@@ -189,7 +192,7 @@ namespace PathTracing
                         out bool wasCreated);
 
                     if (wasCreated) slotsCreated++;
-                    else            slotsReused++;
+                    else slotsReused++;
 
                     // Bake values from the Unity material.
                     bool shouldBake = wasCreated || (!_skipExisting && _reBakeValues);
@@ -201,7 +204,11 @@ namespace PathTracing
                     dirty = true;
                 }
 
-                if (dirty) { EditorUtility.SetDirty(comp); renderersTouched++; }
+                if (dirty)
+                {
+                    EditorUtility.SetDirty(comp);
+                    renderersTouched++;
+                }
             }
 
             AssetDatabase.SaveAssets();
@@ -246,8 +253,8 @@ namespace PathTracing
 
             // 3. Create new asset.
             wasCreated = true;
-            var asset = CreateInstance<RtxptMaterial>();
-            string path = AssetDatabase.GenerateUniqueAssetPath($"{_outputFolder}/{assetName}.asset");
+            var    asset = CreateInstance<RtxptMaterial>();
+            string path  = AssetDatabase.GenerateUniqueAssetPath($"{_outputFolder}/{assetName}.asset");
             AssetDatabase.CreateAsset(asset, path);
 
             // Register in both lookup structures so subsequent slots with the same material reuse it.
@@ -268,6 +275,7 @@ namespace PathTracing
                     list.AddRange(go.GetComponentsInChildren<Renderer>(includeInactive: true));
                 return list.ToArray();
             }
+
             return FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         }
 
@@ -297,8 +305,8 @@ namespace PathTracing
 
         private static string ProjectRoot()
             => System.IO.Path.GetFullPath(
-                   System.IO.Path.Combine(Application.dataPath, ".."))
-               .Replace('\\', '/').TrimEnd('/');
+                    System.IO.Path.Combine(Application.dataPath, ".."))
+                .Replace('\\', '/').TrimEnd('/');
 
         private static string AbsToRelative(string absPath)
         {
@@ -315,8 +323,8 @@ namespace PathTracing
             if (string.IsNullOrWhiteSpace(relPath)) return Application.dataPath;
             if (System.IO.Path.IsPathRooted(relPath)) return relPath;
             return System.IO.Path.GetFullPath(
-                       System.IO.Path.Combine(ProjectRoot(), relPath))
-                   .Replace('\\', '/');
+                    System.IO.Path.Combine(ProjectRoot(), relPath))
+                .Replace('\\', '/');
         }
     }
 }

@@ -33,7 +33,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to<http://unlicense.org/>
 */
 
-namespace PathTracing.Profiling {
+namespace PathTracing.Profiling
+{
     /// <summary>
     /// This is a testing script for find out which of Unity's samplers can report GPU times on your given platform.
     ///
@@ -42,8 +43,8 @@ namespace PathTracing.Profiling {
     ///
     /// Note: Only the editor and development builds can use Recorders as of Unity 2020.2
     /// </summary>
-    public class TestGPURecorders : MonoBehaviour {
-
+    public class TestGPURecorders : MonoBehaviour
+    {
         [Tooltip("Enables the recorder GPU testing.")]
         public bool RunTestInStart = true;
 
@@ -88,8 +89,10 @@ namespace PathTracing.Profiling {
         /// </summary>
         public Dictionary<string, Recorder> GpuRecorders = new Dictionary<string, Recorder>();
 
-        private void Start() {
-            if ( RunTestInStart ) {
+        private void Start()
+        {
+            if (RunTestInStart)
+            {
                 StartCoroutine(StartTestsWithDelays());
             }
         }
@@ -97,9 +100,10 @@ namespace PathTracing.Profiling {
         /// <summary>
         /// Initiates all of the supported recorders.
         /// </summary>
-        public void InitiateAllRecorders() {
+        public void InitiateAllRecorders()
+        {
             // Only run in editor or debug builds.
-            if ( !( Application.isEditor || Debug.isDebugBuild ) ) return;
+            if (!(Application.isEditor || Debug.isDebugBuild)) return;
 
             allNames.Clear();
             allRecorders.Clear();
@@ -107,12 +111,13 @@ namespace PathTracing.Profiling {
             GpuRecorders.Clear();
 
             Sampler.GetNames(allNames);
-            NumRecorders = allNames.Count;
-            ValidRecorders = 0;
+            NumRecorders       = allNames.Count;
+            ValidRecorders     = 0;
             ActiveGPURecorders = 0;
 
             int lenRecorders = allNames.Count;
-            for ( int i = 0; i < lenRecorders; i++ ) {
+            for (int i = 0; i < lenRecorders; i++)
+            {
                 allRecorders.Add(Recorder.Get(allNames[i]));
                 allRecorders[i].enabled = true;
             }
@@ -121,9 +126,10 @@ namespace PathTracing.Profiling {
         /// <summary>
         /// Waits a period then runs the test, then logs the results.
         /// </summary>
-        public IEnumerator StartTestsWithDelays() {
+        public IEnumerator StartTestsWithDelays()
+        {
             // Only run in editor or debug builds.
-            if ( !( Application.isEditor || Debug.isDebugBuild ) ) yield break;
+            if (!(Application.isEditor || Debug.isDebugBuild)) yield break;
 
             // Wait for the scene to get going.
             yield return new WaitForSecondsRealtime(WaitTimeBeforeInitiation);
@@ -132,8 +138,8 @@ namespace PathTracing.Profiling {
             InitiateAllRecorders();
 
             // Wait for the scene to get going.
-            for ( int i = 0; i < 2; i++ ) {
-
+            for (int i = 0; i < 2; i++)
+            {
                 yield return new WaitForSecondsRealtime(WaitTimeBeforeTest);
 
                 AddNewGPURecordingProfilers();
@@ -142,7 +148,7 @@ namespace PathTracing.Profiling {
 
                 LogResults();
 
-                if ( !RunTestTwice ) yield break;
+                if (!RunTestTwice) yield break;
             }
         }
 
@@ -151,17 +157,20 @@ namespace PathTracing.Profiling {
         /// Tests which GPU times have positive values.
         /// This may be called multiple times outside of <see cref="StartTestsWithDelays"/>.
         /// </summary>
-        public void AddNewGPURecordingProfilers() {
+        public void AddNewGPURecordingProfilers()
+        {
             // Determine all of the active gpu recorders
             int lenRecorders = allNames.Count;
-            for ( int i = 0; i < lenRecorders; i++ ) {
-                if ( allRecorders[i].isValid ) {
-
+            for (int i = 0; i < lenRecorders; i++)
+            {
+                if (allRecorders[i].isValid)
+                {
                     ValidRecorders++;
 
-                    if ( allRecorders[i].gpuElapsedNanoseconds > 0 ) {
-                        if ( !GpuRecorders.ContainsKey(allNames[i]) ) {
-
+                    if (allRecorders[i].gpuElapsedNanoseconds > 0)
+                    {
+                        if (!GpuRecorders.ContainsKey(allNames[i]))
+                        {
                             GpuNamesActive.Add(allNames[i]);
                             GpuRecorders[allNames[i]] = allRecorders[i];
 
@@ -175,10 +184,12 @@ namespace PathTracing.Profiling {
         /// <summary>
         /// Lists all of the active gpu recorders.
         /// </summary>
-        public void LogResults() {
+        public void LogResults()
+        {
             Debug.LogFormat("{0} Recorders are reporting positive times for the GPU... Listing <{0}>: ", ActiveGPURecorders);
             int countActive = GpuNamesActive.Count;
-            for ( int i = 0; i < countActive; i++ ) {
+            for (int i = 0; i < countActive; i++)
+            {
                 Debug.LogFormat("{0}: {1:N5} ms",
                     GpuNamesActive[i],
                     GpuRecorders[GpuNamesActive[i]].gpuElapsedNanoseconds * 1e-6);

@@ -17,7 +17,7 @@ namespace PathTracing
     {
         public RtxptRenderer       Renderer;
         public Renderer            TargetRenderer; // MeshRenderer or SkinnedMeshRenderer
-        public SkinnedMeshRenderer Skinned;        // non-null for the skinned/dynamic path
+        public SkinnedMeshRenderer Skinned; // non-null for the skinned/dynamic path
         public Mesh                Mesh;
         public int                 RendererId; // TargetRenderer.GetInstanceID()
         public int                 GroupIndex; // index into Renderer.SubmeshGroups
@@ -128,8 +128,8 @@ namespace PathTracing
                             // IB — must not offset the vertex buffer by baseVertex a second time.
                             // The native mesh IB (static path) stores baseVertex-relative indices,
                             // so there the offset is required.
-                            baseVertex      = skinned ? 0u : (uint)sub.baseVertex,
-                            flags           = nonOpaque ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
+                            baseVertex = skinned ? 0u : (uint)sub.baseVertex,
+                            flags      = nonOpaque ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
                         });
                     }
 
@@ -174,13 +174,14 @@ namespace PathTracing
                 Transform root = rec.Skinned.rootBone != null ? rec.Skinned.rootBone : rec.TargetRenderer.transform;
                 return Matrix4x4.TRS(root.position, root.rotation, Vector3.one);
             }
+
             return rec.TargetRenderer.transform.localToWorldMatrix;
         }
 
         private static ulong HashRegistration(int meshId, NativeRenderPlugin.SubmeshDesc[] descs, bool skinned)
         {
             const ulong Prime = 1099511628211UL;
-            ulong h = 14695981039346656037UL;
+            ulong       h     = 14695981039346656037UL;
             h = (h ^ (uint)meshId) * Prime;
             h = (h ^ (skinned ? 1u : 0u)) * Prime;
             h = (h ^ (uint)descs.Length) * Prime;
@@ -191,6 +192,7 @@ namespace PathTracing
                 h = (h ^ d.baseVertex) * Prime;
                 h = (h ^ d.flags) * Prime;
             }
+
             return h;
         }
     }

@@ -1,16 +1,17 @@
 namespace PathTracing
 {
     using UnityEngine;
-using System;
+    using System;
 
 // 用来代替原生 [Header]
-[AttributeUsage(AttributeTargets.Field)]
-public class FoldoutHeaderAttribute : PropertyAttribute
-{
-    public string Name;
-    public FoldoutHeaderAttribute(string name)
+    [AttributeUsage(AttributeTargets.Field)]
+    public class FoldoutHeaderAttribute : PropertyAttribute
     {
-        this.Name = name;
+        public string Name;
+
+        public FoldoutHeaderAttribute(string name)
+        {
+            this.Name = name;
+        }
     }
-}
 }

@@ -36,7 +36,8 @@ namespace PathTracing
         [Tooltip("Authored local rotation the spin is layered on (set on attach; restored on disable).")]
         public Quaternion baseRotation = Quaternion.identity;
 
-        [HideInInspector] public bool baseCaptured = false;
+        [HideInInspector]
+        public bool baseCaptured = false;
 
         private void OnEnable()
         {

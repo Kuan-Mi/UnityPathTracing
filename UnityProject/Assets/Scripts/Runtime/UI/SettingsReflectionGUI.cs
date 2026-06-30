@@ -27,14 +27,14 @@ namespace PathTracing
         /// <summary>找不到设置来源时显示的提示。</summary>
         protected virtual string NotFoundMessage => "SettingsReflectionGUI: feature not found";
 
-        private bool              _visible;
-        private Vector2           _scrollPos;
+        private          bool                       _visible;
+        private          Vector2                    _scrollPos;
         private readonly Dictionary<string, bool>   _foldouts  = new();
         private readonly Dictionary<string, string> _textCache = new();
 
-        private object       _settings;
-        private Rect         _windowRect;
-        private bool         _windowRectInited;
+        private object _settings;
+        private Rect   _windowRect;
+        private bool   _windowRectInited;
 
         // ─── GUI Styles (lazy init inside OnGUI) ────────────────────────
         private GUIStyle _boldLabel;
@@ -54,12 +54,12 @@ namespace PathTracing
                 fontSize  = 12,
                 normal    = { textColor = new Color(1f, 0.85f, 0.3f) }
             };
-            _label = new GUIStyle(GUI.skin.label)  { fontSize = 11, normal = { textColor = Color.white } };
-            _labelSelected = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.4f, 1f, 0.4f) } };
-            _tf    = new GUIStyle(GUI.skin.textField) { fontSize = 11 };
-            _btn   = new GUIStyle(GUI.skin.button)    { fontSize = 11 };
-            _box   = new GUIStyle(GUI.skin.box);
-            _stylesReady = true;
+            _label         = new GUIStyle(GUI.skin.label) { fontSize     = 11, normal    = { textColor                          = Color.white } };
+            _labelSelected = new GUIStyle(GUI.skin.label) { fontSize     = 11, fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.4f, 1f, 0.4f) } };
+            _tf            = new GUIStyle(GUI.skin.textField) { fontSize = 11 };
+            _btn           = new GUIStyle(GUI.skin.button) { fontSize    = 11 };
+            _box           = new GUIStyle(GUI.skin.box);
+            _stylesReady   = true;
         }
 
         // ─── Lifecycle ──────────────────────────────────────────────────
@@ -75,13 +75,13 @@ namespace PathTracing
             InitStyles();
 
             // 右上角按钮，避免与左上角的 GPU Profiler 按钮重叠
-            int h = Screen.height;
-            int fontSize = h * 2 / 100;
-            float btnW = fontSize * 14;
-            float btnH = fontSize * 1.8f;
-            var btnStyle = new GUIStyle(GUI.skin.button) { fontSize = fontSize };
+            int   h        = Screen.height;
+            int   fontSize = h * 2 / 100;
+            float btnW     = fontSize * 14;
+            float btnH     = fontSize * 1.8f;
+            var   btnStyle = new GUIStyle(GUI.skin.button) { fontSize = fontSize };
             if (GUI.Button(new Rect(Screen.width - btnW - 10, 10, btnW, btnH),
-                           $"PT Settings [{toggleKey}]", btnStyle))
+                    $"PT Settings [{toggleKey}]", btnStyle))
                 _visible = !_visible;
 
             if (!_visible) return;
@@ -139,11 +139,11 @@ namespace PathTracing
                 var foldoutAttr = field.GetCustomAttribute<FoldoutHeaderAttribute>();
                 if (foldoutAttr != null)
                 {
-                    string gKey = path + "_g_" + foldoutAttr.Name;
+                    string gKey                                       = path + "_g_" + foldoutAttr.Name;
                     if (!_foldouts.ContainsKey(gKey)) _foldouts[gKey] = false;
 
-                    bool open    = _foldouts[gKey];
-                    bool newOpen = GUILayout.Toggle(open, (open ? "▼ " : "▶ ") + foldoutAttr.Name, _boldLabel);
+                    bool open                            = _foldouts[gKey];
+                    bool newOpen                         = GUILayout.Toggle(open, (open ? "▼ " : "▶ ") + foldoutAttr.Name, _boldLabel);
                     if (newOpen != open) _foldouts[gKey] = newOpen;
                     groupOpen = newOpen;
                 }
@@ -172,14 +172,14 @@ namespace PathTracing
             }
             else if (ft.IsEnum)
             {
-                string[] names = Enum.GetNames(ft);
-                Array    vals  = Enum.GetValues(ft);
-                int      idx   = Array.IndexOf(names, value.ToString());
+                string[] names   = Enum.GetNames(ft);
+                Array    vals    = Enum.GetValues(ft);
+                int      idx     = Array.IndexOf(names, value.ToString());
                 if (idx < 0) idx = 0;
 
-                string dropKey = path + "_drop";
+                string dropKey                                          = path + "_drop";
                 if (!_foldouts.ContainsKey(dropKey)) _foldouts[dropKey] = false;
-                bool isOpen = _foldouts[dropKey];
+                bool isOpen                                             = _foldouts[dropKey];
 
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(field.Name, _label, GUILayout.Width(215));
@@ -199,17 +199,18 @@ namespace PathTracing
                             _foldouts[dropKey] = false;
                         }
                     }
+
                     GUILayout.EndVertical();
                 }
             }
             else if (ft.IsValueType && !ft.IsPrimitive && !ft.IsEnum)
             {
                 // 嵌套 struct：折叠展开
-                string fkey = path + "_fold";
+                string fkey                                       = path + "_fold";
                 if (!_foldouts.ContainsKey(fkey)) _foldouts[fkey] = false;
 
-                bool open    = _foldouts[fkey];
-                bool newOpen = GUILayout.Toggle(open, (open ? "▼ " : "▷ ") + field.Name, _boldLabel);
+                bool open                            = _foldouts[fkey];
+                bool newOpen                         = GUILayout.Toggle(open, (open ? "▼ " : "▷ ") + field.Name, _boldLabel);
                 if (newOpen != open) _foldouts[fkey] = newOpen;
 
                 if (newOpen)
@@ -235,13 +236,13 @@ namespace PathTracing
 
         private static bool IsSimple(Type t)
         {
-            return t == typeof(bool)   ||
-                   t == typeof(float)  || t == typeof(int)    || t == typeof(uint)  ||
-                   t == typeof(short)  || t == typeof(ushort) || t == typeof(byte)  ||
+            return t == typeof(bool) ||
+                   t == typeof(float) || t == typeof(int) || t == typeof(uint) ||
+                   t == typeof(short) || t == typeof(ushort) || t == typeof(byte) ||
                    t == typeof(string) ||
                    t == typeof(float2) || t == typeof(float3) || t == typeof(float4) ||
-                   t == typeof(int2)   || t == typeof(uint2)  ||
-                   t == typeof(Vector2)|| t == typeof(Vector3)|| t == typeof(Vector4);
+                   t == typeof(int2) || t == typeof(uint2) ||
+                   t == typeof(Vector2) || t == typeof(Vector3) || t == typeof(Vector4);
         }
 
         // ─── Simple value drawing ────────────────────────────────────────
@@ -262,6 +263,7 @@ namespace PathTracing
             {
                 return GUILayout.Toggle((bool)value, "");
             }
+
             if (ft == typeof(float))
             {
                 float v = (float)value;
@@ -271,8 +273,10 @@ namespace PathTracing
                     GUILayout.Label(nv.ToString("F3"), _label, GUILayout.Width(50));
                     return nv;
                 }
+
                 return FloatField(path, v);
             }
+
             if (ft == typeof(int))
             {
                 int v = (int)value;
@@ -282,8 +286,10 @@ namespace PathTracing
                     GUILayout.Label(nv.ToString(), _label, GUILayout.Width(40));
                     return nv;
                 }
+
                 return IntField(path, v, 120);
             }
+
             if (ft == typeof(uint))
             {
                 uint v = (uint)value;
@@ -293,53 +299,63 @@ namespace PathTracing
                     GUILayout.Label(nv.ToString(), _label, GUILayout.Width(40));
                     return nv;
                 }
+
                 return UIntField(path, v, 120);
             }
-            if (ft == typeof(short))   return IntField(path, (short)value,  120);
-            if (ft == typeof(ushort))  return (ushort)Mathf.Max(0, IntField(path, (ushort)value, 120));
-            if (ft == typeof(byte))    return (byte)Mathf.Clamp(IntField(path, (byte)value, 120), 0, 255);
+
+            if (ft == typeof(short)) return IntField(path, (short)value, 120);
+            if (ft == typeof(ushort)) return (ushort)Mathf.Max(0, IntField(path, (ushort)value, 120));
+            if (ft == typeof(byte)) return (byte)Mathf.Clamp(IntField(path, (byte)value, 120), 0, 255);
             if (ft == typeof(float2))
             {
                 float2 v = (float2)value;
                 return new float2(CompactFloat(path + ".x", v.x), CompactFloat(path + ".y", v.y));
             }
+
             if (ft == typeof(float3))
             {
                 float3 v = (float3)value;
                 return new float3(CompactFloat(path + ".x", v.x), CompactFloat(path + ".y", v.y), CompactFloat(path + ".z", v.z));
             }
+
             if (ft == typeof(float4))
             {
                 float4 v = (float4)value;
                 return new float4(CompactFloat(path + ".x", v.x), CompactFloat(path + ".y", v.y),
-                                  CompactFloat(path + ".z", v.z), CompactFloat(path + ".w", v.w));
+                    CompactFloat(path + ".z", v.z), CompactFloat(path + ".w", v.w));
             }
+
             if (ft == typeof(int2))
             {
                 int2 v = (int2)value;
                 return new int2(IntField(path + ".x", v.x, 58), IntField(path + ".y", v.y, 58));
             }
+
             if (ft == typeof(uint2))
             {
                 uint2 v = (uint2)value;
                 return new uint2(UIntField(path + ".x", v.x, 58), UIntField(path + ".y", v.y, 58));
             }
+
             if (ft == typeof(Vector2))
             {
                 Vector2 v = (Vector2)value;
                 return new Vector2(CompactFloat(path + ".x", v.x), CompactFloat(path + ".y", v.y));
             }
+
             if (ft == typeof(Vector3))
             {
                 Vector3 v = (Vector3)value;
                 return new Vector3(CompactFloat(path + ".x", v.x), CompactFloat(path + ".y", v.y), CompactFloat(path + ".z", v.z));
             }
+
             if (ft == typeof(Vector4))
             {
                 Vector4 v = (Vector4)value;
                 return new Vector4(CompactFloat(path + ".x", v.x), CompactFloat(path + ".y", v.y),
-                                   CompactFloat(path + ".z", v.z), CompactFloat(path + ".w", v.w));
+                    CompactFloat(path + ".z", v.z), CompactFloat(path + ".w", v.w));
             }
+
             if (ft == typeof(string))
             {
                 string s   = (string)value ?? "";
@@ -365,7 +381,9 @@ namespace PathTracing
             _textCache[key] = s;
             return float.TryParse(s,
                 System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out float r) ? r : v;
+                System.Globalization.CultureInfo.InvariantCulture, out float r)
+                ? r
+                : v;
         }
 
         private int IntField(string key, int v, int width)
@@ -395,7 +413,9 @@ namespace PathTracing
             _textCache[key] = s;
             return float.TryParse(s,
                 System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out float r) ? r : v;
+                System.Globalization.CultureInfo.InvariantCulture, out float r)
+                ? r
+                : v;
         }
 
         /// <summary>

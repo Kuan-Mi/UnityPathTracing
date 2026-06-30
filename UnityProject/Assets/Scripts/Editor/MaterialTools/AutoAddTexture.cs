@@ -24,7 +24,7 @@ namespace PathTracing
             }
 
             GUILayout.Label($"Selected Folder: {folderPath}");
-            
+
             // 选择材质文件夹
             GUILayout.Space(20);
             GUILayout.Label("Select Material Folder", EditorStyles.boldLabel);
@@ -32,13 +32,14 @@ namespace PathTracing
             {
                 materialFolderPath = EditorUtility.OpenFolderPanel("Select Material Folder", "", "");
             }
+
             GUILayout.Label($"Selected Material Folder: {materialFolderPath}");
 
             if (GUILayout.Button("Merge Textures"))
             {
                 MergeTextures();
             }
-            
+
             if (GUILayout.Button("Auto Add Textures to Materials"))
             {
                 AutoAddTexturesToMaterials();
@@ -48,7 +49,7 @@ namespace PathTracing
         // 合并指定文件夹下的纹理贴图
         // xxx_albedo.png + xxx_opacity.png -> xxx_baseMap.png
         // xxx_metallic.png + xxx_roughness.png -> xxx_maskMap.png
- 
+
         private void MergeTextures()
         {
             if (string.IsNullOrEmpty(folderPath))
@@ -64,15 +65,15 @@ namespace PathTracing
 
             foreach (string file in textureFiles)
             {
-                string dir = System.IO.Path.GetDirectoryName(file);
+                string dir      = System.IO.Path.GetDirectoryName(file);
                 string fileName = System.IO.Path.GetFileNameWithoutExtension(file);
 
                 // 1. 合并 Albedo + Opacity -> BaseMap
-                if (file.EndsWith("_albedo.jpeg", System.StringComparison.OrdinalIgnoreCase) || 
-                    file.EndsWith("_albedo.png", System.StringComparison.OrdinalIgnoreCase) || 
+                if (file.EndsWith("_albedo.jpeg", System.StringComparison.OrdinalIgnoreCase) ||
+                    file.EndsWith("_albedo.png", System.StringComparison.OrdinalIgnoreCase) ||
                     file.EndsWith("_albedo.jpg", System.StringComparison.OrdinalIgnoreCase))
                 {
-                    string baseName = fileName.Replace("_albedo", "");
+                    string baseName    = fileName.Replace("_albedo", "");
                     string opacityFile = FindFileWithExtensions(dir, baseName + "_opacity", new[] { ".jpeg", ".jpg", ".png" });
 
                     if (!string.IsNullOrEmpty(opacityFile))
@@ -85,22 +86,22 @@ namespace PathTracing
 
                 // 2. 合并 Metallic + Roughness -> MaskMap
                 // 逻辑更新：支持仅有 Metallic 或仅有 Roughness 的情况
-                bool isMetallic = file.EndsWith("_metallic.jpeg", System.StringComparison.OrdinalIgnoreCase) || 
-                                  file.EndsWith("_metallic.png", System.StringComparison.OrdinalIgnoreCase) || 
+                bool isMetallic = file.EndsWith("_metallic.jpeg", System.StringComparison.OrdinalIgnoreCase) ||
+                                  file.EndsWith("_metallic.png", System.StringComparison.OrdinalIgnoreCase) ||
                                   file.EndsWith("_metallic.jpg", System.StringComparison.OrdinalIgnoreCase);
-                bool isRoughness = file.EndsWith("_roughness.jpeg", System.StringComparison.OrdinalIgnoreCase) || 
-                                   file.EndsWith("_roughness.png", System.StringComparison.OrdinalIgnoreCase) || 
+                bool isRoughness = file.EndsWith("_roughness.jpeg", System.StringComparison.OrdinalIgnoreCase) ||
+                                   file.EndsWith("_roughness.png", System.StringComparison.OrdinalIgnoreCase) ||
                                    file.EndsWith("_roughness.jpg", System.StringComparison.OrdinalIgnoreCase);
 
                 if (isMetallic || isRoughness)
                 {
                     string baseName;
-                    string metallicFile = null;
+                    string metallicFile  = null;
                     string roughnessFile = null;
 
                     if (isMetallic)
                     {
-                        baseName = fileName.Replace("_metallic", "");
+                        baseName     = fileName.Replace("_metallic", "");
                         metallicFile = file;
                         // 尝试找 roughness，如果没有则为 null
                         roughnessFile = FindFileWithExtensions(dir, baseName + "_roughness", new[] { ".jpeg", ".jpg", ".png" });
@@ -108,21 +109,21 @@ namespace PathTracing
                     else // isRoughness
                     {
                         baseName = fileName.Replace("_roughness", "");
-                        
+
                         // 检查是否已经存在 update metallic 文件，如果存在，则该组合应该在 isMetallic 分支处理过，跳过
                         string existingMetallic = FindFileWithExtensions(dir, baseName + "_metallic", new[] { ".jpeg", ".jpg", ".png" });
-                        if (!string.IsNullOrEmpty(existingMetallic)) 
+                        if (!string.IsNullOrEmpty(existingMetallic))
                         {
                             continue;
                         }
-                        
+
                         roughnessFile = file;
                         // metallicFile 保持为 null
                     }
 
                     Debug.Log($"Processing MaskMap: {baseName}");
                     string outputFile = System.IO.Path.Combine(dir, baseName + "_maskMap.png");
-                    
+
                     // 传入可能为 null 的路径，MergeChannels 内部处理默认值
                     MergeChannels(metallicFile, roughnessFile, outputFile, MergeType.MaskMap);
                 }
@@ -156,7 +157,7 @@ namespace PathTracing
             if (tex1 == null && tex2 == null) return;
 
             // 确定尺寸：以存在的那个为准
-            int width = tex1 != null ? tex1.width : tex2.width;
+            int width  = tex1 != null ? tex1.width : tex2.width;
             int height = tex1 != null ? tex1.height : tex2.height;
 
             // 如果两个都存在，检查尺寸是否匹配
@@ -166,15 +167,15 @@ namespace PathTracing
                 {
                     Debug.LogError($"Size mismatch for merging: {file1} vs {file2}");
                     // 清理内存
-                    if(tex1) DestroyImmediate(tex1);
-                    if(tex2) DestroyImmediate(tex2);
+                    if (tex1) DestroyImmediate(tex1);
+                    if (tex2) DestroyImmediate(tex2);
                     return;
                 }
             }
- 
+
             Color[] cols1 = tex1 != null ? tex1.GetPixels() : GetDefaultColors(width * height, Color.black);
             Color[] cols2 = tex2 != null ? tex2.GetPixels() : GetDefaultColors(width * height, Color.white);
-            
+
             Color[] newCols = new Color[cols1.Length];
 
             for (int i = 0; i < cols1.Length; i++)
@@ -192,8 +193,8 @@ namespace PathTracing
                     // B: Detail (Set to 0)
                     // A: Smoothness (1 - Roughness (cols2.r)). 
                     //    若 Roughness 缺失默认为 1，则 Smoothness 为 0。
-                    float metallic = cols1[i].r;
-                    float roughness = cols2[i].r;
+                    float metallic   = cols1[i].r;
+                    float roughness  = cols2[i].r;
                     float smoothness = 1.0f - roughness;
 
                     newCols[i] = new Color(metallic, 1.0f, 0.0f, smoothness);
@@ -207,8 +208,8 @@ namespace PathTracing
             byte[] bytes = outputTex.EncodeToPNG();
             System.IO.File.WriteAllBytes(outputPath, bytes);
 
-            if(tex1) DestroyImmediate(tex1);
-            if(tex2) DestroyImmediate(tex2);
+            if (tex1) DestroyImmediate(tex1);
+            if (tex2) DestroyImmediate(tex2);
             DestroyImmediate(outputTex);
         }
 
@@ -219,8 +220,10 @@ namespace PathTracing
             {
                 cols[i] = color;
             }
+
             return cols;
         }
+
         private string FindFileWithExtensions(string dir, string fileNameWithoutExt, string[] extensions)
         {
             foreach (var ext in extensions)
@@ -228,15 +231,20 @@ namespace PathTracing
                 string path = System.IO.Path.Combine(dir, fileNameWithoutExt + ext);
                 if (System.IO.File.Exists(path)) return path;
             }
+
             return null;
         }
 
-        private enum MergeType { BaseMap, MaskMap }
- 
+        private enum MergeType
+        {
+            BaseMap,
+            MaskMap
+        }
+
 
         // 为选定的材质自动添加纹理（通过在指定文件夹下搜索同名的纹理）
-        
-          
+
+
         private void AutoAddTexturesToMaterials()
         {
             if (string.IsNullOrEmpty(materialFolderPath) || string.IsNullOrEmpty(folderPath))
@@ -246,7 +254,7 @@ namespace PathTracing
             }
 
             Debug.Log("开始自动为材质赋予纹理...");
-            
+
             // 获取材质文件夹下的所有材质文件
             string[] materialFiles = System.IO.Directory.GetFiles(materialFolderPath, "*.mat", System.IO.SearchOption.AllDirectories);
 
@@ -264,7 +272,7 @@ namespace PathTracing
 
                 // 1. Base Map (Albedo)
                 // 优先找 MergeTextures 生成的 _baseMap，其次找原始的 _albedo
-                string baseMapFile = FindTextureFile(matName, "_baseMap", folderPath);
+                string baseMapFile                                 = FindTextureFile(matName, "_baseMap", folderPath);
                 if (string.IsNullOrEmpty(baseMapFile)) baseMapFile = FindTextureFile(matName, "_albedo", folderPath);
 
                 // 2. Mask Map (Metallic + Smoothness)
@@ -294,12 +302,12 @@ namespace PathTracing
                         Undo.RecordObject(mat, "Assign MaskMap");
                         mat.SetTexture("_MetallicGlossMap", tex);
                         // mat.EnableKeyword("_METALLICSPECGLOSSMAP"); // 必须启用此关键字才能使用金属度贴图
-                        
+
                         // 如果 MaskMap 包含 AO (通常在 G 通道)，也可以赋值给 OcclusionMap
                         // URP Lit 默认从 G 通道读取 AO
                         mat.SetTexture("_OcclusionMap", tex);
                         // mat.EnableKeyword("_OCCLUSIONMAP"); // 取决于具体版本需求，通常赋值贴图即可
-                        
+
                         changed = true;
                     }
                 }
@@ -351,8 +359,8 @@ namespace PathTracing
         {
             // 在文件夹中搜索所有文件
             // 搜索模式示例: Name_suffix.*
-            string searchPattern = $"{baseName}{suffix}.*"; 
-            
+            string searchPattern = $"{baseName}{suffix}.*";
+
             // 注意：Directory.GetFiles 的 searchPattern 匹配比较宽泛，需要精确检查
             string[] files = System.IO.Directory.GetFiles(searchDir, searchPattern, System.IO.SearchOption.AllDirectories);
 
@@ -370,6 +378,7 @@ namespace PathTracing
                     }
                 }
             }
+
             return null;
         }
 
@@ -382,10 +391,10 @@ namespace PathTracing
             {
                 return absolutePath.Substring(index);
             }
+
             // 如果已经在 Assets 文件夹外，无法加载
             Debug.LogWarning($"Path is not inside Assets folder: {absolutePath}");
             return null;
         }
-        
     }
 }

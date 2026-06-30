@@ -44,8 +44,8 @@ namespace NativeRender
             _pipeline = pipeline;
             CopySlotLayout(pipeline);
             AllocateRingBuffers();
-            _descriptorSetHandle = NativeRenderPlugin.NR_RTS_CreateDescriptorSet(pipeline.Handle);
-            pipeline.OnRebuilt  += OnPipelineRebuilt;
+            _descriptorSetHandle =  NativeRenderPlugin.NR_RTS_CreateDescriptorSet(pipeline.Handle);
+            pipeline.OnRebuilt   += OnPipelineRebuilt;
         }
 
         private void CopySlotLayout(RayTracePipeline pipeline)
@@ -66,7 +66,8 @@ namespace NativeRender
             FreeRingBuffersCommon();
             if (_headerRing == null) return;
             for (int i = 0; i < RingSize; i++)
-                if (_headerRing[i].IsCreated) _headerRing[i].Dispose();
+                if (_headerRing[i].IsCreated)
+                    _headerRing[i].Dispose();
             _headerRing = null;
         }
 
@@ -77,6 +78,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_RTS_DestroyDescriptorSet(_descriptorSetHandle);
                 _descriptorSetHandle = 0;
             }
+
             FreeRingBuffers();
             CopySlotLayout(pipeline);
             AllocateRingBuffers();
@@ -95,6 +97,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_RTS_DestroyDescriptorSet(_descriptorSetHandle);
                 _descriptorSetHandle = 0;
             }
+
             FreeRingBuffers();
         }
 

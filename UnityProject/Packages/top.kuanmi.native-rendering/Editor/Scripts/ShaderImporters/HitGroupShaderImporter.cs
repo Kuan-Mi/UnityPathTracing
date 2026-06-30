@@ -36,8 +36,8 @@ namespace NativeRender
             var asset = ScriptableObject.CreateInstance<HitGroupShader>();
             var so    = new SerializedObject(asset);
 
-            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            var globalSettings = NativeShaderProjectSettings.instance;
+            string projectRoot    = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            var    globalSettings = NativeShaderProjectSettings.instance;
 
             // ── Include paths ──
             var allIncludeSources = new string[additionalIncludePaths.Length + globalSettings.globalIncludePaths.Length];
@@ -107,7 +107,10 @@ namespace NativeRender
         protected override bool TryGetStatus(string assetPath,
             out bool hasCompiledBytes, out int byteCount, out string reflectionJson, out string shaderHash)
         {
-            hasCompiledBytes = false; byteCount = 0; reflectionJson = ""; shaderHash = "";
+            hasCompiledBytes = false;
+            byteCount        = 0;
+            reflectionJson   = "";
+            shaderHash       = "";
             var shader = AssetDatabase.LoadAssetAtPath<HitGroupShader>(assetPath);
             if (shader == null) return false;
 
@@ -135,7 +138,7 @@ namespace NativeRender
     {
         static void OnPostprocessAllAssets(
             string[] importedAssets, string[] deletedAssets,
-            string[] movedAssets,    string[] movedFromAssetPaths)
+            string[] movedAssets, string[] movedFromAssetPaths)
         {
             foreach (string path in importedAssets)
             {

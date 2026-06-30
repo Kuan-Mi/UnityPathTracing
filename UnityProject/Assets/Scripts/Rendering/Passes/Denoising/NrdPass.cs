@@ -12,13 +12,13 @@ namespace PathTracing
 {
     public class NrdPass : ScriptableRenderPass
     {
-        private IntPtr       DataPtr;
-        private NamedMarker  _marker;
+        private IntPtr      DataPtr;
+        private NamedMarker _marker;
 
         public void Setup(IntPtr dataPtr, NamedMarker marker)
         {
-            DataPtr  = dataPtr;
-            _marker  = marker;
+            DataPtr = dataPtr;
+            _marker = marker;
         }
 
         class PassData
@@ -29,7 +29,7 @@ namespace PathTracing
 
         [DllImport("Denoiser")]
         private static extern IntPtr GetRenderEventAndDataFunc();
-        
+
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);

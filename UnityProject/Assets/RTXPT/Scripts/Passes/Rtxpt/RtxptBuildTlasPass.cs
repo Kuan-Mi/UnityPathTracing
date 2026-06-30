@@ -1,5 +1,4 @@
 using PathTracing.Profiling;
-
 using System;
 using NativeRender;
 using UnityEngine;
@@ -29,23 +28,23 @@ namespace PathTracing
     public class RtxptBuildTlasPass : ScriptableRenderPass, IDisposable
     {
         // Shader property IDs for the SkinnedRepack.compute uniforms/resources.
-        private static readonly int _idVertexCount     = Shader.PropertyToID("g_VertexCount");
-        private static readonly int _idSrcStride       = Shader.PropertyToID("g_SrcStride");
-        private static readonly int _idSrcPosOffset    = Shader.PropertyToID("g_SrcPosOffset");
-        private static readonly int _idSrcNormalOffset = Shader.PropertyToID("g_SrcNormalOffset");
-        private static readonly int _idSrcTangentOffset= Shader.PropertyToID("g_SrcTangentOffset");
-        private static readonly int _idDstPosOffset    = Shader.PropertyToID("g_DstPosOffset");
-        private static readonly int _idDstPrevPosOffset= Shader.PropertyToID("g_DstPrevPosOffset");
-        private static readonly int _idDstNormalOffset = Shader.PropertyToID("g_DstNormalOffset");
-        private static readonly int _idDstTangentOffset= Shader.PropertyToID("g_DstTangentOffset");
-        private static readonly int _idFlags           = Shader.PropertyToID("g_Flags");
-        private static readonly int _idSrcVertexBuffer = Shader.PropertyToID("t_SrcVertexBuffer");
-        private static readonly int _idDstVertexBuffer = Shader.PropertyToID("u_DstVertexBuffer");
+        private static readonly int _idVertexCount      = Shader.PropertyToID("g_VertexCount");
+        private static readonly int _idSrcStride        = Shader.PropertyToID("g_SrcStride");
+        private static readonly int _idSrcPosOffset     = Shader.PropertyToID("g_SrcPosOffset");
+        private static readonly int _idSrcNormalOffset  = Shader.PropertyToID("g_SrcNormalOffset");
+        private static readonly int _idSrcTangentOffset = Shader.PropertyToID("g_SrcTangentOffset");
+        private static readonly int _idDstPosOffset     = Shader.PropertyToID("g_DstPosOffset");
+        private static readonly int _idDstPrevPosOffset = Shader.PropertyToID("g_DstPrevPosOffset");
+        private static readonly int _idDstNormalOffset  = Shader.PropertyToID("g_DstNormalOffset");
+        private static readonly int _idDstTangentOffset = Shader.PropertyToID("g_DstTangentOffset");
+        private static readonly int _idFlags            = Shader.PropertyToID("g_Flags");
+        private static readonly int _idSrcVertexBuffer  = Shader.PropertyToID("t_SrcVertexBuffer");
+        private static readonly int _idDstVertexBuffer  = Shader.PropertyToID("u_DstVertexBuffer");
 
-        private RtxptGPUScene _gpuScene;
-        private RayTracePipeline    _buildPipeline;
-        private RayTracePipeline    _fillPipeline;
-        private RayTracePipeline    _refPipeline;
+        private RtxptGPUScene    _gpuScene;
+        private RayTracePipeline _buildPipeline;
+        private RayTracePipeline _fillPipeline;
+        private RayTracePipeline _refPipeline;
 
         private readonly ComputeShader _repackCs; // null when no shader assigned
         private readonly int           _repackKernel;
@@ -62,9 +61,9 @@ namespace PathTracing
         }
 
         public void Setup(RtxptGPUScene gpuScene,
-                          RayTracePipeline buildPipeline = null,
-                          RayTracePipeline fillPipeline  = null,
-                          RayTracePipeline refPipeline   = null)
+            RayTracePipeline buildPipeline = null,
+            RayTracePipeline fillPipeline = null,
+            RayTracePipeline refPipeline = null)
         {
             _gpuScene      = gpuScene;
             _buildPipeline = buildPipeline;
@@ -74,12 +73,12 @@ namespace PathTracing
 
         private class PassData
         {
-            internal RtxptGPUScene GpuScene;
-            internal RayTracePipeline    BuildPipeline;
-            internal RayTracePipeline    FillPipeline;
-            internal RayTracePipeline    RefPipeline;
-            internal ComputeShader       RepackCs;
-            internal int                 RepackKernel;
+            internal RtxptGPUScene    GpuScene;
+            internal RayTracePipeline BuildPipeline;
+            internal RayTracePipeline FillPipeline;
+            internal RayTracePipeline RefPipeline;
+            internal ComputeShader    RepackCs;
+            internal int              RepackKernel;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -118,6 +117,7 @@ namespace PathTracing
                 data.GpuScene.RebuildShaderTable(cmd, data.RefPipeline);
                 data.GpuScene.MarkShaderTableClean();
             }
+
             cmd.EndSample(RenderPassMarkers.TLAS);
         }
 
@@ -146,16 +146,16 @@ namespace PathTracing
 
                 uint flags = d.BaseFlags | (d.Geometry.PendingFirstFrame ? RtxptSkinnedDispatch.FlagFirstFrame : 0u);
 
-                cmd.SetComputeIntParam(cs, _idVertexCount,      d.VertexCount);
-                cmd.SetComputeIntParam(cs, _idSrcStride,        (int)d.SrcStride);
-                cmd.SetComputeIntParam(cs, _idSrcPosOffset,     (int)d.SrcPosOffset);
-                cmd.SetComputeIntParam(cs, _idSrcNormalOffset,  (int)d.SrcNormalOffset);
+                cmd.SetComputeIntParam(cs, _idVertexCount, d.VertexCount);
+                cmd.SetComputeIntParam(cs, _idSrcStride, (int)d.SrcStride);
+                cmd.SetComputeIntParam(cs, _idSrcPosOffset, (int)d.SrcPosOffset);
+                cmd.SetComputeIntParam(cs, _idSrcNormalOffset, (int)d.SrcNormalOffset);
                 cmd.SetComputeIntParam(cs, _idSrcTangentOffset, (int)d.SrcTangentOffset);
-                cmd.SetComputeIntParam(cs, _idDstPosOffset,     (int)d.Streams.Pos);
+                cmd.SetComputeIntParam(cs, _idDstPosOffset, (int)d.Streams.Pos);
                 cmd.SetComputeIntParam(cs, _idDstPrevPosOffset, (int)d.Streams.PrevPos);
-                cmd.SetComputeIntParam(cs, _idDstNormalOffset,  (int)d.Streams.Normal);
+                cmd.SetComputeIntParam(cs, _idDstNormalOffset, (int)d.Streams.Normal);
                 cmd.SetComputeIntParam(cs, _idDstTangentOffset, (int)d.Streams.Tangent);
-                cmd.SetComputeIntParam(cs, _idFlags,            (int)flags);
+                cmd.SetComputeIntParam(cs, _idFlags, (int)flags);
 
                 cmd.SetComputeBufferParam(cs, kernel, _idSrcVertexBuffer, srcVb);
                 cmd.SetComputeBufferParam(cs, kernel, _idDstVertexBuffer, d.Geometry.Vb);

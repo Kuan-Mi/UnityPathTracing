@@ -83,7 +83,7 @@ namespace PathTracing
         {
             if (Application.isPlaying) return;
             double now = EditorApplication.timeSinceStartup;
-            float dt = (float)(now - _lastEditorTime);
+            float  dt  = (float)(now - _lastEditorTime);
             _lastEditorTime = now;
             if (playInEditMode)
                 Advance(dt);
@@ -111,19 +111,29 @@ namespace PathTracing
                 t = loop ? Mathf.Repeat(t, duration) : Mathf.Clamp(t, 0f, duration);
             _animationTime = t;
 
-            if (t <= times[0]) { Apply(0); return; }
-            if (t >= times[n - 1]) { Apply(n - 1); return; }
+            if (t <= times[0])
+            {
+                Apply(0);
+                return;
+            }
+
+            if (t >= times[n - 1])
+            {
+                Apply(n - 1);
+                return;
+            }
 
             // Binary search for the segment [lo, hi] with times[lo] <= t < times[hi].
             int lo = 0, hi = n - 1;
             while (lo + 1 < hi)
             {
                 int mid = (lo + hi) >> 1;
-                if (times[mid] <= t) lo = mid; else hi = mid;
+                if (times[mid] <= t) lo = mid;
+                else hi                 = mid;
             }
 
             float span = times[hi] - times[lo];
-            float a = span > 1e-6f ? (t - times[lo]) / span : 0f;
+            float a    = span > 1e-6f ? (t - times[lo]) / span : 0f;
 
             transform.localPosition = Vector3.Lerp(positions[lo], positions[hi], a);
             transform.localRotation = Quaternion.Slerp(rotations[lo], rotations[hi], a);

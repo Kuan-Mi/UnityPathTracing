@@ -56,32 +56,33 @@ namespace PathTracing.NativeInterop.Streamline
                 renderRes = new int2((int)rw, (int)rh);
                 return true;
             }
+
             renderRes = outputRes;
             return false;
         }
 
-        private readonly int                          _instanceId;
+        private readonly int                            _instanceId;
         private          NativeArray<SLDlssrrFrameData> _buffer;
-        private const    int                          BufferCount = 3;
-        private readonly string                       _cameraName;
+        private const    int                            BufferCount = 3;
+        private readonly string                         _cameraName;
 
         /// <summary>
         /// Per-frame camera data, filled from CameraFrameState by the feature.
         /// </summary>
         public struct SLDlssrrFrameInput
         {
-            public Matrix4x4 worldToView;     // current frame
-            public Matrix4x4 viewToClip;      // current frame, no jitter
-            public Matrix4x4 worldToClip;     // current frame
+            public Matrix4x4 worldToView; // current frame
+            public Matrix4x4 viewToClip; // current frame, no jitter
+            public Matrix4x4 worldToClip; // current frame
             public Matrix4x4 prevWorldToClip; // previous frame
             public float3    camPos;
-            public float2    viewportJitter;  // pixel space
+            public float2    viewportJitter; // pixel space
             public int2      renderResolution;
             public int2      outputResolution;
             public uint      frameIndex;
             public float     cameraNear;
             public float     cameraFar;
-            public float     cameraFOV;       // radians
+            public float     cameraFOV; // radians
             public float     cameraAspect;
             public bool      useSpecularMotionVector; // false: pass hit distance (matches NRI default)
             public bool      reset;
@@ -93,13 +94,13 @@ namespace PathTracing.NativeInterop.Streamline
         /// </summary>
         public struct DlssrrResources
         {
-            public NriTextureResource input;              // noisy color (ScalingInputColor)
-            public NriTextureResource output;             // denoised/upscaled (ScalingOutputColor)
-            public NriTextureResource mv;                 // motion vectors
-            public NriTextureResource depth;              // linear view-Z
-            public NriTextureResource diffAlbedo;         // Albedo
-            public NriTextureResource specAlbedo;         // SpecularAlbedo
-            public NriTextureResource normalRoughness;    // NormalRoughness (roughness packed in .w)
+            public NriTextureResource input; // noisy color (ScalingInputColor)
+            public NriTextureResource output; // denoised/upscaled (ScalingOutputColor)
+            public NriTextureResource mv; // motion vectors
+            public NriTextureResource depth; // linear view-Z
+            public NriTextureResource diffAlbedo; // Albedo
+            public NriTextureResource specAlbedo; // SpecularAlbedo
+            public NriTextureResource normalRoughness; // NormalRoughness (roughness packed in .w)
             public NriTextureResource specularMvOrHitTex; // SpecularHitDistance or SpecularMotionVectors
         }
 
@@ -112,20 +113,20 @@ namespace PathTracing.NativeInterop.Streamline
         }
 
         private SLDlssrrFrameData GetData(SLDlssrrFrameInput fi, DlssrrResources res,
-                                          UpscalerMode upscalerMode, DlssRRPreset preset)
+            UpscalerMode upscalerMode, DlssRRPreset preset)
         {
             // Streamline common constants (row-major; SL receives Unity column-major bytes and
             // transposes). Matches StreamlineProbe's DLSS-G constants derivation.
-            Matrix4x4 viewToWorld     = fi.worldToView.inverse;
-            Matrix4x4 clipToCameraView = fi.viewToClip.inverse;
-            Matrix4x4 worldToClipInv   = fi.worldToClip.inverse;
+            Matrix4x4 viewToWorld        = fi.worldToView.inverse;
+            Matrix4x4 clipToCameraView   = fi.viewToClip.inverse;
+            Matrix4x4 worldToClipInv     = fi.worldToClip.inverse;
             Matrix4x4 prevWorldToClipInv = fi.prevWorldToClip.inverse;
-            Matrix4x4 clipToPrevClip   = fi.prevWorldToClip * worldToClipInv;
-            Matrix4x4 prevClipToClip   = fi.worldToClip * prevWorldToClipInv;
+            Matrix4x4 clipToPrevClip     = fi.prevWorldToClip * worldToClipInv;
+            Matrix4x4 prevClipToClip     = fi.worldToClip * prevWorldToClipInv;
 
             // Camera basis (world space) from viewToWorld columns. Unity view space looks down -Z.
-            float3 camRight =  new float3(viewToWorld.m00, viewToWorld.m10, viewToWorld.m20);
-            float3 camUp    =  new float3(viewToWorld.m01, viewToWorld.m11, viewToWorld.m21);
+            float3 camRight = new float3(viewToWorld.m00, viewToWorld.m10, viewToWorld.m20);
+            float3 camUp    = new float3(viewToWorld.m01, viewToWorld.m11, viewToWorld.m21);
             float3 camFwd   = -new float3(viewToWorld.m02, viewToWorld.m12, viewToWorld.m22);
 
             float renderW = math.max(1, fi.renderResolution.x);
@@ -136,16 +137,16 @@ namespace PathTracing.NativeInterop.Streamline
                 // This camera render's SL token: the shared per-frame token in the player, or a
                 // per-camera-render token in editor edit mode (see CurrentFrameTokenPtr). Non-null
                 // whenever the evaluate runs; native bails if it is null.
-                frameToken          = SLStreamlineFrameLoop.CurrentFrameTokenPtr,
+                frameToken = SLStreamlineFrameLoop.CurrentFrameTokenPtr,
 
-                inputTex            = res.input.NativePtr,
-                outputTex           = res.output.NativePtr,
-                mvTex               = res.mv.NativePtr,
-                depthTex            = res.depth.NativePtr,
-                diffuseAlbedoTex    = res.diffAlbedo.NativePtr,
-                specularAlbedoTex   = res.specAlbedo.NativePtr,
-                normalRoughnessTex  = res.normalRoughness.NativePtr,
-                specularMvOrHitTex  = res.specularMvOrHitTex.NativePtr,
+                inputTex           = res.input.NativePtr,
+                outputTex          = res.output.NativePtr,
+                mvTex              = res.mv.NativePtr,
+                depthTex           = res.depth.NativePtr,
+                diffuseAlbedoTex   = res.diffAlbedo.NativePtr,
+                specularAlbedoTex  = res.specAlbedo.NativePtr,
+                normalRoughnessTex = res.normalRoughness.NativePtr,
+                specularMvOrHitTex = res.specularMvOrHitTex.NativePtr,
 
                 inputState           = D3D12_STATE_UNORDERED_ACCESS,
                 outputState          = D3D12_STATE_UNORDERED_ACCESS,
@@ -195,7 +196,7 @@ namespace PathTracing.NativeInterop.Streamline
         }
 
         public IntPtr GetInteropDataPtr(SLDlssrrFrameInput fi, DlssrrResources res,
-                                        UpscalerMode upscalerMode, DlssRRPreset preset = DlssRRPreset.Default)
+            UpscalerMode upscalerMode, DlssRRPreset preset = DlssRRPreset.Default)
         {
             var index = (int)(fi.frameIndex % BufferCount);
             _buffer[index] = GetData(fi, res, upscalerMode, preset);

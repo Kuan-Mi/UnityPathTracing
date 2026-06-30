@@ -53,14 +53,14 @@ namespace NativeRender
 
         private void OnEnable()
         {
-            _propSourceMesh      = serializedObject.FindProperty("sourceMesh");
-            _propSourceTexture   = serializedObject.FindProperty("sourceTexture");
-            _propSubmeshIndex    = serializedObject.FindProperty("submeshIndex");
-            _propAlphaCutoff     = serializedObject.FindProperty("alphaCutoff");
-            _propMaxSubdiv       = serializedObject.FindProperty("maxSubdivisionLevel");
-            _propDownsample      = serializedObject.FindProperty("textureDownsampleFactor");
-            _propDynSubdivScale  = serializedObject.FindProperty("dynamicSubdivisionScale");
-            _propOmmFormat       = serializedObject.FindProperty("ommFormat");
+            _propSourceMesh     = serializedObject.FindProperty("sourceMesh");
+            _propSourceTexture  = serializedObject.FindProperty("sourceTexture");
+            _propSubmeshIndex   = serializedObject.FindProperty("submeshIndex");
+            _propAlphaCutoff    = serializedObject.FindProperty("alphaCutoff");
+            _propMaxSubdiv      = serializedObject.FindProperty("maxSubdivisionLevel");
+            _propDownsample     = serializedObject.FindProperty("textureDownsampleFactor");
+            _propDynSubdivScale = serializedObject.FindProperty("dynamicSubdivisionScale");
+            _propOmmFormat      = serializedObject.FindProperty("ommFormat");
         }
 
         public override void OnInspectorGUI()
@@ -78,8 +78,8 @@ namespace NativeRender
                 // Submesh picker — show a popup when the mesh has multiple submeshes
                 if (cache.sourceMesh != null && cache.sourceMesh.subMeshCount > 1)
                 {
-                    int subCount = cache.sourceMesh.subMeshCount;
-                    string[] subLabels = new string[subCount];
+                    int      subCount                                   = cache.sourceMesh.subMeshCount;
+                    string[] subLabels                                  = new string[subCount];
                     for (int si = 0; si < subCount; si++) subLabels[si] = $"Submesh {si}";
                     int newIdx = EditorGUILayout.Popup(
                         new GUIContent("Submesh", "Which submesh to bake OMM for."),
@@ -119,6 +119,7 @@ namespace NativeRender
                         $"Bake will use {cache.sourceTexture.width / f}×{cache.sourceTexture.height / f} (1/{f} of original {cache.sourceTexture.width}×{cache.sourceTexture.height})",
                         MessageType.None);
                 }
+
                 serializedObject.ApplyModifiedProperties();
 
                 EditorGUILayout.BeginHorizontal();
@@ -502,15 +503,19 @@ namespace NativeRender
         /// </summary>
         public static bool BakeInto(OMMCache cache, int submeshIndex = 0)
         {
-            if (cache == null) { Debug.LogError("[OMMBaker] BakeInto: cache is null"); return false; }
+            if (cache == null)
+            {
+                Debug.LogError("[OMMBaker] BakeInto: cache is null");
+                return false;
+            }
 
-            Mesh      mesh                  = cache.sourceMesh;
-            Texture2D texture               = cache.sourceTexture;
-            float     alphaCutoff           = cache.alphaCutoff;
-            byte      maxSubdivisionLevel   = cache.maxSubdivisionLevel;
-            int       downsample            = (int)cache.textureDownsampleFactor;
-            float     dynSubdivScale        = cache.dynamicSubdivisionScale;
-            byte      ommFormat             = (byte)cache.ommFormat;
+            Mesh      mesh                = cache.sourceMesh;
+            Texture2D texture             = cache.sourceTexture;
+            float     alphaCutoff         = cache.alphaCutoff;
+            byte      maxSubdivisionLevel = cache.maxSubdivisionLevel;
+            int       downsample          = (int)cache.textureDownsampleFactor;
+            float     dynSubdivScale      = cache.dynamicSubdivisionScale;
+            byte      ommFormat           = (byte)cache.ommFormat;
 
             if (mesh == null)
             {
@@ -538,7 +543,7 @@ namespace NativeRender
 
 
             // -- Read alpha pixels, optionally downsampling -----------------
-            int bakeTexW = Mathf.Max(1, texture.width  / downsample);
+            int bakeTexW = Mathf.Max(1, texture.width / downsample);
             int bakeTexH = Mathf.Max(1, texture.height / downsample);
 
             Color32[] pixels32;
@@ -583,8 +588,8 @@ namespace NativeRender
             string label = $"{mesh.name}[{submeshIndex}]";
 
             // -- Extract indices for the target submesh only -----------------
-            var   subDesc   = mesh.GetSubMesh(submeshIndex);
-            int[] allTris   = mesh.triangles;
+            var   subDesc = mesh.GetSubMesh(submeshIndex);
+            int[] allTris = mesh.triangles;
             // subDesc.indexStart is in units of indices, subDesc.indexCount is the count
             int  subStart   = subDesc.indexStart;
             int  subCount2  = subDesc.indexCount;

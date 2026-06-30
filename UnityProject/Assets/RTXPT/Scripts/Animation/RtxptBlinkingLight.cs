@@ -79,11 +79,12 @@ namespace PathTracing
             bool enabled = baseEnabled;
             if (autoOffTime != 0f && autoOnTime != 0f)
             {
-                double period   = (double)autoOffTime + autoOnTime;
-                double scaled   = (GameTime() + autoOnOffTimeOffset) / period;
+                double period    = (double)autoOffTime + autoOnTime;
+                double scaled    = (GameTime() + autoOnOffTimeOffset) / period;
                 double remainder = Saturate(scaled - System.Math.Floor(scaled));
                 enabled = enabled && remainder < (autoOffTime / period);
             }
+
             _light.intensity = enabled ? baseIntensity : 0f;
         }
 

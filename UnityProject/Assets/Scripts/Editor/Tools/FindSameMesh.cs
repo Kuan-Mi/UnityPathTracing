@@ -46,12 +46,12 @@ namespace PathTracing.Editor
             {
                 FindMatWithoutAO();
             }
-            
+
             if (GUILayout.Button("Find Same Texture"))
             {
                 FindSameTextureInScene();
             }
-            
+
             if (GUILayout.Button("Find Same Mesh Collider"))
             {
                 FindSameMeshColliderInScene();
@@ -60,7 +60,7 @@ namespace PathTracing.Editor
 
         private void FindSameMeshColliderInScene()
         {
-            var allMeshColliders = FindObjectsByType<MeshCollider>(FindObjectsInactive.Include,FindObjectsSortMode.None);
+            var allMeshColliders = FindObjectsByType<MeshCollider>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
 
             foreach (var meshCollider in allMeshColliders)
@@ -70,35 +70,30 @@ namespace PathTracing.Editor
                 {
                     continue;
                 }
-                
-                if(meshCollider.sharedMesh!= meshFilter.sharedMesh)
+
+                if (meshCollider.sharedMesh != meshFilter.sharedMesh)
                 {
-                    var hash = GetHash(meshFilter.sharedMesh);
+                    var hash         = GetHash(meshFilter.sharedMesh);
                     var colliderHash = GetHash(meshCollider.sharedMesh);
 
                     if (hash == colliderHash)
                     {
-                         meshCollider.sharedMesh = meshFilter.sharedMesh;
-                         Debug.Log($"MeshCollider {meshCollider.name} has same mesh hash: {colliderHash}");
+                        meshCollider.sharedMesh = meshFilter.sharedMesh;
+                        Debug.Log($"MeshCollider {meshCollider.name} has same mesh hash: {colliderHash}");
                     }
                     else
                     {
                         Debug.LogWarning($"MeshCollider {meshCollider.name} has different mesh hash: {colliderHash} vs {hash}");
                     }
-                    
                 }
-                
-                
-                
-                
             }
         }
 
         private void FindMatWithoutAO()
         {
-            var allMeshRenderers = GameObject.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None).ToList();
+            var allMeshRenderers = GameObject.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None).ToList();
 
-            var allSkinnedMeshRenderers = GameObject.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None);
+            var allSkinnedMeshRenderers = GameObject.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
             var allRenderers = new List<Renderer>();
             allRenderers.AddRange(allSkinnedMeshRenderers);
@@ -124,7 +119,7 @@ namespace PathTracing.Editor
                         var metallic = materials[i].GetFloat("_Metallic");
 
                         var MSTexture = new Texture2D(2, 2);
-                        var c = new Color(metallic, 1, 1, 1);
+                        var c         = new Color(metallic, 1, 1, 1);
                         MSTexture.SetPixel(0, 0, c);
                         MSTexture.SetPixel(1, 0, c);
                         MSTexture.SetPixel(0, 1, c);
@@ -178,7 +173,7 @@ namespace PathTracing.Editor
 
         private void FindSameMatScene()
         {
-            var allRenderers = FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None);
+            var allRenderers = FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
             foreach (var meshRenderer in allRenderers)
             {
@@ -196,7 +191,7 @@ namespace PathTracing.Editor
                             {
                                 Debug.Log(
                                     $"GO {meshRenderer.name} has same material with {otherMeshRenderer.name} at index {i}: {material.name}");
-                                otherMaterials[i] = material;
+                                otherMaterials[i]                 = material;
                                 otherMeshRenderer.sharedMaterials = otherMaterials;
                             }
                         }
@@ -210,10 +205,10 @@ namespace PathTracing.Editor
         public int GetHash(Mesh mesh)
         {
             var allVertices = mesh.vertices;
-            var allNormals = mesh.normals;
+            var allNormals  = mesh.normals;
             var allTangents = mesh.tangents;
-            var allUVs = mesh.uv;
-            var allUV2S = mesh.uv2;
+            var allUVs      = mesh.uv;
+            var allUV2S     = mesh.uv2;
 
 
             var hash = 17;
@@ -248,11 +243,11 @@ namespace PathTracing.Editor
 
         private void FindSameMeshInScene()
         {
-            var meshes = new Dictionary<int, List<MeshFilter>>();
+            var meshes    = new Dictionary<int, List<MeshFilter>>();
             var keyToMesh = new Dictionary<int, Mesh>();
 
 
-            var allObjects = FindObjectsByType<MeshFilter>(FindObjectsInactive.Include,FindObjectsSortMode.None);
+            var allObjects = FindObjectsByType<MeshFilter>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
             foreach (var meshFilter in allObjects)
             {
@@ -290,25 +285,24 @@ namespace PathTracing.Editor
 
             EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
         }
-        
-        
-        
+
+
         private void FindSameTextureInScene()
         {
-            var mats = new Dictionary<int, List<(Material,int)>>();
+            var mats         = new Dictionary<int, List<(Material, int)>>();
             var keyToTexture = new Dictionary<int, Texture2D>();
 
 
-            var allObjects = FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None);
-            
+            var allObjects = FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
             var allMaterials = new HashSet<Material>();
-            
+
             foreach (var meshRenderer in allObjects)
             {
                 allMaterials.UnionWith(meshRenderer.sharedMaterials);
             }
-            
-            
+
+
             Debug.Log($"Found {allMaterials.Count} materials in scene.");
 
             foreach (var material in allMaterials)
@@ -319,9 +313,9 @@ namespace PathTracing.Editor
                 {
                     continue;
                 }
-                
+
                 var textureIDs = material.GetTexturePropertyNameIDs();
-                
+
                 foreach (var id in textureIDs)
                 {
                     var texture = material.GetTexture(id) as Texture2D;
@@ -332,10 +326,10 @@ namespace PathTracing.Editor
 
                     if (!mats.ContainsKey(hash))
                     {
-                        mats[hash] = new List<(Material,int)>();
+                        mats[hash] = new List<(Material, int)>();
                     }
-                    
-                    mats[hash].Add( (material, id));
+
+                    mats[hash].Add((material, id));
 
                     keyToTexture.TryAdd(hash, texture);
                 }
@@ -353,7 +347,7 @@ namespace PathTracing.Editor
                         material.SetTexture(id, keyToTexture[pair.Key]);
                     }
                 }
-            } 
+            }
 
 
             // foreach (var pair in meshes)
@@ -383,15 +377,15 @@ namespace PathTracing.Editor
                 Debug.LogWarning($"Texture '{texture.name}' does not have a valid asset path.");
                 return 0;
             }
-            
+
             using (var stream = File.OpenRead(path))
             using (var md5 = MD5.Create())
             {
                 var hash = md5.ComputeHash(stream);
-                return  hash.Aggregate(0, (current, b) => current * 31 + b.GetHashCode());
+                return hash.Aggregate(0, (current, b) => current * 31 + b.GetHashCode());
             }
         }
-        
+
         // private int GetMatHash(Material mat)
         // {
         //     var hash = 17;
@@ -420,11 +414,11 @@ namespace PathTracing.Editor
 
         private void FindSameSkinMeshInScene()
         {
-            var meshes = new Dictionary<int, List<SkinnedMeshRenderer>>();
+            var meshes    = new Dictionary<int, List<SkinnedMeshRenderer>>();
             var keyToMesh = new Dictionary<int, Mesh>();
 
 
-            var allObjects = GameObject.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None);
+            var allObjects = GameObject.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
             foreach (var meshFilter in allObjects)
             {

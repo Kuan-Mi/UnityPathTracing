@@ -34,9 +34,9 @@ namespace NativeRender
     /// </summary>
     public sealed class BindlessTexture : IDisposable
     {
-        private ulong    _handle;
+        private ulong     _handle;
         private Texture[] _textures;
-        private bool     _disposed;
+        private bool      _disposed;
 
         /// <summary>Opaque native handle. Used internally by RayTraceShader.SetBindlessTexture.</summary>
         public ulong Handle => _handle;
@@ -82,7 +82,7 @@ namespace NativeRender
             {
                 if (index < 0 || index >= _textures.Length)
                     throw new ArgumentOutOfRangeException(nameof(index));
-                
+
                 // Debug.Log($"[BindlessTexture] Setting slot {index} to {(value != null ? value.name : "null")}");
                 _textures[index] = value;
                 if (IsValid)
@@ -152,6 +152,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_DestroyBindlessTexture(_handle);
                 _handle = 0;
             }
+
             _textures = Array.Empty<Texture>();
         }
     }

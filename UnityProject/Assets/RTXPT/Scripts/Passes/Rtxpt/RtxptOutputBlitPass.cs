@@ -15,11 +15,11 @@ namespace PathTracing
     /// </summary>
     public class RtxptOutputBlitPass : ScriptableRenderPass
     {
-        private readonly Material                    _blitMaterial;
+        private readonly Material              _blitMaterial;
         private          RtxptTextureResources _resources;
         private          RtxptShowMode         _showMode;
-        private          float                       _renderScale; // renderRes / displayRes
-        private          RtxptDebugViewType          _debugViewType;
+        private          float                 _renderScale; // renderRes / displayRes
+        private          RtxptDebugViewType    _debugViewType;
 
         public RtxptOutputBlitPass(Material blitMaterial)
         {
@@ -41,12 +41,12 @@ namespace PathTracing
 
         class PassData
         {
-            internal Material                    BlitMaterial;
+            internal Material              BlitMaterial;
             internal RtxptTextureResources Resources;
             internal RtxptShowMode         ShowMode;
-            internal float                       RenderScale;
-            internal TextureHandle               CameraTexture;
-            internal RtxptDebugViewType          DebugViewType;
+            internal float                 RenderScale;
+            internal TextureHandle         CameraTexture;
+            internal RtxptDebugViewType    DebugViewType;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)

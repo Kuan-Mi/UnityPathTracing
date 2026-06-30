@@ -35,7 +35,10 @@ namespace NativeRender
             *(ulong*)(p + 0) = (ulong)textureResource.ToInt64();
             *(uint*)(p + 8)  = dxgiFormat;
             float* c = (float*)(p + 12);
-            c[0] = color.r; c[1] = color.g; c[2] = color.b; c[3] = color.a;
+            c[0] = color.r;
+            c[1] = color.g;
+            c[2] = color.b;
+            c[3] = color.a;
 
             cmd.IssuePluginEventAndData(NativeRenderPlugin.NR_GetClearTextureUavFloatCallbackPtr(), 1, blob);
         }

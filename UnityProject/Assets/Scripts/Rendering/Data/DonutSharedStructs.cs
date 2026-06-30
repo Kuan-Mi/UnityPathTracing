@@ -58,6 +58,7 @@ namespace PathTracing
         public uint pad1; // +56
         public uint pad2; // +60
     } // Total: 64 bytes
+
     /// <summary>
     /// One entry per emissive sub-mesh in the scene.
     /// Mirrors the per-geometry task record that PrepareLights.computeshader needs.

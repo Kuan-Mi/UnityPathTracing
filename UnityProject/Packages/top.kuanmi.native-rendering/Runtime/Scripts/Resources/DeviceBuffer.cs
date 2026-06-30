@@ -46,7 +46,7 @@ namespace NativeRender
             cmd.IssuePluginEventAndData(
                 NativeRenderPlugin.NR_GetClearNativeGpuBufferCallbackPtr(),
                 0,
-                 (IntPtr)Handle);
+                (IntPtr)Handle);
         }
 
         public void Dispose()
@@ -57,6 +57,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_DestroyNativeBuffer(Handle);
                 Handle = 0;
             }
+
             _disposed = true;
         }
     }

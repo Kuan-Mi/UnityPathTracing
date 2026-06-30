@@ -12,7 +12,7 @@ namespace PathTracing
         {
             return $"Foldout_{instanceID}_{headerName}";
         }
-        
+
         /// <summary>
         /// 递归绘制对象的所有公有字段
         /// </summary>
@@ -32,7 +32,7 @@ namespace PathTracing
             }
 
             // 为当前层级生成唯一的 SessionState Key
-            string foldoutKey = GetKey(instanceID,path + "_" + label);
+            string foldoutKey = GetKey(instanceID, path + "_" + label);
             bool   isExpanded = SessionState.GetBool(foldoutKey, false); // 默认折叠
 
             EditorGUILayout.BeginVertical();
@@ -49,7 +49,7 @@ namespace PathTracing
                 {
                     object value = field.GetValue(obj);
                     // 递归时将当前 label 加入 path，保证子节点的 key 唯一
-                    Draw(instanceID,field.Name, value, path + "_" + label);
+                    Draw(instanceID, field.Name, value, path + "_" + label);
                 }
 
                 EditorGUI.indentLevel--;
@@ -99,6 +99,5 @@ namespace PathTracing
             else if (value is uint2 u2) EditorGUILayout.Vector2IntField(label, new Vector2Int((int)u2.x, (int)u2.y));
             else EditorGUILayout.LabelField(label, value?.ToString() ?? "null");
         }
-   
     }
 }

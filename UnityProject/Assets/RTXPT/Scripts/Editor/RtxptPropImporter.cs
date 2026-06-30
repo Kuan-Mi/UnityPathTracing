@@ -61,9 +61,10 @@ namespace PathTracing
             _propsFolder = EditorGUILayout.TextField("Props Folder", _propsFolder);
             if (GUILayout.Button("…", GUILayout.Width(26)))
             {
-                string picked = EditorUtility.OpenFolderPanel("Select RTXPT props folder", _propsFolder, "");
+                string picked                                   = EditorUtility.OpenFolderPanel("Select RTXPT props folder", _propsFolder, "");
                 if (!string.IsNullOrEmpty(picked)) _propsFolder = picked;
             }
+
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(6);
@@ -107,6 +108,7 @@ namespace PathTracing
                 _report = $"No *.prop.json files found in: {_propsFolder}";
                 return;
             }
+
             ImportFiles(files);
         }
 
@@ -128,7 +130,7 @@ namespace PathTracing
                 return;
             }
 
-            var matMap = BuildMaterialMap();
+            var matMap    = BuildMaterialMap();
             var modelDefs = new Dictionary<string, ModelDef>(StringComparer.OrdinalIgnoreCase);
             var propsRoot = FindOrCreateRoot();
 
@@ -138,9 +140,13 @@ namespace PathTracing
             {
                 try
                 {
-                    string name = Path.GetFileName(file).Replace(".prop.json", "").Replace(".json", "");
+                    string     name = Path.GetFileName(file).Replace(".prop.json", "").Replace(".json", "");
                     GameObject prop = ImportOne(file, name, modelsJsonFolder, modelDefs, matMap, propsRoot);
-                    if (prop != null) { ok++; sb.AppendLine($"✓ {name}"); }
+                    if (prop != null)
+                    {
+                        ok++;
+                        sb.AppendLine($"✓ {name}");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -167,7 +173,7 @@ namespace PathTracing
                 throw new Exception("prop has no 'modelName'");
 
             var model = GetModelDef(modelName, modelsJsonFolder, modelDefs);
-            var gltf = AssetDatabase.LoadAssetAtPath<GameObject>(model.GltfAssetPath);
+            var gltf  = AssetDatabase.LoadAssetAtPath<GameObject>(model.GltfAssetPath);
             if (gltf == null)
                 throw new Exception($"model '{model.SceneModelName}' not imported at {model.GltfAssetPath} " +
                                     "(let Unity reimport the .gltf, then retry)");
@@ -178,7 +184,7 @@ namespace PathTracing
             // which may also carry a non-unit scale, e.g. SHIP_random_1..3 at 6×).
             bool hasAnim = root.TryGetValue("animation", out var animObj)
                            && animObj is List<object> a && a.Count > 0;
-            var anim = hasAnim ? (List<object>)animObj : null;
+            var                        anim      = hasAnim ? (List<object>)animObj : null;
             Dictionary<string, object> startPose = null;
             if (!hasAnim)
             {
@@ -213,8 +219,8 @@ namespace PathTracing
 
             if (hasAnim)
             {
-                int n = anim.Count;
-                var times = new float[n];
+                int n         = anim.Count;
+                var times     = new float[n];
                 var positions = new Vector3[n];
                 var rotations = new Quaternion[n];
 
@@ -227,12 +233,12 @@ namespace PathTracing
                 }
 
                 var path = outer.AddComponent<PropFlightPath>();
-                path.times = times;
-                path.positions = positions;
-                path.rotations = rotations;
-                path.duration = times[n - 1];
+                path.times         = times;
+                path.positions     = positions;
+                path.rotations     = rotations;
+                path.duration      = times[n - 1];
                 path.playbackSpeed = playbackSpeed;
-                path.loop = true;
+                path.loop          = true;
             }
             else
             {
@@ -279,6 +285,7 @@ namespace PathTracing
                         (float)(double)el[2] * Mathf.Rad2Deg);
                     def.PoseRotation = new Quaternion(fq.x, -fq.y, -fq.z, fq.w);
                 }
+
                 if (mp.TryGetValue("scaling", out var s))
                     def.PoseScale = (float)(double)s;
             }
@@ -294,9 +301,9 @@ namespace PathTracing
                     {
                         Name      = l.TryGetValue("name", out var ln) ? (string)ln : "",
                         Intensity = l.TryGetValue("intensity", out var inten) ? (float)(double)inten : 1f,
-                        Color     = l.TryGetValue("color", out var c) && c is List<object> cl
-                                        ? new Color((float)(double)cl[0], (float)(double)cl[1], (float)(double)cl[2])
-                                        : Color.white,
+                        Color = l.TryGetValue("color", out var c) && c is List<object> cl
+                            ? new Color((float)(double)cl[0], (float)(double)cl[1], (float)(double)cl[2])
+                            : Color.white,
                     };
                     float outer = l.TryGetValue("outerAngle", out var oa) ? (float)(double)oa : 0f;
                     float inner = l.TryGetValue("innerAngle", out var ia) ? (float)(double)ia : 0f;
@@ -309,7 +316,7 @@ namespace PathTracing
             }
 
             def.GltfAssetPath = FindGltfAssetPath(def.SceneModelName)
-                ?? throw new Exception($"no '{def.SceneModelName}.gltf' found under {kModelsRoot}");
+                                ?? throw new Exception($"no '{def.SceneModelName}.gltf' found under {kModelsRoot}");
 
             cache[modelName] = def;
             return def;
@@ -317,22 +324,24 @@ namespace PathTracing
 
         private sealed class ModelDef
         {
-            public string SceneModelName;
-            public string GltfAssetPath;
-            public Vector3 PosePosition;
-            public Quaternion PoseRotation;
-            public float PoseScale;
+            public string         SceneModelName;
+            public string         GltfAssetPath;
+            public Vector3        PosePosition;
+            public Quaternion     PoseRotation;
+            public float          PoseScale;
             public List<LightDef> Lights;
         }
 
         private sealed class LightDef
         {
             public string Name;
-            public Color Color;
-            public float Intensity;
-            public bool IsSpot;
-            public float InnerHalfDeg, OuterHalfDeg;
+            public Color  Color;
+            public float  Intensity;
+            public bool   IsSpot;
+            public float  InnerHalfDeg, OuterHalfDeg;
+
             public bool Enabled = true;
+
             // Blink controller (RTXPT LightController) — non-zero off+on means the light auto-toggles.
             public float AutoOffTime, AutoOnTime, AutoOnOffTimeOffset;
 
@@ -344,12 +353,12 @@ namespace PathTracing
         {
             foreach (var rend in root.GetComponentsInChildren<Renderer>(includeInactive: true))
             {
-                var mats = rend.sharedMaterials ?? Array.Empty<Material>();
-                var mf   = rend.GetComponent<MeshFilter>();
+                var mats      = rend.sharedMaterials ?? Array.Empty<Material>();
+                var mf        = rend.GetComponent<MeshFilter>();
                 int slotCount = mf != null && mf.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
                 if (slotCount == 0) continue;
 
-                var rr = rend.GetComponent<RtxptRenderer>();
+                var rr             = rend.GetComponent<RtxptRenderer>();
                 if (rr == null) rr = rend.gameObject.AddComponent<RtxptRenderer>();
                 while (rr.Slots.Count < slotCount) rr.Slots.Add(null);
                 if (rr.Slots.Count > slotCount) rr.Slots.RemoveRange(slotCount, rr.Slots.Count - slotCount);
@@ -378,9 +387,10 @@ namespace PathTracing
                     Debug.LogWarning($"[RtxptPropImporter] light node '{d.Name}' not found under {root.name}");
                     continue;
                 }
+
                 // Reuse any glTFast-imported KHR_lights_punctual Light on the node, else add one.
                 // Use Unity's overloaded null check, not '??' (which bypasses it and can keep a fake-null).
-                var light = node.GetComponent<Light>();
+                var light                = node.GetComponent<Light>();
                 if (light == null) light = node.gameObject.AddComponent<Light>();
                 light.color     = d.Color;
                 light.intensity = d.Intensity;
@@ -404,7 +414,7 @@ namespace PathTracing
                 bool blinks = d.AutoOffTime != 0f && d.AutoOnTime != 0f;
                 if (blinks)
                 {
-                    var blink = node.GetComponent<RtxptBlinkingLight>();
+                    var blink                = node.GetComponent<RtxptBlinkingLight>();
                     if (blink == null) blink = node.gameObject.AddComponent<RtxptBlinkingLight>();
                     blink.baseIntensity       = d.Intensity;
                     blink.baseEnabled         = d.Enabled;
@@ -439,23 +449,24 @@ namespace PathTracing
                 {
                     if (loRaw is not Dictionary<string, object> lo) continue;
                     string lname = lo.TryGetValue("name", out var n) ? (string)n : "";
-                    var ld = merged.Find(x => x.Name == lname);
+                    var    ld    = merged.Find(x => x.Name == lname);
                     if (ld == null) continue;
 
                     if (lo.TryGetValue("color", out var c) && c is List<object> cl)
                         ld.Color = new Color((float)(double)cl[0], (float)(double)cl[1], (float)(double)cl[2]);
-                    if (lo.TryGetValue("intensity", out var inten))           ld.Intensity           = (float)(double)inten;
-                    if (lo.TryGetValue("innerAngle", out var ia))            ld.InnerHalfDeg        = (float)(double)ia;
-                    if (lo.TryGetValue("outerAngle", out var oa))            ld.OuterHalfDeg        = (float)(double)oa;
-                    if (lo.TryGetValue("enabled", out var en) && en is bool eb) ld.Enabled          = eb;
-                    if (lo.TryGetValue("autoOffTime", out var aoff))         ld.AutoOffTime         = (float)(double)aoff;
-                    if (lo.TryGetValue("autoOnTime", out var aon))           ld.AutoOnTime          = (float)(double)aon;
-                    if (lo.TryGetValue("autoOnOffTimeOffset", out var aoo))  ld.AutoOnOffTimeOffset = (float)(double)aoo;
+                    if (lo.TryGetValue("intensity", out var inten)) ld.Intensity                   = (float)(double)inten;
+                    if (lo.TryGetValue("innerAngle", out var ia)) ld.InnerHalfDeg                  = (float)(double)ia;
+                    if (lo.TryGetValue("outerAngle", out var oa)) ld.OuterHalfDeg                  = (float)(double)oa;
+                    if (lo.TryGetValue("enabled", out var en) && en is bool eb) ld.Enabled         = eb;
+                    if (lo.TryGetValue("autoOffTime", out var aoff)) ld.AutoOffTime                = (float)(double)aoff;
+                    if (lo.TryGetValue("autoOnTime", out var aon)) ld.AutoOnTime                   = (float)(double)aon;
+                    if (lo.TryGetValue("autoOnOffTimeOffset", out var aoo)) ld.AutoOnOffTimeOffset = (float)(double)aoo;
 
                     // An override may add angles to a point light (police blobs) → promote it to a spot.
                     ld.IsSpot = ld.OuterHalfDeg > 0f;
                 }
             }
+
             return merged;
         }
 
@@ -471,18 +482,18 @@ namespace PathTracing
 
                 if (type == "PoliceLightingOnRX6")
                 {
-                    var pl = outer.GetComponent<RtxptPoliceLights>();
+                    var pl             = outer.GetComponent<RtxptPoliceLights>();
                     if (pl == null) pl = outer.AddComponent<RtxptPoliceLights>();
                     pl.animTimeStart = c.TryGetValue("animTimeStart", out var s) ? (float)(double)s : 0f;
-                    pl.animTimeStop  = c.TryGetValue("animTimeStop",  out var e) ? (float)(double)e : 0f;
+                    pl.animTimeStop  = c.TryGetValue("animTimeStop", out var e) ? (float)(double)e : 0f;
 
-                    pl.spotLeft  = WirePoliceLight(modelRoot, lights, "SpotLeft",  out pl.spotLeftIntensity);
+                    pl.spotLeft  = WirePoliceLight(modelRoot, lights, "SpotLeft", out pl.spotLeftIntensity);
                     pl.spotRight = WirePoliceLight(modelRoot, lights, "SpotRight", out pl.spotRightIntensity);
-                    pl.blobLeft  = WirePoliceLight(modelRoot, lights, "BlobLeft",  out pl.blobLeftIntensity);
+                    pl.blobLeft  = WirePoliceLight(modelRoot, lights, "BlobLeft", out pl.blobLeftIntensity);
                     pl.blobRight = WirePoliceLight(modelRoot, lights, "BlobRight", out pl.blobRightIntensity);
 
                     // Capture blob base rotations after SetupLights (which may have applied the spot flip).
-                    if (pl.blobLeft  != null) pl.blobLeftRot  = pl.blobLeft.transform.localRotation;
+                    if (pl.blobLeft != null) pl.blobLeftRot   = pl.blobLeft.transform.localRotation;
                     if (pl.blobRight != null) pl.blobRightRot = pl.blobRight.transform.localRotation;
                 }
                 // "BasicInteractableUI" is an editor click-to-select overlay with no runtime visual — skip.
@@ -493,9 +504,9 @@ namespace PathTracing
             Transform modelRoot, List<LightDef> lights, string name, out float intensity)
         {
             intensity = 0f;
-            var ld = lights.Find(x => x.Name == name);
+            var ld                    = lights.Find(x => x.Name == name);
             if (ld != null) intensity = ld.Intensity;
-            var node = FindLightNode(modelRoot, name);
+            var node                  = FindLightNode(modelRoot, name);
             return node != null ? node.GetComponent<Light>() : null;
         }
 
@@ -509,6 +520,7 @@ namespace PathTracing
                 var found = FindDeep(child, name);
                 if (found != null) return found;
             }
+
             return root.name == name ? root : null;
         }
 
@@ -519,11 +531,12 @@ namespace PathTracing
             var map = new Dictionary<string, RtxptMaterial>(StringComparer.OrdinalIgnoreCase);
             foreach (var guid in AssetDatabase.FindAssets("t:RtxptMaterial", new[] { kMaterialFolder }))
             {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                var asset = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(path);
+                string path  = AssetDatabase.GUIDToAssetPath(guid);
+                var    asset = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(path);
                 if (asset == null) continue;
                 map.TryAdd(Path.GetFileNameWithoutExtension(path), asset);
             }
+
             return map;
         }
 
@@ -556,6 +569,7 @@ namespace PathTracing
                 var found = FindDeep(child, name);
                 if (found != null) return found;
             }
+
             return null;
         }
 
@@ -575,7 +589,11 @@ namespace PathTracing
     /// bool, null) — enough for RTXPT prop/model files; the project has no Newtonsoft dependency.</summary>
     internal static class MiniJson
     {
-        public static object Parse(string s) { int i = 0; return ParseValue(s, ref i); }
+        public static object Parse(string s)
+        {
+            int i = 0;
+            return ParseValue(s, ref i);
+        }
 
         private static object ParseValue(string s, ref int i)
         {
@@ -586,10 +604,16 @@ namespace PathTracing
                 case '{': return ParseObject(s, ref i);
                 case '[': return ParseArray(s, ref i);
                 case '"': return ParseString(s, ref i);
-                case 't': i += 4; return true;
-                case 'f': i += 5; return false;
-                case 'n': i += 4; return null;
-                default:  return ParseNumber(s, ref i);
+                case 't':
+                    i += 4;
+                    return true;
+                case 'f':
+                    i += 5;
+                    return false;
+                case 'n':
+                    i += 4;
+                    return null;
+                default: return ParseNumber(s, ref i);
             }
         }
 
@@ -598,7 +622,12 @@ namespace PathTracing
             var d = new Dictionary<string, object>();
             i++; // {
             SkipWs(s, ref i);
-            if (s[i] == '}') { i++; return d; }
+            if (s[i] == '}')
+            {
+                i++;
+                return d;
+            }
+
             while (true)
             {
                 SkipWs(s, ref i);
@@ -609,6 +638,7 @@ namespace PathTracing
                 SkipWs(s, ref i);
                 if (s[i++] == '}') break; // else ','
             }
+
             return d;
         }
 
@@ -617,13 +647,19 @@ namespace PathTracing
             var a = new List<object>();
             i++; // [
             SkipWs(s, ref i);
-            if (s[i] == ']') { i++; return a; }
+            if (s[i] == ']')
+            {
+                i++;
+                return a;
+            }
+
             while (true)
             {
                 a.Add(ParseValue(s, ref i));
                 SkipWs(s, ref i);
                 if (s[i++] == ']') break; // else ','
             }
+
             return a;
         }
 
@@ -648,11 +684,15 @@ namespace PathTracing
                         case 'r': sb.Append('\r'); break;
                         case 'b': sb.Append('\b'); break;
                         case 'f': sb.Append('\f'); break;
-                        case 'u': sb.Append((char)Convert.ToInt32(s.Substring(i, 4), 16)); i += 4; break;
+                        case 'u':
+                            sb.Append((char)Convert.ToInt32(s.Substring(i, 4), 16));
+                            i += 4;
+                            break;
                     }
                 }
                 else sb.Append(c);
             }
+
             return sb.ToString();
         }
 
@@ -665,6 +705,7 @@ namespace PathTracing
                 if (c == '-' || c == '+' || c == '.' || c == 'e' || c == 'E' || (c >= '0' && c <= '9')) i++;
                 else break;
             }
+
             return double.Parse(s.Substring(start, i - start), CultureInfo.InvariantCulture);
         }
 

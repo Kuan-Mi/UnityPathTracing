@@ -43,11 +43,20 @@ namespace NativeRender
     [BurstCompile]
     public struct BuildPrimitivesJob : IJobParallelFor
     {
-        [ReadOnly] public NativeArray<int>    Indices;   // indexCount = triCount * 3
-        [ReadOnly] public NativeArray<float3> Positions; // full mesh vertex count
-        [ReadOnly] public NativeArray<float3> Normals;
-        [ReadOnly] public NativeArray<float4> Tangents;
-        [ReadOnly] public NativeArray<float2> UVs;
+        [ReadOnly]
+        public NativeArray<int> Indices; // indexCount = triCount * 3
+
+        [ReadOnly]
+        public NativeArray<float3> Positions; // full mesh vertex count
+
+        [ReadOnly]
+        public NativeArray<float3> Normals;
+
+        [ReadOnly]
+        public NativeArray<float4> Tangents;
+
+        [ReadOnly]
+        public NativeArray<float2> UVs;
 
         public bool HasN;
         public bool HasT;
@@ -119,7 +128,9 @@ namespace NativeRender
     [BurstCompile]
     public struct TransformVerticesJob : IJobParallelFor
     {
-        [ReadOnly] public NativeArray<float3> LocalPositions;
+        [ReadOnly]
+        public NativeArray<float3> LocalPositions;
+
         public float4x4 LocalToWorld;
 
         [NativeDisableContainerSafetyRestriction]
@@ -138,7 +149,9 @@ namespace NativeRender
     [BurstCompile]
     public struct RemapIndicesJob : IJobParallelFor
     {
-        [ReadOnly] public NativeArray<int> LocalIndices;
+        [ReadOnly]
+        public NativeArray<int> LocalIndices;
+
         public int VertBase;
 
         [NativeDisableContainerSafetyRestriction]
@@ -159,18 +172,27 @@ namespace NativeRender
     [BurstCompile]
     public struct BuildMergedPrimitivesJob : IJobParallelFor
     {
-        [ReadOnly] public NativeArray<int>    Indices;        // local submesh indices
-        [ReadOnly] public NativeArray<float3> LocalPositions;
-        [ReadOnly] public NativeArray<float3> LocalNormals;
-        [ReadOnly] public NativeArray<float4> LocalTangents;
-        [ReadOnly] public NativeArray<float2> UVs;
+        [ReadOnly]
+        public NativeArray<int> Indices; // local submesh indices
+
+        [ReadOnly]
+        public NativeArray<float3> LocalPositions;
+
+        [ReadOnly]
+        public NativeArray<float3> LocalNormals;
+
+        [ReadOnly]
+        public NativeArray<float4> LocalTangents;
+
+        [ReadOnly]
+        public NativeArray<float2> UVs;
 
         public bool HasN;
         public bool HasT;
         public bool HasUV;
 
-        public float4x4 LocalToWorld;   // for positions + tangent direction
-        public float4x4 NormalMatrix;   // inverse-transpose, for normal direction
+        public float4x4 LocalToWorld; // for positions + tangent direction
+        public float4x4 NormalMatrix; // inverse-transpose, for normal direction
 
         [NativeDisableContainerSafetyRestriction]
         public NativeArray<PrimitiveDataNRD> Output;
@@ -205,7 +227,7 @@ namespace NativeRender
             float3   n2  = math.lengthsq(rn2) > 1e-12f ? math.normalize(rn2) : new float3(0f, 1f, 0f);
 
             // World-space tangent directions via upper-3×3 of LocalToWorld.
-            float3x3 m33  = new float3x3(LocalToWorld);
+            float3x3 m33   = new float3x3(LocalToWorld);
             float4   t0Raw = HasT ? LocalTangents[i0] : new float4(1f, 0f, 0f, 1f);
             float4   t1Raw = HasT ? LocalTangents[i1] : new float4(1f, 0f, 0f, 1f);
             float4   t2Raw = HasT ? LocalTangents[i2] : new float4(1f, 0f, 0f, 1f);

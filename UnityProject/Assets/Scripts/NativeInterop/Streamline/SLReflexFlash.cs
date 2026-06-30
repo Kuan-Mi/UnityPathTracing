@@ -36,8 +36,14 @@ namespace PathTracing.NativeInterop.Streamline
             IntPtr token = SLStreamlineFrameLoop.CurrentFrameTokenPtr;
             if (token == IntPtr.Zero) return;
 
-            try { SLNative.SL_MarkTriggerFlash(token); }
-            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+            try
+            {
+                SLNative.SL_MarkTriggerFlash(token);
+            }
+            catch (DllNotFoundException)
+            {
+                SLNative.MarkUnavailable();
+            }
         }
     }
 }

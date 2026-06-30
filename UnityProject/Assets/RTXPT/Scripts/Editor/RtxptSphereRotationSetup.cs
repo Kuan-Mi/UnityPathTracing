@@ -25,8 +25,8 @@ namespace PathTracing
                 // The sphere_with_holes "body" is the unique node named "body" that parents a "bulb".
                 if (t.name != "body" || t.Find("bulb") == null) continue;
 
-                var spin = t.GetComponent<RtxptSpin>();
-                bool fresh = spin == null;
+                var  spin       = t.GetComponent<RtxptSpin>();
+                bool fresh      = spin == null;
                 if (fresh) spin = Undo.AddComponent<RtxptSpin>(t.gameObject);
 
                 spin.axis                 = Vector3.forward; // local Z, per RotatingSphere

@@ -77,15 +77,15 @@ namespace PathTracing
             if (ReferenceEquals(setting, authored))
                 setting = authored.Clone();
 
-            var s = setting;
-            if (v.autoExposure.overrideState)         s.autoExposure         = v.autoExposure.value;
+            var s                                                            = setting;
+            if (v.autoExposure.overrideState) s.autoExposure                 = v.autoExposure.value;
             if (v.exposureCompensation.overrideState) s.exposureCompensation = v.exposureCompensation.value;
-            if (v.exposureValueMin.overrideState)     s.exposureValueMin     = v.exposureValueMin.value;
-            if (v.exposureValueMax.overrideState)     s.exposureValueMax     = v.exposureValueMax.value;
-            if (v.exposureValue.overrideState)        s.exposureValue        = v.exposureValue.value;
-            if (v.filmSpeed.overrideState)            s.filmSpeed            = v.filmSpeed.value;
-            if (v.fNumber.overrideState)              s.fNumber              = v.fNumber.value;
-            if (v.shutter.overrideState)              s.shutter              = v.shutter.value;
+            if (v.exposureValueMin.overrideState) s.exposureValueMin         = v.exposureValueMin.value;
+            if (v.exposureValueMax.overrideState) s.exposureValueMax         = v.exposureValueMax.value;
+            if (v.exposureValue.overrideState) s.exposureValue               = v.exposureValue.value;
+            if (v.filmSpeed.overrideState) s.filmSpeed                       = v.filmSpeed.value;
+            if (v.fNumber.overrideState) s.fNumber                           = v.fNumber.value;
+            if (v.shutter.overrideState) s.shutter                           = v.shutter.value;
         }
     }
 }

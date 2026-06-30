@@ -51,14 +51,15 @@ namespace PathTracing.NativeInterop.Streamline
                 renderRes = new int2((int)rw, (int)rh);
                 return true;
             }
+
             renderRes = outputRes;
             return false;
         }
 
-        private readonly int                         _instanceId;
+        private readonly int                           _instanceId;
         private          NativeArray<SLDlssrFrameData> _buffer;
-        private const    int                         BufferCount = 3;
-        private readonly string                      _cameraName;
+        private const    int                           BufferCount = 3;
+        private readonly string                        _cameraName;
 
         /// <summary>
         /// Per-frame camera data, filled from CameraFrameState by the feature. Matches
@@ -66,18 +67,18 @@ namespace PathTracing.NativeInterop.Streamline
         /// </summary>
         public struct SLDlssrFrameInput
         {
-            public Matrix4x4 worldToView;     // current frame
-            public Matrix4x4 viewToClip;      // current frame, no jitter
-            public Matrix4x4 worldToClip;     // current frame
+            public Matrix4x4 worldToView; // current frame
+            public Matrix4x4 viewToClip; // current frame, no jitter
+            public Matrix4x4 worldToClip; // current frame
             public Matrix4x4 prevWorldToClip; // previous frame
             public float3    camPos;
-            public float2    viewportJitter;  // pixel space
+            public float2    viewportJitter; // pixel space
             public int2      renderResolution;
             public int2      outputResolution;
             public uint      frameIndex;
             public float     cameraNear;
             public float     cameraFar;
-            public float     cameraFOV;       // radians
+            public float     cameraFOV; // radians
             public float     cameraAspect;
             public bool      reset;
         }
@@ -87,10 +88,10 @@ namespace PathTracing.NativeInterop.Streamline
         /// </summary>
         public struct DlssrResources
         {
-            public NriTextureResource input;    // low-res color (ScalingInputColor)
-            public NriTextureResource output;   // upscaled color (ScalingOutputColor)
-            public NriTextureResource mv;       // motion vectors
-            public NriTextureResource depth;    // depth
+            public NriTextureResource input; // low-res color (ScalingInputColor)
+            public NriTextureResource output; // upscaled color (ScalingOutputColor)
+            public NriTextureResource mv; // motion vectors
+            public NriTextureResource depth; // depth
             public NriTextureResource exposure; // optional – null -> internal auto-exposure
         }
 
@@ -103,7 +104,7 @@ namespace PathTracing.NativeInterop.Streamline
         }
 
         private SLDlssrFrameData GetData(SLDlssrFrameInput fi, DlssrResources res,
-                                         UpscalerMode upscalerMode, byte preset)
+            UpscalerMode upscalerMode, byte preset)
         {
             // Streamline common constants (row-major; SL receives Unity column-major bytes and
             // transposes). Matches SLDlssrr's derivation.
@@ -115,8 +116,8 @@ namespace PathTracing.NativeInterop.Streamline
             Matrix4x4 prevClipToClip     = fi.worldToClip * prevWorldToClipInv;
 
             // Camera basis (world space) from viewToWorld columns. Unity view space looks down -Z.
-            float3 camRight =  new float3(viewToWorld.m00, viewToWorld.m10, viewToWorld.m20);
-            float3 camUp    =  new float3(viewToWorld.m01, viewToWorld.m11, viewToWorld.m21);
+            float3 camRight = new float3(viewToWorld.m00, viewToWorld.m10, viewToWorld.m20);
+            float3 camUp    = new float3(viewToWorld.m01, viewToWorld.m11, viewToWorld.m21);
             float3 camFwd   = -new float3(viewToWorld.m02, viewToWorld.m12, viewToWorld.m22);
 
             float renderW = math.max(1, fi.renderResolution.x);
@@ -178,7 +179,7 @@ namespace PathTracing.NativeInterop.Streamline
         }
 
         public IntPtr GetInteropDataPtr(SLDlssrFrameInput fi, DlssrResources res,
-                                        UpscalerMode upscalerMode, byte preset = 0)
+            UpscalerMode upscalerMode, byte preset = 0)
         {
             var index = (int)(fi.frameIndex % BufferCount);
             _buffer[index] = GetData(fi, res, upscalerMode, preset);

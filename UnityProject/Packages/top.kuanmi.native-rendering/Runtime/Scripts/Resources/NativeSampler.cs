@@ -18,19 +18,20 @@ namespace NativeRender
     [CreateAssetMenu(fileName = "Sampler", menuName = "Native Render/Sampler")]
     public sealed class NativeSampler : ScriptableObject
     {
-        public SamplerFilter  Filter        = SamplerFilter.Linear;
+        public SamplerFilter Filter = SamplerFilter.Linear;
 
         [Tooltip("Address (wrap) mode for the U/V/W texture axes. Usually all three are equal; " +
                  "they differ only for cases like an equirectangular sampler (U=Wrap, V/W=Clamp).")]
-        public SamplerAddress AddressU      = SamplerAddress.Clamp;
-        public SamplerAddress AddressV      = SamplerAddress.Clamp;
-        public SamplerAddress AddressW      = SamplerAddress.Clamp;
+        public SamplerAddress AddressU = SamplerAddress.Clamp;
+
+        public SamplerAddress AddressV = SamplerAddress.Clamp;
+        public SamplerAddress AddressW = SamplerAddress.Clamp;
 
         [Tooltip("Sample mip levels (MaxLOD 16) when true; clamp to mip 0 otherwise.")]
-        public bool           Mips          = false;
+        public bool Mips = false;
 
         [Tooltip("Max anisotropy; used only when Filter is Anisotropic.")]
-        public uint           MaxAnisotropy = 16;
+        public uint MaxAnisotropy = 16;
 
         /// <summary>Resolves this definition into the wire-format <see cref="SamplerHint"/> for the
         /// given HLSL sampler variable name (which the native plugin matches by name).</summary>
@@ -57,6 +58,7 @@ namespace NativeRender
     {
         /// <summary>HLSL sampler variable name to match exactly.</summary>
         public string Name;
+
         /// <summary>
         /// The shared sampler definition; unset falls back to native name-inference.
         /// Stored as a <see cref="LazyLoadReference{T}"/> (a weak PPtr) rather than a direct
@@ -86,6 +88,7 @@ namespace NativeRender
                 if (sampler != null && !string.IsNullOrEmpty(b.Name))
                     hints.Add(sampler.ToHint(b.Name));
             }
+
             return hints.Count == 0 ? Array.Empty<SamplerHint>() : hints.ToArray();
         }
     }

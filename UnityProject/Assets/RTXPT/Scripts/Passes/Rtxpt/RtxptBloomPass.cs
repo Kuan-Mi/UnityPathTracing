@@ -62,11 +62,11 @@ namespace PathTracing
         private readonly uint[] _colorFmt = { kRGBA16F };
 
         private RtxptPassContext _ctx;
-        private IntPtr                 _hdrPtr;
+        private IntPtr           _hdrPtr;
 
         public RtxptBloomPass(NativeRasterShader downsampleShader,
-                                    NativeRasterShader blurShader,
-                                    NativeRasterShader compositeShader)
+            NativeRasterShader blurShader,
+            NativeRasterShader compositeShader)
         {
             var opaque = NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F);
 
@@ -112,16 +112,16 @@ namespace PathTracing
 
         private class PassData
         {
-            internal NativeRasterPipeline      DownsampleRaster, BlurRaster, CompositeRaster;
-            internal NativeRasterDescriptorSet Downsample1Ds, Downsample2Ds, BlurHDs, BlurVDs, CompositeDs;
-            internal VolatileConstantBuffer    HBlurCb, VBlurCb;
-            internal BloomConstants            HBlur, VBlur;
+            internal NativeRasterPipeline      DownsampleRaster, BlurRaster,    CompositeRaster;
+            internal NativeRasterDescriptorSet Downsample1Ds,    Downsample2Ds, BlurHDs, BlurVDs, CompositeDs;
+            internal VolatileConstantBuffer    HBlurCb,          VBlurCb;
+            internal BloomConstants            HBlur,            VBlur;
             internal float                     BlendFactor;
             internal IntPtr                    HdrPtr;
-            internal IntPtr                    Down1Ptr, Down2Ptr, Pass1Ptr, Pass2Ptr;
-            internal int2                       DisplayRes, HalfRes, QuarterRes;
+            internal IntPtr                    Down1Ptr,   Down2Ptr, Pass1Ptr, Pass2Ptr;
+            internal int2                      DisplayRes, HalfRes,  QuarterRes;
             internal uint[]                    ColorFmt;
-            internal IntPtr[]                  ColorRes;   // scratch length-1, refilled per draw
+            internal IntPtr[]                  ColorRes; // scratch length-1, refilled per draw
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -132,7 +132,7 @@ namespace PathTracing
             // original's quirk: Sample.cpp constructs BloomPass with the render-res *m_view, so the
             // first "Downscale" blit is a >2x reduction of the display-res HDR and the blur runs on
             // quarter-render-res buffers, while the final Apply composites at display res.
-            var rend = _ctx.RenderResolution;
+            var rend    = _ctx.RenderResolution;
             var half    = new int2((rend.x + 1) / 2, (rend.y + 1) / 2);
             var quarter = new int2((half.x + 1) / 2, (half.y + 1) / 2);
 
@@ -198,9 +198,9 @@ namespace PathTracing
                 data.ColorRes[0] = data.Down1Ptr;
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.HalfRes.x, data.HalfRes.y),
-                    vertexCount = 4, instanceCount = 1,
+                    numRenderTargets = 1, colorResources     = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = new Rect(0, 0, data.HalfRes.x, data.HalfRes.y),
+                    vertexCount      = 4, instanceCount      = 1,
                 };
                 data.DownsampleRaster.Draw(cmd, ds, in draw);
             }
@@ -212,9 +212,9 @@ namespace PathTracing
                 data.ColorRes[0] = data.Down2Ptr;
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
-                    vertexCount = 4, instanceCount = 1,
+                    numRenderTargets = 1, colorResources     = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
+                    vertexCount      = 4, instanceCount      = 1,
                 };
                 data.DownsampleRaster.Draw(cmd, ds, in draw);
             }
@@ -233,9 +233,9 @@ namespace PathTracing
                 data.ColorRes[0] = data.Pass1Ptr;
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
-                    vertexCount = 4, instanceCount = 1,
+                    numRenderTargets = 1, colorResources     = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
+                    vertexCount      = 4, instanceCount      = 1,
                 };
                 data.BlurRaster.Draw(cmd, ds, in draw);
             }
@@ -249,9 +249,9 @@ namespace PathTracing
                 data.ColorRes[0] = data.Pass2Ptr;
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
-                    vertexCount = 4, instanceCount = 1,
+                    numRenderTargets = 1, colorResources     = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
+                    vertexCount      = 4, instanceCount      = 1,
                 };
                 data.BlurRaster.Draw(cmd, ds, in draw);
             }
@@ -269,9 +269,9 @@ namespace PathTracing
                 data.ColorRes[0] = data.HdrPtr;
                 var draw = new RasterDrawDesc
                 {
-                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
-                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.DisplayRes.x, data.DisplayRes.y),
-                    vertexCount = 4, instanceCount = 1, blendFactor = data.BlendFactor,
+                    numRenderTargets = 1, colorResources     = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource    = IntPtr.Zero, viewport = new Rect(0, 0, data.DisplayRes.x, data.DisplayRes.y),
+                    vertexCount      = 4, instanceCount      = 1, blendFactor = data.BlendFactor,
                 };
                 data.CompositeRaster.Draw(cmd, ds, in draw);
             }

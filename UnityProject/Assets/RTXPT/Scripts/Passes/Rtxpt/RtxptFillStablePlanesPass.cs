@@ -29,7 +29,8 @@ namespace PathTracing
         private readonly RayTracePipeline            _refSP;
         private readonly NativeRayTraceDescriptorSet _refDs;
 
-        private          RtxptPassContext _ctx;
+        private RtxptPassContext _ctx;
+
         private static readonly RootConstantsHint[] MiniConstRootConstantsHints =
         {
             new RootConstantsHint { Name = "g_MiniConst", Count = 16 }
@@ -37,12 +38,13 @@ namespace PathTracing
 
         /// <summary>Pipeline handles exposed for RtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline FillPipeline => _fillSP;
-        public RayTracePipeline RefPipeline  => _refSP;
+
+        public RayTracePipeline RefPipeline => _refSP;
 
         public RtxptFillStablePlanesPass(
             RayTraceShader fillStablePlanes,
             RayTraceShader reference,
-            HitGroupShader[] fillHitGroups      = null,
+            HitGroupShader[] fillHitGroups = null,
             HitGroupShader[] referenceHitGroups = null)
         {
             _fillSP = fillHitGroups is { Length: > 0 }
@@ -72,7 +74,7 @@ namespace PathTracing
         {
             internal RayTracePipeline            FillSP, RefSP;
             internal NativeRayTraceDescriptorSet FillDs, RefDs;
-            internal RtxptPassContext      Ctx;
+            internal RtxptPassContext            Ctx;
             internal int2                        RenderRes;
             internal bool                        IsRealtime;
         }
@@ -85,13 +87,13 @@ namespace PathTracing
             // REF pipeline in reference mode — RTXPT drives both through the single "PathTrace" marker).
             using var builder = renderGraph.AddUnsafePass<PassData>("PathTrace", out var passData);
 
-            passData.FillSP             = _fillSP;
-            passData.FillDs             = _fillDs;
-            passData.RefSP              = _refSP;
-            passData.RefDs              = _refDs;
-            passData.Ctx                = _ctx;
-            passData.RenderRes          = _ctx.RenderResolution;
-            passData.IsRealtime         = _ctx.Setting.realtimeMode;
+            passData.FillSP     = _fillSP;
+            passData.FillDs     = _fillDs;
+            passData.RefSP      = _refSP;
+            passData.RefDs      = _refDs;
+            passData.Ctx        = _ctx;
+            passData.RenderRes  = _ctx.RenderResolution;
+            passData.IsRealtime = _ctx.Setting.realtimeMode;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -123,9 +125,9 @@ namespace PathTracing
                     BindLightBuffers(ds, ctx);
 
                     ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
-                    ds.SetRWTexture("u_DebugOutputColor",            res.DebugOutputColor.NativePtr);
-                    ds.SetRWTexture("u_StablePlanesHeader",          res.StablePlanesHeader.NativePtr);
-                    ds.SetRWTexture("u_SpecularHitT",                res.SpecularHitT.NativePtr);
+                    ds.SetRWTexture("u_DebugOutputColor", res.DebugOutputColor.NativePtr);
+                    ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
+                    ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
                     ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBufferPtr, buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
                     data.FillSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
@@ -140,11 +142,11 @@ namespace PathTracing
                     BindCommonRT(ds, ctx, &miniConst, tlas);
                     BindLightBuffers(ds, ctx);
 
-                    ds.SetRWTexture("u_OutputColor",   res.OutputColor.NativePtr);
-                    ds.SetRWTexture("u_Throughput",    res.Throughput.NativePtr);
+                    ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);
+                    ds.SetRWTexture("u_Throughput", res.Throughput.NativePtr);
                     ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
-                    ds.SetRWTexture("u_Depth",         res.Depth.NativePtr);
-                    ds.SetRWTexture("u_SpecularHitT",  res.SpecularHitT.NativePtr);
+                    ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+                    ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
 
                     data.RefSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }
@@ -160,7 +162,7 @@ namespace PathTracing
             SampleMiniConstants* miniConst,
             RayTracingAccelerationStructure tlas)
         {
-            ds.SetConstantBuffer("g_Const",     ctx.ConstantBuffer);
+            ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
             ds.SetRootConstants("g_MiniConst", miniConst);
             ds.SetAccelerationStructure("SceneBVH", tlas);
 
@@ -192,17 +194,17 @@ namespace PathTracing
             if (buf == null) return;
 
             ds.SetStructuredBuffer("t_LightsCB", buf.LightControlBuffer, buf.LightControlBuffer.count, buf.LightControlBuffer.stride);
-            ds.SetStructuredBuffer("t_Lights",   buf.LightBuffer,        buf.LightBuffer.count,        buf.LightBuffer.stride);
+            ds.SetStructuredBuffer("t_Lights", buf.LightBuffer, buf.LightBuffer.count, buf.LightBuffer.stride);
 
-            ds.SetTypedBuffer("t_LightProxyCounters",       buf.LightProxyCountersPtr,   buf.LightProxyCounters.count,   (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
-            ds.SetTypedBuffer("t_LightProxyIndices",        buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
-            ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBufferPtr,  buf.LocalSamplingBuffer.count,  (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightProxyCounters", buf.LightProxyCountersPtr, buf.LightProxyCounters.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightProxyIndices", buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBufferPtr, buf.LocalSamplingBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer, buf.LightExBuffer.count, buf.LightExBuffer.stride);
 
             var tex = ctx.Textures;
             ds.SetRWTexture("u_LightFeedbackTotalWeight", tex.LightFeedbackTotalWeight.NativePtr);
-            ds.SetRWTexture("u_LightFeedbackCandidates",  tex.LightFeedbackCandidates.NativePtr);
+            ds.SetRWTexture("u_LightFeedbackCandidates", tex.LightFeedbackCandidates.NativePtr);
         }
     }
 }

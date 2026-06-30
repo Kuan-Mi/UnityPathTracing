@@ -16,7 +16,7 @@ namespace PathTracing
     ///   sizeof(PackedPathTracerSurfaceData) = 64 bytes  (TODO: verify from HLSL)
     /// </summary>
     public class RtxptBufferResources : IDisposable
-    { 
+    {
         // sizeof(StablePlane) in bytes — must match HLSL struct StablePlane layout.
         public const int StablePlaneStride = 80;
 
@@ -50,6 +50,7 @@ namespace PathTracing
         /// HLSL: RWStructuredBuffer u_FeedbackBuffer (u51).
         /// </summary>
         public GraphicsBuffer FeedbackBuffer;
+
         public const int FeedbackStructSize = 320;
 
         // ── ShaderDebug (Libraries/ShaderDebug/ShaderDebug.hlsl, u125) ────────
@@ -65,7 +66,8 @@ namespace PathTracing
 
         /// <summary>HLSL: RWByteAddressBuffer u_ShaderDebugBuffer (u125). Raw UAV.</summary>
         public GraphicsBuffer ShaderDebugBuffer;
-        public IntPtr         ShaderDebugBufferPtr { get; private set; }
+
+        public IntPtr ShaderDebugBufferPtr { get; private set; }
 
         /// <summary>
         /// Picked-pixel debug line vertices (PathTracerDebug.hlsli DebugLineStruct, 32 B).
@@ -73,7 +75,8 @@ namespace PathTracing
         /// only referenced when the shaders are compiled with ENABLE_DEBUG_LINES_VIZ=1.
         /// </summary>
         public GraphicsBuffer DebugLinesBuffer;
-        public IntPtr         DebugLinesBufferPtr { get; private set; }
+
+        public IntPtr DebugLinesBufferPtr { get; private set; }
         public const int MaxDebugLines       = 2048; // PathTracerDebug.hlsli MAX_DEBUG_LINES
         public const int DebugLineStructSize = 32;
 
@@ -85,25 +88,30 @@ namespace PathTracing
                 ReleaseShaderDebugBuffers();
                 return;
             }
+
             if (ShaderDebugBuffer != null) return;
 
             ShaderDebugBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Raw,
-                ShaderDebugTotalBytes / 4, 4)
-            { name = "ShaderDebugBufferGPU" };
+                    GraphicsBuffer.Target.Raw,
+                    ShaderDebugTotalBytes / 4, 4)
+                { name = "ShaderDebugBufferGPU" };
             ShaderDebugBufferPtr = ShaderDebugBuffer.GetNativeBufferPtr();
 
             DebugLinesBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                MaxDebugLines, DebugLineStructSize)
-            { name = "DebugLinesBuffer" };
+                    GraphicsBuffer.Target.Structured,
+                    MaxDebugLines, DebugLineStructSize)
+                { name = "DebugLinesBuffer" };
             DebugLinesBufferPtr = DebugLinesBuffer.GetNativeBufferPtr();
         }
 
         private void ReleaseShaderDebugBuffers()
         {
-            ShaderDebugBuffer?.Release(); ShaderDebugBuffer = null; ShaderDebugBufferPtr = IntPtr.Zero;
-            DebugLinesBuffer?.Release();  DebugLinesBuffer  = null; DebugLinesBufferPtr  = IntPtr.Zero;
+            ShaderDebugBuffer?.Release();
+            ShaderDebugBuffer    = null;
+            ShaderDebugBufferPtr = IntPtr.Zero;
+            DebugLinesBuffer?.Release();
+            DebugLinesBuffer    = null;
+            DebugLinesBufferPtr = IntPtr.Zero;
         }
 
         // ── Light system buffers ──────────────────────────────────────────────
@@ -183,16 +191,16 @@ namespace PathTracing
 
         // ── Cached native pointers ────────────────────────────────────────────
         // Resolution-dependent buffers — valid after EnsureResources(), cleared on resize
-        public IntPtr StablePlanesBufferPtr  { get; private set; }
-        public IntPtr SurfaceDataBufferPtr   { get; private set; }
+        public IntPtr StablePlanesBufferPtr { get; private set; }
+        public IntPtr SurfaceDataBufferPtr { get; private set; }
         public IntPtr LocalSamplingBufferPtr { get; private set; }
 
         // Light system buffers — valid after EnsureLightBuffers(), cleared in ReleaseLightBuffers()
-        public IntPtr FeedbackBufferPtr           { get; private set; }
-        public IntPtr LightProxyCountersPtr       { get; private set; }
-        public IntPtr LightSamplingProxiesPtr     { get; private set; }
-        public IntPtr LightWeightsBufferPtr       { get; private set; }
-        public IntPtr ScratchListBufferPtr        { get; private set; }
+        public IntPtr FeedbackBufferPtr { get; private set; }
+        public IntPtr LightProxyCountersPtr { get; private set; }
+        public IntPtr LightSamplingProxiesPtr { get; private set; }
+        public IntPtr LightWeightsBufferPtr { get; private set; }
+        public IntPtr ScratchListBufferPtr { get; private set; }
 
         // CPU-side copy of the latest control data uploaded into LightControlBuffer.
         // NativeBuffer does not support the old synchronous GraphicsBuffer.GetData path.
@@ -223,10 +231,11 @@ namespace PathTracing
         // ProxyCounterCount: HLSL only ever indexes [0 .. TotalLightCount], where the last
         // slot [TotalLightCount] holds the invalid-feedback count, so MaxLights+1 elements
         // would be functionally sufficient. Sized to CarryoverGroupCount to match the original.
-        private const int ProxyCounterCount   = CarryoverGroupCount;
+        private const int ProxyCounterCount = CarryoverGroupCount;
+
         // ProxySamplingCount: worst-case total proxies = RTXPT_LIGHTING_MAX_SAMPLING_PROXIES.
         internal const int ProxySamplingCount = LightingConfig.RTXPT_LIGHTING_MAX_SAMPLING_PROXIES;
-        private const int LocalSamplingCount  = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS; // placeholder; actual buffer is resolution-dependent (see EnsureResources)
+        private const  int LocalSamplingCount = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS; // placeholder; actual buffer is resolution-dependent (see EnsureResources)
 
         // ScratchListBuffer functional requirement is the larger of:
         //   - proxy-build passes: MaxLights entries
@@ -250,8 +259,8 @@ namespace PathTracing
 
             // Tiled-swizzled storage element count for StablePlanesBuffer (TS_TILE_SIZE = 8 in Utils.hlsli).
             // Must match GenericTSComputePlaneStride: ceil(W/8)*8 * ceil(H/8)*8.
-            int tsLineStride   = ((renderRes.x + 7) / 8) * 8;
-            int tsPlaneStride  = tsLineStride * (((renderRes.y + 7) / 8) * 8);
+            int tsLineStride  = ((renderRes.x + 7) / 8) * 8;
+            int tsPlaneStride = tsLineStride * (((renderRes.y + 7) / 8) * 8);
 
             ReleaseResolutionBuffers();
 
@@ -260,32 +269,32 @@ namespace PathTracing
             // +1 border tile on each axis to accommodate the jitter offset — must match
             // LightsBaker.cpp:340-341 and the LocalSamplingResolution uploaded to the control
             // buffer (RtxptLightingUpdateBeginPass), since that value is the addressing stride.
-            int tileW    = (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
-            int tileH    = (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
+            int tileW          = (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
+            int tileH          = (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
             int localSampCount = tileW * tileH * LightingConfig.RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
             LocalSamplingBuffer?.Release();
             LocalSamplingBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                localSampCount, 4)
-            { name = "NEE_AT_LocalSamplingBuffer" };
+                    GraphicsBuffer.Target.Structured,
+                    localSampCount, 4)
+                { name = "NEE_AT_LocalSamplingBuffer" };
             LocalSamplingBufferPtr = LocalSamplingBuffer.GetNativeBufferPtr();
 
             // StablePlanesBuffer: W×H×StablePlaneCount structured entries, stride = StablePlaneStride (80).
             // Shader declares: RWStructuredBuffer<StablePlane> u_StablePlanesBuffer (u42).
             StablePlanesBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                tsPlaneStride * StablePlaneCount,
-                StablePlaneStride)
-            { name = "StablePlanesBuffer" };
+                    GraphicsBuffer.Target.Structured,
+                    tsPlaneStride * StablePlaneCount,
+                    StablePlaneStride)
+                { name = "StablePlanesBuffer" };
             StablePlanesBufferPtr = StablePlanesBuffer.GetNativeBufferPtr();
 
             // SurfaceDataBuffer: W×H×2 structured entries, stride = SurfaceDataStride (64).
             // Shader declares: RWStructuredBuffer<PackedPathTracerSurfaceData> u_SurfaceData (u45).
             SurfaceDataBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                pixelCount * 2,
-                SurfaceDataStride)
-            { name = "SurfaceData(GBuffer)" };
+                    GraphicsBuffer.Target.Structured,
+                    pixelCount * 2,
+                    SurfaceDataStride)
+                { name = "SurfaceData(GBuffer)" };
             SurfaceDataBufferPtr = SurfaceDataBuffer.GetNativeBufferPtr();
 
             return true;
@@ -304,9 +313,9 @@ namespace PathTracing
 
             // FeedbackBuffer — 1 element of DebugFeedbackStruct (PathTracerDebug.hlsli, 320 B).
             FeedbackBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                1, FeedbackStructSize)
-            { name = "Feedback_Buffer_Gpu" };
+                    GraphicsBuffer.Target.Structured,
+                    1, FeedbackStructSize)
+                { name = "Feedback_Buffer_Gpu" };
             FeedbackBufferPtr = FeedbackBuffer.GetNativeBufferPtr();
 
             // LightControlBuffer — single RtxptLightingControlData element (576 bytes).
@@ -342,33 +351,33 @@ namespace PathTracing
                 UploadBuffer.UploadMode.Ranges, allowUAV: true, debugName: "HistoryRemapPastToCurrent");
 
             LightProxyCounters = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                ProxyCounterCount, 4)
-            { name = "PerLightProxyCounters" };
+                    GraphicsBuffer.Target.Structured,
+                    ProxyCounterCount, 4)
+                { name = "PerLightProxyCounters" };
             LightProxyCountersPtr = LightProxyCounters.GetNativeBufferPtr();
 
             LightSamplingProxies = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                ProxySamplingCount, 4)
-            { name = "LightSamplingProxies" };
+                    GraphicsBuffer.Target.Structured,
+                    ProxySamplingCount, 4)
+                { name = "LightSamplingProxies" };
             LightSamplingProxiesPtr = LightSamplingProxies.GetNativeBufferPtr();
 
             // LocalSamplingBuffer is now allocated in EnsureResources() with the correct resolution-dependent size.
 
             // LightWeightsBuffer: 2 halves of (MaxLights+1) floats for ping-pong historic weights.
             LightWeightsBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                2 * WeightsCountHalf, 4)
-            { name = "LightsWeights" };
+                    GraphicsBuffer.Target.Structured,
+                    2 * WeightsCountHalf, 4)
+                { name = "LightsWeights" };
             LightWeightsBufferPtr = LightWeightsBuffer.GetNativeBufferPtr();
 
             // ScratchListBuffer: uint typed scratch for proxy count prefix-sum and job list.
             // Functional need is max(MaxLights, 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT);
             // sized to CarryoverGroupCount (= 2 × (MaxLights+1)) to match the original allocation.
             ScratchListBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                ScratchListCount, 4)
-            { name = "ScratchList" };
+                    GraphicsBuffer.Target.Structured,
+                    ScratchListCount, 4)
+                { name = "ScratchList" };
             ScratchListBufferPtr = ScratchListBuffer.GetNativeBufferPtr();
         }
 
@@ -389,31 +398,49 @@ namespace PathTracing
         private void ReleaseResolutionBuffers()
         {
             StablePlanesBuffer?.Release();
-            StablePlanesBuffer  = null;
+            StablePlanesBuffer    = null;
             StablePlanesBufferPtr = IntPtr.Zero;
             SurfaceDataBuffer?.Release();
-            SurfaceDataBuffer  = null;
+            SurfaceDataBuffer    = null;
             SurfaceDataBufferPtr = IntPtr.Zero;
             LocalSamplingBuffer?.Release();
-            LocalSamplingBuffer  = null;
+            LocalSamplingBuffer    = null;
             LocalSamplingBufferPtr = IntPtr.Zero;
         }
 
         private void ReleaseLightBuffers()
         {
-            EnvBakerCb?.Dispose();               EnvBakerCb               = null;
-            ImportanceBakerCb?.Dispose();         ImportanceBakerCb        = null;
-            FeedbackBuffer?.Release();            FeedbackBuffer           = null; FeedbackBufferPtr           = IntPtr.Zero;
-            LightControlBuffer?.Dispose();        LightControlBuffer       = null; 
-            LightBuffer?.Dispose();               LightBuffer              = null;
-            LightExBuffer?.Dispose();             LightExBuffer            = null;
-            LightScratchBuffer?.Dispose();        LightScratchBuffer       = null; 
-            HistoryRemapCurrentToPast?.Dispose(); HistoryRemapCurrentToPast= null;
-            HistoryRemapPastToCurrent?.Dispose(); HistoryRemapPastToCurrent= null;
-            LightProxyCounters?.Release();        LightProxyCounters       = null; LightProxyCountersPtr       = IntPtr.Zero;
-            LightSamplingProxies?.Release();      LightSamplingProxies     = null; LightSamplingProxiesPtr     = IntPtr.Zero;
-            LightWeightsBuffer?.Release();        LightWeightsBuffer       = null; LightWeightsBufferPtr       = IntPtr.Zero;
-            ScratchListBuffer?.Release();         ScratchListBuffer        = null; ScratchListBufferPtr        = IntPtr.Zero;
+            EnvBakerCb?.Dispose();
+            EnvBakerCb = null;
+            ImportanceBakerCb?.Dispose();
+            ImportanceBakerCb = null;
+            FeedbackBuffer?.Release();
+            FeedbackBuffer    = null;
+            FeedbackBufferPtr = IntPtr.Zero;
+            LightControlBuffer?.Dispose();
+            LightControlBuffer = null;
+            LightBuffer?.Dispose();
+            LightBuffer = null;
+            LightExBuffer?.Dispose();
+            LightExBuffer = null;
+            LightScratchBuffer?.Dispose();
+            LightScratchBuffer = null;
+            HistoryRemapCurrentToPast?.Dispose();
+            HistoryRemapCurrentToPast = null;
+            HistoryRemapPastToCurrent?.Dispose();
+            HistoryRemapPastToCurrent = null;
+            LightProxyCounters?.Release();
+            LightProxyCounters    = null;
+            LightProxyCountersPtr = IntPtr.Zero;
+            LightSamplingProxies?.Release();
+            LightSamplingProxies    = null;
+            LightSamplingProxiesPtr = IntPtr.Zero;
+            LightWeightsBuffer?.Release();
+            LightWeightsBuffer    = null;
+            LightWeightsBufferPtr = IntPtr.Zero;
+            ScratchListBuffer?.Release();
+            ScratchListBuffer    = null;
+            ScratchListBufferPtr = IntPtr.Zero;
         }
 
         public void Dispose()

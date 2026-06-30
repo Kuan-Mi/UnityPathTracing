@@ -44,36 +44,41 @@ namespace PathTracing.NativeInterop.NRD
         // Matrices
         [NonSerialized]
         public Matrix4x4 viewToClipMatrix;
+
         [NonSerialized]
         public Matrix4x4 viewToClipMatrixPrev;
+
         [NonSerialized]
         public Matrix4x4 worldToViewMatrix;
+
         [NonSerialized]
         public Matrix4x4 worldToViewMatrixPrev;
+
         [NonSerialized]
         public Matrix4x4 worldPrevToWorldMatrix; // Default: Identity
 
         // Motion Vectors
-        
+
         [NonSerialized]
         public float3 motionVectorScale; // Default: {1.0, 1.0, 0.0}
 
         // Jitter
         [NonSerialized]
         public float2 cameraJitter;
+
         [NonSerialized]
         public float2 cameraJitterPrev;
 
         // Resolution
         [NonSerialized]
         public fixed ushort resourceSize[2];
-        
+
         [NonSerialized]
         public fixed ushort resourceSizePrev[2];
-        
+
         [NonSerialized]
         public fixed ushort rectSize[2];
-        
+
         [NonSerialized]
         public fixed ushort rectSizePrev[2];
 

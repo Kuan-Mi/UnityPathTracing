@@ -1,5 +1,4 @@
 using PathTracing.Profiling;
-
 using System;
 using System.Runtime.InteropServices;
 using NativeRender;
@@ -105,8 +104,8 @@ namespace PathTracing
             public uint  ImportanceMapBaseMip;
         }
 
-        internal static unsafe int EnvBakerCbSize        => sizeof(EnvMapBakerCB);
-        internal static        int ImportanceBakerCbSize => System.Runtime.InteropServices.Marshal.SizeOf<ImportanceBakerCB>();
+        internal static unsafe int EnvBakerCbSize => sizeof(EnvMapBakerCB);
+        internal static int ImportanceBakerCbSize => System.Runtime.InteropServices.Marshal.SizeOf<ImportanceBakerCB>();
 
         private readonly NativeComputePipeline      _baseLayerCs;
         private readonly NativeComputeDescriptorSet _baseLayerDs;
@@ -215,9 +214,9 @@ namespace PathTracing
         {
             FillEnvBakerConstants(setting, sceneLights);
 
-            Texture sky      = setting?.environmentMap;
-            int     skyId    = sky != null ? sky.GetInstanceID() : 0;
-            uint    skyEdits = sky != null ? sky.updateCount : 0u; // bumps on CPU uploads (Apply etc.)
+            Texture sky       = setting?.environmentMap;
+            int     skyId     = sky != null ? sky.GetInstanceID() : 0;
+            uint    skyEdits  = sky != null ? sky.updateCount : 0u; // bumps on CPU uploads (Apply etc.)
             ulong   signature = ComputeEnvSignature(skyId, skyEdits);
 
             // A RenderTexture source can be rewritten on the GPU without any CPU-observable change
@@ -226,7 +225,7 @@ namespace PathTracing
             bool dynamicSource = sky is RenderTexture;
 
             _skipBake = !DebugForceDynamic && !dynamicSource
-                        && tex.EnvBaked && tex.EnvBakeSignature == signature;
+                                           && tex.EnvBaked && tex.EnvBakeSignature == signature;
             if (!_skipBake)
             {
                 // The bake is guaranteed to be recorded this frame, so mark it done now.
@@ -284,17 +283,19 @@ namespace PathTracing
             internal VolatileConstantBuffer     ImportanceBakerCb;
             internal EnvMapBakerCB              EnvBakerCbData;
             internal ImportanceBakerCB          ImportanceCbData;
-            internal IntPtr                     SkyTexturePtr;
+
+            internal IntPtr SkyTexturePtr;
+
             // True when SkyTexturePtr is a cubemap (DepthOrArraySize==6) source, so it must bind to
             // t_SrcCubemapEnvMap (BackgroundSourceType==2) rather than the equirectangular 2D slot.
-            internal bool                       SourceIsCube;
-            internal IntPtr                     EnvCubePtr;
-            internal IntPtr                     ImportanceMapPtr;
-            internal IntPtr                     RadianceMapPtr;
-            internal RenderTexture              ImportanceMapRt;
-            internal RenderTexture              RadianceMapRt;
-            internal IntPtr                     DummyCubePtr;
-            internal IntPtr                     DummyTex2DPtr;
+            internal bool          SourceIsCube;
+            internal IntPtr        EnvCubePtr;
+            internal IntPtr        ImportanceMapPtr;
+            internal IntPtr        RadianceMapPtr;
+            internal RenderTexture ImportanceMapRt;
+            internal RenderTexture RadianceMapRt;
+            internal IntPtr        DummyCubePtr;
+            internal IntPtr        DummyTex2DPtr;
 
             // BC6H compression (null pipeline ⇒ skipped).
             internal NativeComputePipeline      Bc6uCompressCs;
@@ -324,7 +325,7 @@ namespace PathTracing
             pd.EnvBakerCb        = _ctx.Buffers.EnvBakerCb;
             pd.ImportanceBakerCb = _ctx.Buffers.ImportanceBakerCb;
             pd.EnvBakerCbData    = s_envBakerCb;
-            pd.ImportanceCbData  = s_importanceCb; 
+            pd.ImportanceCbData  = s_importanceCb;
             pd.SkyTexturePtr     = _ctx.environmentMapPtrPtr != IntPtr.Zero ? _ctx.environmentMapPtrPtr : _ctx.blackTexturePtr;
             // A real cube source only counts when its native pointer is bound; otherwise SkyTexturePtr
             // fell back to the 2D black dummy and must use the equirectangular path.
@@ -384,6 +385,7 @@ namespace PathTracing
                     ds.SetTexture("t_SrcEquirectangularEnvMap", data.SkyTexturePtr);
                     ds.SetTexture("t_SrcCubemapEnvMap", data.DummyCubePtr);
                 }
+
                 ds.SetTexture("t_LowResPrePassCube", data.DummyCubePtr);
                 ds.SetTexture("t_ProcSkyTransmittance", data.DummyTex2DPtr);
                 ds.SetTexture("t_ProcSkyScatter", data.DummyTex2DPtr);
@@ -517,7 +519,7 @@ namespace PathTracing
                 if (lightCount >= 16) break;
 
                 var lightAngularSize = light.GetComponent<LightAngularSize>();
-                
+
                 Color   linear = light.color.linear;
                 Vector3 fwd    = light.transform.forward;
                 int     f      = lightCount * 8; // 8 floats per EMB_DirectionalLight
@@ -556,7 +558,7 @@ namespace PathTracing
         private static bool IsCubeTexture(Texture tex)
         {
             return tex is Cubemap
-                || (tex is RenderTexture rt && rt.dimension == TextureDimension.Cube);
+                   || (tex is RenderTexture rt && rt.dimension == TextureDimension.Cube);
         }
 
         private static void FillImportanceBakerConstants()

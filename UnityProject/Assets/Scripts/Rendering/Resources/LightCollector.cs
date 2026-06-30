@@ -12,8 +12,8 @@ namespace PathTracing
         private GraphicsBuffer _areaLightBuffer;
         private GraphicsBuffer _pointLightBuffer;
 
-        private readonly List<SpotLightData> _spotLightList = new();
-        private readonly List<AreaLightData> _areaLightList = new();
+        private readonly List<SpotLightData>  _spotLightList  = new();
+        private readonly List<AreaLightData>  _areaLightList  = new();
         private readonly List<PointLightData> _pointLightList = new();
 
         public GraphicsBuffer SpotLightBuffer => _spotLightBuffer;
@@ -43,18 +43,18 @@ namespace PathTracing
 
                 Vector3 pos = light.transform.position;
                 Vector3 dir = light.transform.forward.normalized;
-                Color fc = light.color * light.intensity;
+                Color   fc  = light.color * light.intensity;
 
                 float outerHalf = light.spotAngle * 0.5f * Mathf.Deg2Rad;
                 float innerHalf = light.innerSpotAngle * 0.5f * Mathf.Deg2Rad;
 
                 _spotLightList.Add(new SpotLightData
                 {
-                    position = pos,
-                    range = light.range,
-                    direction = dir,
+                    position      = pos,
+                    range         = light.range,
+                    direction     = dir,
                     cosOuterAngle = Mathf.Cos(outerHalf),
-                    color = new Vector3(fc.r, fc.g, fc.b),
+                    color         = new Vector3(fc.r, fc.g, fc.b),
                     cosInnerAngle = Mathf.Cos(innerHalf),
                 });
             }
@@ -83,20 +83,20 @@ namespace PathTracing
                 if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
                 if (light.type != LightType.Rectangle && light.type != LightType.Disc) continue;
 
-                Color fc = light.color * light.intensity;
-                Vector2 sz = light.areaSize;
-                bool isDisc = light.type == LightType.Disc;
+                Color   fc     = light.color * light.intensity;
+                Vector2 sz     = light.areaSize;
+                bool    isDisc = light.type == LightType.Disc;
 
                 _areaLightList.Add(new AreaLightData
                 {
-                    position = light.transform.position,
-                    halfWidth = isDisc ? sz.x : sz.x * 0.5f,
-                    right = light.transform.right.normalized,
+                    position   = light.transform.position,
+                    halfWidth  = isDisc ? sz.x : sz.x * 0.5f,
+                    right      = light.transform.right.normalized,
                     halfHeight = isDisc ? 0f : sz.y * 0.5f,
-                    up = light.transform.up.normalized,
-                    lightType = isDisc ? 1f : 0f,
-                    color = new Vector3(fc.r, fc.g, fc.b),
-                    pad2 = 0f,
+                    up         = light.transform.up.normalized,
+                    lightType  = isDisc ? 1f : 0f,
+                    color      = new Vector3(fc.r, fc.g, fc.b),
+                    pad2       = 0f,
                 });
             }
 
@@ -126,15 +126,15 @@ namespace PathTracing
 
                 Color fc = light.color * light.intensity;
 
-                var plr = light.GetComponent<PointLightRadius>();
+                var   plr    = light.GetComponent<PointLightRadius>();
                 float radius = plr != null ? Mathf.Max(0f, plr.radius) : 0f;
 
                 _pointLightList.Add(new PointLightData
                 {
                     position = light.transform.position,
-                    range = light.range,
-                    color = new Vector3(fc.r, fc.g, fc.b),
-                    radius = radius,
+                    range    = light.range,
+                    color    = new Vector3(fc.r, fc.g, fc.b),
+                    radius   = radius,
                 });
             }
 

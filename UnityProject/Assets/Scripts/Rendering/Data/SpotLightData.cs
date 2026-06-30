@@ -8,13 +8,13 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential)]
     public struct SpotLightData
     {
-        public Vector3 position;       // World-space position
-        public float   range;          // Maximum range
+        public Vector3 position; // World-space position
+        public float   range; // Maximum range
 
-        public Vector3 direction;      // Normalized forward direction (light → scene)
-        public float   cosOuterAngle;  // cos(outerHalfAngle)
+        public Vector3 direction; // Normalized forward direction (light → scene)
+        public float   cosOuterAngle; // cos(outerHalfAngle)
 
-        public Vector3 color;          // Pre-multiplied color * intensity
-        public float   cosInnerAngle;  // cos(innerHalfAngle)
+        public Vector3 color; // Pre-multiplied color * intensity
+        public float   cosInnerAngle; // cos(innerHalfAngle)
     }
 }

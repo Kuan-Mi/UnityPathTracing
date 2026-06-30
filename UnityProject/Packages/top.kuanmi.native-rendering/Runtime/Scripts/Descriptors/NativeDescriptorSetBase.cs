@@ -59,16 +59,23 @@ namespace NativeRender
             {
                 if (!s_nameToId.TryGetValue(name, out int id))
                 {
-                    id = s_nameToId.Count;
+                    id               = s_nameToId.Count;
                     s_nameToId[name] = id;
                 }
+
                 return id;
             }
         }
 
         private static int GlobalIdCount
         {
-            get { lock (s_idLock) { return s_nameToId.Count; } }
+            get
+            {
+                lock (s_idLock)
+                {
+                    return s_nameToId.Count;
+                }
+            }
         }
 
         // Native C++ descriptor-set handle.
@@ -221,12 +228,13 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = 0;
+            _stagingSlots[i].objectPtr  = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
+            _stagingSlots[i].format     = 0;
         }
+
         /// <summary>Binds a raw/structured buffer (SRV) by HLSL variable name.</summary>
         public void SetBuffer(string name, IntPtr bufferPtr) => SetBuffer(PropertyToID(name), bufferPtr);
 
@@ -235,12 +243,13 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = 0;
+            _stagingSlots[i].objectPtr  = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
+            _stagingSlots[i].format     = 0;
         }
+
         /// <summary>Binds an RW buffer (UAV) by HLSL variable name.</summary>
         public void SetRWBuffer(string name, IntPtr bufferPtr) => SetRWBuffer(PropertyToID(name), bufferPtr);
 
@@ -249,12 +258,13 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = 0;
+            _stagingSlots[i].objectPtr  = buffer != null ? buffer.Handle : 0;
+            _stagingSlots[i].objectKind = ObjKindNativeBuffer;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
+            _stagingSlots[i].format     = 0;
         }
+
         /// <summary>Binds an <see cref="UploadBuffer"/> as a raw RW buffer UAV.</summary>
         public void SetRWBuffer(string name, UploadBuffer buffer) => SetRWBuffer(PropertyToID(name), buffer);
 
@@ -263,12 +273,13 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = dxgiFormat;
+            _stagingSlots[i].objectPtr  = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = (uint)count;
+            _stagingSlots[i].stride     = 0;
+            _stagingSlots[i].format     = dxgiFormat;
         }
+
         /// <summary>Binds an RW typed buffer (UAV) with an explicit DXGI_FORMAT.</summary>
         public void SetRWTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
             => SetRWTypedBuffer(PropertyToID(name), bufferPtr, count, dxgiFormat);
@@ -278,12 +289,13 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = deviceBuffer.Handle;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = dxgiFormat;
+            _stagingSlots[i].objectPtr  = deviceBuffer.Handle;
+            _stagingSlots[i].objectKind = ObjKindNativeBuffer;
+            _stagingSlots[i].count      = (uint)count;
+            _stagingSlots[i].stride     = 0;
+            _stagingSlots[i].format     = dxgiFormat;
         }
+
         /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float2&gt;).</summary>
         public void SetRWTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
             => SetRWTypedBuffer(PropertyToID(name), deviceBuffer, count, dxgiFormat);
@@ -294,12 +306,13 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = dxgiFormat;
+            _stagingSlots[i].objectPtr  = buffer != null ? buffer.Handle : 0;
+            _stagingSlots[i].objectKind = ObjKindNativeBuffer;
+            _stagingSlots[i].count      = (uint)count;
+            _stagingSlots[i].stride     = 0;
+            _stagingSlots[i].format     = dxgiFormat;
         }
+
         /// <summary>Binds an <see cref="UploadBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float&gt;).</summary>
         public void SetRWTypedBuffer(string name, UploadBuffer buffer, int count, uint dxgiFormat)
             => SetRWTypedBuffer(PropertyToID(name), buffer, count, dxgiFormat);
@@ -309,17 +322,19 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = (uint)stride;
+            _stagingSlots[i].objectPtr  = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = (uint)count;
+            _stagingSlots[i].stride     = (uint)stride;
         }
+
         /// <summary>Binds a structured buffer (UAV) with explicit element count and stride.</summary>
         public void SetRWStructuredBuffer(string name, IntPtr bufferPtr, int count, int stride)
             => SetRWStructuredBuffer(PropertyToID(name), bufferPtr, count, stride);
 
         public void SetRWStructuredBuffer(int nameId, GraphicsBuffer buffe)
             => SetRWStructuredBuffer(nameId, buffe.GetNativeBufferPtr(), buffe.count, buffe.stride);
+
         public void SetRWStructuredBuffer(string name, GraphicsBuffer buffe)
             => SetRWStructuredBuffer(PropertyToID(name), buffe.GetNativeBufferPtr(), buffe.count, buffe.stride);
 
@@ -329,11 +344,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = (uint)stride;
+            _stagingSlots[i].objectPtr  = buffer != null ? buffer.Handle : 0;
+            _stagingSlots[i].objectKind = ObjKindNativeBuffer;
+            _stagingSlots[i].count      = (uint)count;
+            _stagingSlots[i].stride     = (uint)stride;
         }
+
         /// <summary>Binds an <see cref="UploadBuffer"/> as a RWStructuredBuffer UAV (resolved by handle).</summary>
         public void SetRWStructuredBuffer(string name, UploadBuffer buffer, int count, int stride)
             => SetRWStructuredBuffer(PropertyToID(name), buffer, count, stride);
@@ -343,11 +359,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)texturePtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].objectPtr  = (ulong)texturePtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
         }
+
         /// <summary>Binds a Texture2D or RenderTexture as a read-only texture (SRV).</summary>
         public void SetTexture(string name, IntPtr texturePtr) => SetTexture(PropertyToID(name), texturePtr);
 
@@ -362,10 +379,11 @@ namespace NativeRender
             if (i < 0) return;
             _stagingSlots[i].objectPtr  = (ulong)texturePtr;
             _stagingSlots[i].objectKind = ObjKindNone;
-            _stagingSlots[i].count      = (uint)mipCount;   // texture SRV: MipLevels (0 = all remaining)
-            _stagingSlots[i].stride     = (uint)firstMip;   // texture SRV: MostDetailedMip
+            _stagingSlots[i].count      = (uint)mipCount; // texture SRV: MipLevels (0 = all remaining)
+            _stagingSlots[i].stride     = (uint)firstMip; // texture SRV: MostDetailedMip
             _stagingSlots[i].format     = 0;
         }
+
         /// <summary>Binds a single mip range of a texture as an SRV.</summary>
         public void SetTexture(string name, IntPtr texturePtr, int firstMip, int mipCount)
             => SetTexture(PropertyToID(name), texturePtr, firstMip, mipCount);
@@ -384,10 +402,11 @@ namespace NativeRender
             if (i < 0) return;
             _stagingSlots[i].objectPtr  = (ulong)texturePtr;
             _stagingSlots[i].objectKind = ObjKindNone;
-            _stagingSlots[i].count      = 1;                // MipLevels = 1
-            _stagingSlots[i].stride     = (uint)mip;        // MostDetailedMip
-            _stagingSlots[i].format     = dxgiFormat;       // non-zero ⇒ Texture2DArray view
+            _stagingSlots[i].count      = 1; // MipLevels = 1
+            _stagingSlots[i].stride     = (uint)mip; // MostDetailedMip
+            _stagingSlots[i].format     = dxgiFormat; // non-zero ⇒ Texture2DArray view
         }
+
         /// <summary>Binds a cubemap/array mip as an explicit <c>Texture2DArray</c> SRV.</summary>
         public void SetTextureArraySlice(string name, IntPtr texturePtr, int mip, uint dxgiFormat)
             => SetTextureArraySlice(PropertyToID(name), texturePtr, mip, dxgiFormat);
@@ -397,11 +416,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)texturePtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].objectPtr  = (ulong)texturePtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
         }
+
         /// <summary>Binds a RenderTexture as a read-write texture (UAV).</summary>
         public void SetRWTexture(string name, IntPtr texturePtr) => SetRWTexture(PropertyToID(name), texturePtr);
 
@@ -413,9 +433,10 @@ namespace NativeRender
             _stagingSlots[i].objectPtr  = (ulong)texturePtr;
             _stagingSlots[i].objectKind = ObjKindNone;
             _stagingSlots[i].count      = 0;
-            _stagingSlots[i].stride     = (uint)mipSlice;   // texture UAV: MipSlice
+            _stagingSlots[i].stride     = (uint)mipSlice; // texture UAV: MipSlice
             _stagingSlots[i].format     = 0;
         }
+
         /// <summary>Binds a single mip slice of a texture as a UAV.</summary>
         public void SetRWTexture(string name, IntPtr texturePtr, int mipSlice)
             => SetRWTexture(PropertyToID(name), texturePtr, mipSlice);
@@ -432,9 +453,10 @@ namespace NativeRender
             _stagingSlots[i].objectPtr  = (ulong)texturePtr;
             _stagingSlots[i].objectKind = ObjKindNone;
             _stagingSlots[i].count      = 0;
-            _stagingSlots[i].stride     = (uint)baseMip;    // first mip of the array
+            _stagingSlots[i].stride     = (uint)baseMip; // first mip of the array
             _stagingSlots[i].format     = 0;
         }
+
         /// <summary>Binds a bounded UAV array to N consecutive mip slices of one texture.</summary>
         public void SetRWTextureMipArray(string name, IntPtr texturePtr, int baseMip)
             => SetRWTextureMipArray(PropertyToID(name), texturePtr, baseMip);
@@ -453,6 +475,7 @@ namespace NativeRender
             _stagingSlots[i].stride     = (uint)baseMip;
             _stagingSlots[i].format     = 0;
         }
+
         /// <summary>Binds a bounded SRV array to N consecutive single-mip views of one texture.</summary>
         public void SetTextureMipArray(string name, IntPtr texturePtr, int baseMip)
             => SetTextureMipArray(PropertyToID(name), texturePtr, baseMip);
@@ -462,11 +485,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].objectPtr  = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
         }
+
         /// <summary>Binds a GraphicsBuffer as a constant buffer (CBV).</summary>
         public void SetConstantBuffer(string name, IntPtr bufferPtr) => SetConstantBuffer(PropertyToID(name), bufferPtr);
 
@@ -475,11 +499,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = volatileConstantBuffer.Handle;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].objectPtr  = volatileConstantBuffer.Handle;
+            _stagingSlots[i].objectKind = ObjKindNativeBuffer;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
         }
+
         /// <summary>Binds a <see cref="VolatileConstantBuffer"/> as a constant buffer (CBV).</summary>
         public void SetConstantBuffer(string name, VolatileConstantBuffer volatileConstantBuffer)
             => SetConstantBuffer(PropertyToID(name), volatileConstantBuffer);
@@ -489,12 +514,13 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = dxgiFormat;
+            _stagingSlots[i].objectPtr  = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = (uint)count;
+            _stagingSlots[i].stride     = 0;
+            _stagingSlots[i].format     = dxgiFormat;
         }
+
         /// <summary>Binds a typed buffer SRV (e.g. Buffer&lt;float2&gt;) with explicit DXGI_FORMAT.</summary>
         public void SetTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
             => SetTypedBuffer(PropertyToID(name), bufferPtr, count, dxgiFormat);
@@ -504,12 +530,13 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = deviceBuffer.Handle;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = dxgiFormat;
+            _stagingSlots[i].objectPtr  = deviceBuffer.Handle;
+            _stagingSlots[i].objectKind = ObjKindNativeBuffer;
+            _stagingSlots[i].count      = (uint)count;
+            _stagingSlots[i].stride     = 0;
+            _stagingSlots[i].format     = dxgiFormat;
         }
+
         /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed buffer SRV (e.g. Buffer&lt;float2&gt;).</summary>
         public void SetTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
             => SetTypedBuffer(PropertyToID(name), deviceBuffer, count, dxgiFormat);
@@ -519,17 +546,19 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = (uint)elementCount;
-            _stagingSlots[i].stride      = (uint)elementStride;
+            _stagingSlots[i].objectPtr  = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = (uint)elementCount;
+            _stagingSlots[i].stride     = (uint)elementStride;
         }
+
         /// <summary>Binds a StructuredBuffer SRV with explicit element count and stride.</summary>
         public void SetStructuredBuffer(string name, IntPtr bufferPtr, int elementCount, int elementStride)
             => SetStructuredBuffer(PropertyToID(name), bufferPtr, elementCount, elementStride);
 
         public void SetStructuredBuffer(int nameId, GraphicsBuffer buffer)
             => SetStructuredBuffer(nameId, buffer.GetNativeBufferPtr(), buffer.count, buffer.stride);
+
         public void SetStructuredBuffer(string name, GraphicsBuffer buffer)
             => SetStructuredBuffer(PropertyToID(name), buffer.GetNativeBufferPtr(), buffer.count, buffer.stride);
 
@@ -539,17 +568,19 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = (uint)elementCount;
-            _stagingSlots[i].stride      = (uint)elementStride;
+            _stagingSlots[i].objectPtr  = buffer != null ? buffer.Handle : 0;
+            _stagingSlots[i].objectKind = ObjKindNativeBuffer;
+            _stagingSlots[i].count      = (uint)elementCount;
+            _stagingSlots[i].stride     = (uint)elementStride;
         }
+
         /// <summary>Binds an <see cref="UploadBuffer"/> as a StructuredBuffer SRV (resolved by handle).</summary>
         public void SetStructuredBuffer(string name, UploadBuffer buffer, int elementCount, int elementStride)
             => SetStructuredBuffer(PropertyToID(name), buffer, elementCount, elementStride);
 
         public void SetStructuredBuffer(int nameId, UploadBuffer buffer)
             => SetStructuredBuffer(nameId, buffer, buffer != null ? buffer.count : 0, buffer != null ? buffer.stride : 0);
+
         public void SetStructuredBuffer(string name, UploadBuffer buffer)
             => SetStructuredBuffer(PropertyToID(name), buffer, buffer != null ? buffer.count : 0, buffer != null ? buffer.stride : 0);
 
@@ -558,11 +589,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = accelStructure != null ? accelStructure.Handle : 0;
-            _stagingSlots[i].objectKind  = ObjKindAccelStruct;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].objectPtr  = accelStructure != null ? accelStructure.Handle : 0;
+            _stagingSlots[i].objectKind = ObjKindAccelStruct;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
         }
+
         /// <summary>Binds a RaytracingAccelerationStructure (TLAS) by HLSL variable name.</summary>
         public void SetAccelerationStructure(string name, RayTracingAccelerationStructure accelStructure)
             => SetAccelerationStructure(PropertyToID(name), accelStructure);
@@ -572,11 +604,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = bt != null ? bt.Handle : 0;
-            _stagingSlots[i].objectKind  = ObjKindBindlessTexture;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].objectPtr  = bt != null ? bt.Handle : 0;
+            _stagingSlots[i].objectKind = ObjKindBindlessTexture;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
         }
+
         /// <summary>Binds a BindlessTexture to an unbounded Texture2D[] variable.</summary>
         public void SetBindlessTexture(string name, BindlessTexture bt) => SetBindlessTexture(PropertyToID(name), bt);
 
@@ -585,11 +618,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = bb != null ? bb.Handle : 0;
-            _stagingSlots[i].objectKind  = ObjKindBindlessBuffer;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].objectPtr  = bb != null ? bb.Handle : 0;
+            _stagingSlots[i].objectKind = ObjKindBindlessBuffer;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
         }
+
         /// <summary>Binds a BindlessBuffer to an unbounded ByteAddressBuffer[] variable.</summary>
         public void SetBindlessBuffer(string name, BindlessBuffer bb) => SetBindlessBuffer(PropertyToID(name), bb);
 
@@ -603,11 +637,12 @@ namespace NativeRender
         {
             int i = SlotFromId(nameId);
             if (i < 0) return;
-            _stagingSlots[i].objectPtr   = uav != null ? uav.Handle : 0;
-            _stagingSlots[i].objectKind  = ObjKindBindlessUAVTexture;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].objectPtr  = uav != null ? uav.Handle : 0;
+            _stagingSlots[i].objectKind = ObjKindBindlessUAVTexture;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = 0;
         }
+
         /// <summary>Binds a BindlessUAVTexture to an unbounded RWTexture2D[] variable.</summary>
         public void SetBindlessRWTexture(string name, BindlessUAVTexture uav, IntPtr baseResource = default)
             => SetBindlessRWTexture(PropertyToID(name), uav, baseResource);
@@ -630,13 +665,14 @@ namespace NativeRender
                     dst + i * MaxRootConstantBytes + destByteOffset,
                     MaxRootConstantBytes - destByteOffset,
                     byteCount);
-            _stagingSlots[i].objectPtr   = 0; // resolved to pinned ptr at Snapshot time
-            _stagingSlots[i].count       = count32;
-            _stagingSlots[i].stride      = destOffset32;
-            _stagingSlots[i].objectKind  = ObjKindRootConstants;
-            _slotIsRootConst[i]          = true;
-            _anyRootConst                = true;
+            _stagingSlots[i].objectPtr  = 0; // resolved to pinned ptr at Snapshot time
+            _stagingSlots[i].count      = count32;
+            _stagingSlots[i].stride     = destOffset32;
+            _stagingSlots[i].objectKind = ObjKindRootConstants;
+            _slotIsRootConst[i]         = true;
+            _anyRootConst               = true;
         }
+
         /// <summary>Pushes inline 32-bit constants directly into the root signature.</summary>
         public unsafe void SetRootConstants<T>(
             string name, T* dataPtr, uint count32 = 0, uint destOffset32 = 0)
@@ -661,13 +697,14 @@ namespace NativeRender
                     dst + i * MaxRootConstantBytes + destByteOffset,
                     MaxRootConstantBytes - destByteOffset,
                     byteCount);
-            _stagingSlots[i].objectPtr   = 0;
-            _stagingSlots[i].count       = count32;
-            _stagingSlots[i].stride      = destOffset32;
-            _stagingSlots[i].objectKind  = ObjKindRootConstants;
-            _slotIsRootConst[i]          = true;
-            _anyRootConst                = true;
+            _stagingSlots[i].objectPtr  = 0;
+            _stagingSlots[i].count      = count32;
+            _stagingSlots[i].stride     = destOffset32;
+            _stagingSlots[i].objectKind = ObjKindRootConstants;
+            _slotIsRootConst[i]         = true;
+            _anyRootConst               = true;
         }
+
         /// <summary>Pushes inline 32-bit constants from a <see cref="NativeArray{T}"/>.</summary>
         public unsafe void SetRootConstants<T>(
             string name, NativeArray<T> data, uint count32 = 0, uint destOffset32 = 0)

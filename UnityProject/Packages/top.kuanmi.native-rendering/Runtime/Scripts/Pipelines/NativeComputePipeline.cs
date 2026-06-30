@@ -14,15 +14,28 @@ namespace NativeRender
     {
         /// <summary>The HLSL variable name of the ConstantBuffer.</summary>
         public string Name;
+
         /// <summary>Total number of 32-bit values in the constant buffer.</summary>
-        public uint   Count;
+        public uint Count;
     }
 
     /// <summary>Texture filtering mode for a <see cref="SamplerHint"/>. Order matches the native parser.</summary>
-    public enum SamplerFilter { Point = 0, Linear = 1, Anisotropic = 2 }
+    public enum SamplerFilter
+    {
+        Point       = 0,
+        Linear      = 1,
+        Anisotropic = 2
+    }
 
     /// <summary>Texture address (wrap) mode for a <see cref="SamplerHint"/>. Order matches the native parser.</summary>
-    public enum SamplerAddress { Wrap = 0, Clamp = 1, Mirror = 2, MirrorOnce = 3, Border = 4 }
+    public enum SamplerAddress
+    {
+        Wrap       = 0,
+        Clamp      = 1,
+        Mirror     = 2,
+        MirrorOnce = 3,
+        Border     = 4
+    }
 
     /// <summary>
     /// Overrides the static-sampler attributes for one HLSL sampler, replacing the
@@ -33,17 +46,22 @@ namespace NativeRender
     public struct SamplerHint
     {
         /// <summary>HLSL sampler variable name to match exactly.</summary>
-        public string         Name;
-        public SamplerFilter  Filter;
+        public string Name;
+
+        public SamplerFilter Filter;
+
         /// <summary>Address mode for the U/V/W texture axes. Usually all three are equal;
         /// they differ only for cases like an equirectangular sampler (U=Wrap, V/W=Clamp).</summary>
         public SamplerAddress AddressU;
+
         public SamplerAddress AddressV;
         public SamplerAddress AddressW;
+
         /// <summary>Sample mip levels (MaxLOD 16) when true; clamp to mip 0 otherwise.</summary>
-        public bool           Mips;
+        public bool Mips;
+
         /// <summary>Max anisotropy; used only when <see cref="Filter"/> is Anisotropic.</summary>
-        public uint           MaxAnisotropy;
+        public uint MaxAnisotropy;
     }
 
     /// <summary>
@@ -62,14 +80,15 @@ namespace NativeRender
                 if (i > 0) sb.Append(',');
                 var h = hints[i];
                 sb.Append("{\"name\":\"").Append(h.Name)
-                  .Append("\",\"filter\":").Append((int)h.Filter)
-                  .Append(",\"addressU\":").Append((int)h.AddressU)
-                  .Append(",\"addressV\":").Append((int)h.AddressV)
-                  .Append(",\"addressW\":").Append((int)h.AddressW)
-                  .Append(",\"mips\":").Append(h.Mips ? 1 : 0)
-                  .Append(",\"aniso\":").Append(h.MaxAnisotropy)
-                  .Append('}');
+                    .Append("\",\"filter\":").Append((int)h.Filter)
+                    .Append(",\"addressU\":").Append((int)h.AddressU)
+                    .Append(",\"addressV\":").Append((int)h.AddressV)
+                    .Append(",\"addressW\":").Append((int)h.AddressW)
+                    .Append(",\"mips\":").Append(h.Mips ? 1 : 0)
+                    .Append(",\"aniso\":").Append(h.MaxAnisotropy)
+                    .Append('}');
             }
+
             sb.Append(']');
         }
     }
@@ -87,15 +106,15 @@ namespace NativeRender
     /// </summary>
     public sealed class NativeComputePipeline : IDisposable
     {
-        private ulong _handle;
+        private ulong               _handle;
         private NativeComputeShader _shader;
         private RootConstantsHint[] _rootConstantsHints; // may be null
-        private string[]            _rootSRVHints;       // may be null
-        private SamplerHint[]       _samplerHints;       // from shader asset; may be null
+        private string[]            _rootSRVHints; // may be null
+        private SamplerHint[]       _samplerHints; // from shader asset; may be null
 
         // Slot layout: name → slot index as reported by NR_CS_GetSlotIndex
         private Dictionary<string, uint> _nameToSlot;
-        private uint _slotCount;
+        private uint                     _slotCount;
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -123,8 +142,10 @@ namespace NativeRender
         /// </summary>
         public NativeComputePipeline(NativeComputeShader shader)
             : this(shader,
-                   shader != null ? shader.RootConstantsHints : null,
-                   shader != null ? shader.RootSRVHints        : null) { }
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null)
+        {
+        }
 
         /// <summary>
         /// Creates a new compute pipeline, promoting the specified CBV bindings to
@@ -133,7 +154,9 @@ namespace NativeRender
         /// for this pipeline.
         /// </summary>
         public NativeComputePipeline(NativeComputeShader shader, RootConstantsHint[] rootConstantsHints)
-            : this(shader, rootConstantsHints, null) { }
+            : this(shader, rootConstantsHints, null)
+        {
+        }
 
         /// <summary>
         /// Creates a new compute pipeline with both root constants and root SRV hints.
@@ -174,9 +197,9 @@ namespace NativeRender
         }
 
         private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-                                             SamplerHint[] samplerHints)
+            SamplerHint[] samplerHints)
         {
-            bool hasRC   = rcHints  != null && rcHints.Length  > 0;
+            bool hasRC   = rcHints != null && rcHints.Length > 0;
             bool hasSRV  = srvHints != null && srvHints.Length > 0;
             bool hasSamp = SamplerHintJson.Has(samplerHints);
             if (!hasRC && !hasSRV && !hasSamp) return null;
@@ -198,6 +221,7 @@ namespace NativeRender
                     sb.Append(rcHints[i].Count);
                     sb.Append('}');
                 }
+
                 sb.Append(']');
                 any = true;
             }
@@ -214,6 +238,7 @@ namespace NativeRender
                     sb.Append(srvHints[i]);
                     sb.Append('"');
                 }
+
                 sb.Append(']');
                 any = true;
             }
@@ -238,7 +263,7 @@ namespace NativeRender
             string json = shader.ReflectionJson ?? "";
             if (_slotCount > 0 && json.Length > 0)
             {
-                int arrayStart = -1;
+                int arrayStart  = -1;
                 int bindingsIdx = json.IndexOf("\"bindings\"", StringComparison.Ordinal);
                 if (bindingsIdx >= 0)
                     arrayStart = json.IndexOf('[', bindingsIdx);
@@ -261,6 +286,7 @@ namespace NativeRender
                             if (idx != uint.MaxValue)
                                 _nameToSlot[name] = idx;
                         }
+
                         pos = objEnd + 1;
                     }
                 }
@@ -326,7 +352,7 @@ namespace NativeRender
         /// Safe to call multiple times per frame with different descriptor sets.
         /// </summary>
         public void Dispatch(CommandBuffer cmd, NativeComputeDescriptorSet descriptorSet,
-                             uint threadGroupX, uint threadGroupY, uint threadGroupZ)
+            uint threadGroupX, uint threadGroupY, uint threadGroupZ)
         {
             if (!IsValid || descriptorSet == null) return;
 
@@ -347,7 +373,7 @@ namespace NativeRender
         private static string ExtractJsonString(string obj, string key)
         {
             string search = "\"" + key + "\"";
-            int ki = obj.IndexOf(search, StringComparison.Ordinal);
+            int    ki     = obj.IndexOf(search, StringComparison.Ordinal);
             if (ki < 0) return null;
             int colon = obj.IndexOf(':', ki + search.Length);
             if (colon < 0) return null;

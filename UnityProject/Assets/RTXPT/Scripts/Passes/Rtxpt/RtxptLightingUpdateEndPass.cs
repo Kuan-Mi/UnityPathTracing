@@ -107,7 +107,7 @@ namespace PathTracing
         {
             internal NativeComputePipeline      P1aCs, P1bCs, P2Cs, P3Cs, ClearCs, DebugVizCs;
             internal NativeComputeDescriptorSet P1aDs, P1bDs, P2Ds, P3Ds, ClearDs, DebugVizDs;
-            internal RtxptPassContext     Ctx;
+            internal RtxptPassContext           Ctx;
         }
 
         // ── RenderGraph ────────────────────────────────────────────────────────
@@ -116,19 +116,19 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("LightingUpdateEnd", out var pd);
 
-            pd.P1aCs   = _p1aCs;
-            pd.P1aDs   = _p1aDs;
-            pd.P1bCs   = _p1bCs;
-            pd.P1bDs   = _p1bDs;
-            pd.P2Cs    = _p2Cs;
-            pd.P2Ds    = _p2Ds;
-            pd.P3Cs    = _p3Cs;
-            pd.P3Ds    = _p3Ds;
-            pd.ClearCs = _clearCs;
-            pd.ClearDs = _clearDs;
+            pd.P1aCs      = _p1aCs;
+            pd.P1aDs      = _p1aDs;
+            pd.P1bCs      = _p1bCs;
+            pd.P1bDs      = _p1bDs;
+            pd.P2Cs       = _p2Cs;
+            pd.P2Ds       = _p2Ds;
+            pd.P3Cs       = _p3Cs;
+            pd.P3Ds       = _p3Ds;
+            pd.ClearCs    = _clearCs;
+            pd.ClearDs    = _clearDs;
             pd.DebugVizCs = _debugVizCs;
             pd.DebugVizDs = _debugVizDs;
-            pd.Ctx     = _ctx;
+            pd.Ctx        = _ctx;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData d, UnsafeGraphContext c) => ExecutePass(d, c));
@@ -149,7 +149,7 @@ namespace PathTracing
             // (begin pass sets ImportanceSamplingType = useNEE ? neeType : 0).
             var setting = ctx.Setting;
             bool neeAtEnabled = setting != null && setting.useNEE
-                                && setting.neeType == RtxptNeeType.NEEAT;
+                                                && setting.neeType == RtxptNeeType.NEEAT;
             if (!neeAtEnabled)
                 return;
 
@@ -222,7 +222,7 @@ namespace PathTracing
                 ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
                 ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
                 ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", buf.HistoryRemapPastToCurrent, buf.HistoryRemapPastToCurrent.count, DXGI_FORMAT_R32_UINT);
-                ds.SetRWTypedBuffer("u_lightSamplingProxies",      buf.LightSamplingProxiesPtr,   buf.LightSamplingProxies.count,   DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer("u_lightSamplingProxies", buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
 
 

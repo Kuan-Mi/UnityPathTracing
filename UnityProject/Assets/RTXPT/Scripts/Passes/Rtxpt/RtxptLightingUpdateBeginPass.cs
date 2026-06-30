@@ -1,5 +1,4 @@
 using PathTracing.Profiling;
-
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -45,7 +44,7 @@ namespace PathTracing
         // ====================================================================
 
         // LightingTypes.hlsli
-        private const uint  RTXPT_INVALID_LIGHT_INDEX = 0xFFFFFFFFu;
+        private const uint RTXPT_INVALID_LIGHT_INDEX = 0xFFFFFFFFu;
 
         // PolymorphicLight.h
         private const uint  kTypeShift               = 24;
@@ -157,8 +156,8 @@ namespace PathTracing
         // Indexed by analytic-local index i; the corresponding global light slot is EnvQtTotalNodeCount+i.
         //   s_currentToPastStaging[i]      = previous-frame global index of light i (or INVALID).
         //   s_pastToCurrentStaging[j]      = current global index that maps onto current analytic slot j.
-        private static          uint[] s_currentToPastStaging = new uint[RtxptBufferResources.MaxLights];
-        private static          uint[] s_pastToCurrentStaging = new uint[RtxptBufferResources.MaxLights];
+        private static uint[] s_currentToPastStaging = new uint[RtxptBufferResources.MaxLights];
+        private static uint[] s_pastToCurrentStaging = new uint[RtxptBufferResources.MaxLights];
 
         // Env-quad-node placeholders for the [0..EnvQt) range, uploaded unconditionally every frame to
         // mirror LightsBaker::CollectEnvmapLightPlaceholders. The light/lightsEx structs are zeroed (the
@@ -191,24 +190,24 @@ namespace PathTracing
         // ====================================================================
 
         private RtxptPassContext _ctx;
-        private int                    _analyticLightCount;
+        private int              _analyticLightCount;
 
         // Cross-frame analytic-light history matching (mirrors C++ m_historyRemapAnalyticLightIndices +
         // LightLink). Ping-pong maps keyed by Unity light InstanceID → global light index assigned that
         // frame. _prev holds last frame's assignment (read this frame); _cur is built this frame.
-        private Dictionary<int, uint>  _prevAnalyticLightIndices = new Dictionary<int, uint>();
-        private Dictionary<int, uint>  _curAnalyticLightIndices  = new Dictionary<int, uint>();
-        private int                    _emissiveTaskCount;
-        private uint                   _emissiveTotalTriCount;
-        private bool                   _ping = true; // ping-pong for weights buffer
-        private int                    _dbgFrameCounter;
-        private uint                   _historicTotalLightCount;
-        private bool                   _feedbackBufferFilled;
-        private bool                   _previousFrameTemporalFeedbackAvailable;
-        private Vector2                _localJitterSequence;
-        private uint2                  _localSamplingTileJitter;
-        private uint2                  _prevLocalSamplingTileJitter;
-        private int2                   _prevRenderResolution;
+        private Dictionary<int, uint> _prevAnalyticLightIndices = new Dictionary<int, uint>();
+        private Dictionary<int, uint> _curAnalyticLightIndices  = new Dictionary<int, uint>();
+        private int                   _emissiveTaskCount;
+        private uint                  _emissiveTotalTriCount;
+        private bool                  _ping = true; // ping-pong for weights buffer
+        private int                   _dbgFrameCounter;
+        private uint                  _historicTotalLightCount;
+        private bool                  _feedbackBufferFilled;
+        private bool                  _previousFrameTemporalFeedbackAvailable;
+        private Vector2               _localJitterSequence;
+        private uint2                 _localSamplingTileJitter;
+        private uint2                 _prevLocalSamplingTileJitter;
+        private int2                  _prevRenderResolution;
 
         /// <summary>lightsBuffer index where emissive triangles start (= EnvQtTotalNodeCount + analyticLightCount).</summary>
         public uint EmissiveLightOffset => EnvQtTotalNodeCount + (uint)_analyticLightCount;
@@ -218,17 +217,17 @@ namespace PathTracing
 
         // Light statistics for the editor "Info and statistics:" block (LightsBaker::InfoGUI).
         public uint EnvmapQuadNodeCount => EnvQtTotalNodeCount;
-        public uint AnalyticLightCount  => (uint)_analyticLightCount;
-        public uint TotalLightCount     => EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
+        public uint AnalyticLightCount => (uint)_analyticLightCount;
+        public uint TotalLightCount => EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
 
         // GPU-computed stats from the control buffer (LightsBaker::m_lastReadback — proxies are
         // counted and weights summed on GPU during the proxy build, LightsBaker.cpp:1301-1326).
         // Filled by an async readback a few frames behind, like the original's delayed copy.
-        public uint  SamplingProxyCount { get; private set; }
-        public float WeightsSum         { get; private set; }
-        public bool  HasControlReadback { get; private set; }
+        public uint SamplingProxyCount { get; private set; }
+        public float WeightsSum { get; private set; }
+        public bool HasControlReadback { get; private set; }
         private readonly RtxptLightingControlData[] _controlReadback = new RtxptLightingControlData[1];
-        private bool _controlReadbackPending;
+        private          bool                       _controlReadbackPending;
 
         // ====================================================================
         // Constructor
@@ -341,7 +340,6 @@ namespace PathTracing
             _processFeedbackHistoryPreFilterCs?.Dispose();
             _processFeedbackHistoryP0Ds?.Dispose();
             _processFeedbackHistoryP0Cs?.Dispose();
-
         }
 
         // ====================================================================
@@ -387,38 +385,40 @@ namespace PathTracing
             internal IntPtr                     EnvLightLookupMapPtr;
 
             // --- BakeEmissiveTriangles ---
-            internal NativeComputePipeline      BakeEmissiveTrianglesCs;
+            internal NativeComputePipeline BakeEmissiveTrianglesCs;
+
             internal NativeComputeDescriptorSet BakeEmissiveTrianglesDs;
+
             // Scene SRV buffers (t_SubInstanceData/t_InstanceData/t_GeometryData/t_PTMaterialData) are
             // bound at execute time via GpuScene.BindToShader(ds); no per-buffer pointers cached here.
-            internal int                        EmissiveTaskCount;
+            internal int EmissiveTaskCount;
 
             // --- Proxy build ---
-            internal NativeComputePipeline      ResetProxyCountersCs;
-            internal NativeComputeDescriptorSet ResetProxyCountersDs;
-            internal NativeComputePipeline      ResetPastToCurrentCs;
-            internal NativeComputeDescriptorSet ResetPastToCurrentDs;
-            internal NativeComputePipeline      ComputeWeightsCs;
-            internal NativeComputeDescriptorSet ComputeWeightsDs;
-            internal NativeComputePipeline      ComputeProxyCountsCs;
-            internal NativeComputeDescriptorSet ComputeProxyCountsDs;
-            internal NativeComputePipeline      ComputeProxyBaselineOffsetsCs;
-            internal NativeComputeDescriptorSet ComputeProxyBaselineOffsetsDs;
-            internal NativeComputePipeline      CreateProxyJobsCs;
-            internal NativeComputeDescriptorSet CreateProxyJobsDs;
-            internal NativeComputePipeline      ExecuteProxyJobsCs;
-            internal NativeComputeDescriptorSet ExecuteProxyJobsDs;
-            internal uint                       TotalLightCount;
-            internal uint                       HistoricTotalLightCount;
-            internal UploadBuffer               LightControlBuffer;
-            internal UploadBuffer     LightBuffer;
-            internal UploadBuffer     LightExBuffer;
-            internal RtxptLightingControlData[] ControlData;
-            internal RtxptPolymorphicLightInfo[] LightData;
+            internal NativeComputePipeline         ResetProxyCountersCs;
+            internal NativeComputeDescriptorSet    ResetProxyCountersDs;
+            internal NativeComputePipeline         ResetPastToCurrentCs;
+            internal NativeComputeDescriptorSet    ResetPastToCurrentDs;
+            internal NativeComputePipeline         ComputeWeightsCs;
+            internal NativeComputeDescriptorSet    ComputeWeightsDs;
+            internal NativeComputePipeline         ComputeProxyCountsCs;
+            internal NativeComputeDescriptorSet    ComputeProxyCountsDs;
+            internal NativeComputePipeline         ComputeProxyBaselineOffsetsCs;
+            internal NativeComputeDescriptorSet    ComputeProxyBaselineOffsetsDs;
+            internal NativeComputePipeline         CreateProxyJobsCs;
+            internal NativeComputeDescriptorSet    CreateProxyJobsDs;
+            internal NativeComputePipeline         ExecuteProxyJobsCs;
+            internal NativeComputeDescriptorSet    ExecuteProxyJobsDs;
+            internal uint                          TotalLightCount;
+            internal uint                          HistoricTotalLightCount;
+            internal UploadBuffer                  LightControlBuffer;
+            internal UploadBuffer                  LightBuffer;
+            internal UploadBuffer                  LightExBuffer;
+            internal RtxptLightingControlData[]    ControlData;
+            internal RtxptPolymorphicLightInfo[]   LightData;
             internal RtxptPolymorphicLightInfoEx[] LightExData;
-            internal int                        AnalyticLightCount;
-            internal uint[]                     CurrentToPastData;
-            internal uint[]                     PastToCurrentData;
+            internal int                           AnalyticLightCount;
+            internal uint[]                        CurrentToPastData;
+            internal uint[]                        PastToCurrentData;
 
             // --- Feedback pre-processing (begin) ---
             internal NativeComputePipeline      ProcessFeedbackHistoryPreFilterCs;
@@ -497,24 +497,25 @@ namespace PathTracing
             pd.ProcessFeedbackHistoryP0Ds        = _processFeedbackHistoryP0Ds;
             pd.LastFrameFeedbackAvailable        = s_controlStaging[0].LastFrameTemporalFeedbackAvailable != 0;
             // m_importanceBoost_PreFilter (LightsBaker.cpp:1206) gates the PreFilter dispatch.
-            pd.ImportanceBoostPreFilter          = _ctx.Setting?.neeatImportanceBoostPreFilter ?? true;
+            pd.ImportanceBoostPreFilter = _ctx.Setting?.neeatImportanceBoostPreFilter ?? true;
 
             // Debug draw lights (LightsBaker.cpp:1290) — needs the ShaderDebug buffer for output.
             pd.DebugDrawLightsCs = _debugDrawLightsCs;
             pd.DebugDrawLightsDs = _debugDrawLightsDs;
-            pd.DbgDrawLights     = (_ctx.Setting?.neeatDbgDrawLights ?? false)
-                                   && (_ctx.Setting?.enableShaderDebug ?? false)
-                                   && _ctx.Buffers.ShaderDebugBufferPtr != IntPtr.Zero;
+            pd.DbgDrawLights = (_ctx.Setting?.neeatDbgDrawLights ?? false)
+                               && (_ctx.Setting?.enableShaderDebug ?? false)
+                               && _ctx.Buffers.ShaderDebugBufferPtr != IntPtr.Zero;
 
             // Control-buffer stats readback (LightsBaker.cpp:1301-1326 "for debugging only").
             // Poll the previous request here (main thread); issue a new one in Execute when idle.
             if (_controlReadbackPending && _ctx.Buffers.LightControlBuffer.TryGetReadback(_controlReadback, 1))
             {
                 _controlReadbackPending = false;
-                SamplingProxyCount = _controlReadback[0].SamplingProxyCount;
-                WeightsSum         = math.asfloat(_controlReadback[0].WeightsSumUINT);
-                HasControlReadback = true;
+                SamplingProxyCount      = _controlReadback[0].SamplingProxyCount;
+                WeightsSum              = math.asfloat(_controlReadback[0].WeightsSumUINT);
+                HasControlReadback      = true;
             }
+
             pd.RequestControlReadback = !_controlReadbackPending;
             _controlReadbackPending   = true;
 
@@ -522,7 +523,7 @@ namespace PathTracing
             pd.BakeEmissiveTrianglesCs = _bakeEmissiveTrianglesCs;
             pd.BakeEmissiveTrianglesDs = _bakeEmissiveTrianglesDs;
             pd.EmissiveTaskCount       = _emissiveTaskCount;
-            _historicTotalLightCount = pd.TotalLightCount;
+            _historicTotalLightCount   = pd.TotalLightCount;
 
             // Flip ping-pong AFTER filling passData so BuildControlData used same side
             _ping = !_ping;
@@ -907,7 +908,7 @@ namespace PathTracing
 
         private int CollectAndPackLights()
         {
-            int count = 0;
+            int count       = 0;
             var sceneLights = _ctx.SceneLights;
             if (sceneLights != null)
             {
@@ -1018,35 +1019,35 @@ namespace PathTracing
             Color envTint      = (_ctx.Setting?.environmentMapTint ?? Color.white).linear;
 
             ref var ctrl = ref s_controlStaging[0];
-            ctrl                         = default;
+            ctrl = default;
             var setting = _ctx.Setting;
             // Original (LightsBaker.cpp:1022): TemporalFeedbackRequired depends only on
             // ImportanceSamplingType == NEEAT, not on the global UseNEE toggle.
-            bool neeAtSelected      = setting != null && setting.neeType == RtxptNeeType.NEEAT;
-            bool neeAtEnabled       = setting != null && setting.useNEE && neeAtSelected;
+            bool neeAtSelected = setting != null && setting.neeType == RtxptNeeType.NEEAT;
+            bool neeAtEnabled  = setting != null && setting.useNEE && neeAtSelected;
             if (!neeAtSelected)
                 _feedbackBufferFilled = false;
 
             // Original (LightsBaker.cpp:1021): feedback availability also gated by the
             // "disable last frame feedback" debug switch.
-            bool lastFrameFeedback  = neeAtEnabled && _feedbackBufferFilled
-                                      && !(setting?.neeatDbgDisableLastFrameFeedback ?? false);
-            bool lastFrameLocal     = _previousFrameTemporalFeedbackAvailable && lastFrameFeedback;
-            uint totalLightCount    = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
-            int2 renderRes          = _ctx.RenderResolution;
-            uint feedbackW          = (uint)Math.Max(1, renderRes.x);
-            uint feedbackH          = (uint)Math.Max(1, renderRes.y);
-            uint blendedW           = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
-            uint blendedH           = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
+            bool lastFrameFeedback = neeAtEnabled && _feedbackBufferFilled
+                                                  && !(setting?.neeatDbgDisableLastFrameFeedback ?? false);
+            bool lastFrameLocal  = _previousFrameTemporalFeedbackAvailable && lastFrameFeedback;
+            uint totalLightCount = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
+            int2 renderRes       = _ctx.RenderResolution;
+            uint feedbackW       = (uint)Math.Max(1, renderRes.x);
+            uint feedbackH       = (uint)Math.Max(1, renderRes.y);
+            uint blendedW        = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
+            uint blendedH        = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
             // +1 border tile on each axis for the jitter offset (LightsBaker.cpp:340-341).
             // This is the LocalSamplingResolution used as the addressing stride — must match the
             // LocalSamplingBuffer allocation (RtxptBufferResources) and the P2/P3 dispatch dims.
-            uint localW             = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE) + 1;
-            uint localH             = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE) + 1;
-            uint p0ThreadCount      = ((feedbackW + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
-                                    * ((feedbackH + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
-                                    * LLB_NUM_COMPUTE_THREADS_2D * LLB_NUM_COMPUTE_THREADS_2D;
- 
+            uint localW = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE) + 1;
+            uint localH = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE) + 1;
+            uint p0ThreadCount = ((feedbackW + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
+                                 * ((feedbackH + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
+                                 * LLB_NUM_COMPUTE_THREADS_2D * LLB_NUM_COMPUTE_THREADS_2D;
+
             ctrl.TotalLightCount                    = totalLightCount;
             ctrl.AnalyticLightCount                 = (uint)_analyticLightCount;
             ctrl.EnvmapQuadNodeCount                = EnvQtTotalNodeCount;
@@ -1057,20 +1058,20 @@ namespace PathTracing
             ctrl.ImportanceSamplingType             = setting != null && setting.useNEE ? (uint)setting.neeType : 0u;
             // LightsBaker.cpp:1022,1070 — depends only on ImportanceSamplingType == NEEAT,
             // and the "Freeze NEE-AT feedback updates" debug switch.
-            ctrl.TemporalFeedbackRequired           = neeAtSelected && !(setting?.neeatDbgFreezeUpdates ?? false) ? 1u : 0u;
-            ctrl.TotalMaxFeedbackCount              = lastFrameFeedback ? p0ThreadCount : 0u;
-            ctrl.GlobalFeedbackUseWeight            = lastFrameFeedback ? (setting?.neeatGlobalTemporalFeedbackWeight ?? 0.75f) : 0.0f;
-            ctrl.LocalToGlobalSampleRatio           = lastFrameFeedback ? (setting?.neeatLocalToGlobalSampleRatio ?? 0.65f) : 0.0f;
-            ctrl.TileBufferHeight                   = localH;
-            ctrl.ScreenSpaceVsWorldSpaceThreshold   = setting?.neeatScreenSpaceVsWorldSpaceThreshold ?? 0.3f;
-            ctrl.LocalSamplingResolutionX           = localW;
-            ctrl.LocalSamplingResolutionY           = localH;
+            ctrl.TemporalFeedbackRequired         = neeAtSelected && !(setting?.neeatDbgFreezeUpdates ?? false) ? 1u : 0u;
+            ctrl.TotalMaxFeedbackCount            = lastFrameFeedback ? p0ThreadCount : 0u;
+            ctrl.GlobalFeedbackUseWeight          = lastFrameFeedback ? (setting?.neeatGlobalTemporalFeedbackWeight ?? 0.75f) : 0.0f;
+            ctrl.LocalToGlobalSampleRatio         = lastFrameFeedback ? (setting?.neeatLocalToGlobalSampleRatio ?? 0.65f) : 0.0f;
+            ctrl.TileBufferHeight                 = localH;
+            ctrl.ScreenSpaceVsWorldSpaceThreshold = setting?.neeatScreenSpaceVsWorldSpaceThreshold ?? 0.3f;
+            ctrl.LocalSamplingResolutionX         = localW;
+            ctrl.LocalSamplingResolutionY         = localH;
             UpdateLocalSamplingJitter();
-            ctrl.LocalSamplingTileJitterX           = _localSamplingTileJitter.x;
-            ctrl.LocalSamplingTileJitterY           = _localSamplingTileJitter.y;
-            ctrl.LocalSamplingTileJitterPrevX       = _prevLocalSamplingTileJitter.x;
-            ctrl.LocalSamplingTileJitterPrevY       = _prevLocalSamplingTileJitter.y;
- 
+            ctrl.LocalSamplingTileJitterX     = _localSamplingTileJitter.x;
+            ctrl.LocalSamplingTileJitterY     = _localSamplingTileJitter.y;
+            ctrl.LocalSamplingTileJitterPrevX = _prevLocalSamplingTileJitter.x;
+            ctrl.LocalSamplingTileJitterPrevY = _prevLocalSamplingTileJitter.y;
+
             ref var bk = ref ctrl.BakerConstants;
             bk.CurrentWeightsBufferOffset       = currentOffset;
             bk.HistoricWeightsBufferOffset      = historicOffset;
@@ -1085,31 +1086,31 @@ namespace PathTracing
 
             // Prev-over-current viewport size (LightsBaker.cpp:1019). First frame: 1.0.
             int2 prevRes = _prevRenderResolution.x > 0 ? _prevRenderResolution : renderRes;
-            bk.PrevOverCurrentViewportSizeX     = (float)prevRes.x / math.max(renderRes.x, 1);
-            bk.PrevOverCurrentViewportSizeY     = (float)prevRes.y / math.max(renderRes.y, 1);
-            _prevRenderResolution               = renderRes;
+            bk.PrevOverCurrentViewportSizeX = (float)prevRes.x / math.max(renderRes.x, 1);
+            bk.PrevOverCurrentViewportSizeY = (float)prevRes.y / math.max(renderRes.y, 1);
+            _prevRenderResolution           = renderRes;
 
-            bk.UpdateCounter                    = (uint)_dbgFrameCounter;
-            bk.DepthDisocclusionThreshold       = setting?.neeatDepthDisocclusionThreshold ?? 1.5f;
-            bk.EnableMotionReprojection         = (setting?.neeatEnableMotionReprojection ?? true) ? 1u : 0u;
-            bk.ReservoirHistoryDropoff          = setting?.neeatReservoirHistoryDropoff ?? 0.005f;
+            bk.UpdateCounter              = (uint)_dbgFrameCounter;
+            bk.DepthDisocclusionThreshold = setting?.neeatDepthDisocclusionThreshold ?? 1.5f;
+            bk.EnableMotionReprojection   = (setting?.neeatEnableMotionReprojection ?? true) ? 1u : 0u;
+            bk.ReservoirHistoryDropoff    = setting?.neeatReservoirHistoryDropoff ?? 0.005f;
 
             // Scene-relative info used by NEE-AT tile/light importance scoring.
-            bk.SceneCameraPosX                  = _ctx.FrameState != null ? _ctx.FrameState.camPos.x : 0f;
-            bk.SceneCameraPosY                  = _ctx.FrameState != null ? _ctx.FrameState.camPos.y : 0f;
-            bk.SceneCameraPosZ                  = _ctx.FrameState != null ? _ctx.FrameState.camPos.z : 0f;
-            bk.SceneAverageContentsDistance     = setting?.neeatSceneAverageContentsDistance ?? 10.0f;
+            bk.SceneCameraPosX              = _ctx.FrameState != null ? _ctx.FrameState.camPos.x : 0f;
+            bk.SceneCameraPosY              = _ctx.FrameState != null ? _ctx.FrameState.camPos.y : 0f;
+            bk.SceneCameraPosZ              = _ctx.FrameState != null ? _ctx.FrameState.camPos.z : 0f;
+            bk.SceneAverageContentsDistance = setting?.neeatSceneAverageContentsDistance ?? 10.0f;
 
-            bk.ImportanceBoostIntensityDelta    = setting?.neeatImportanceBoostIntensityDelta ?? 0f;
-            bk.ImportanceBoostFrustumMul        = setting?.neeatImportanceBoostFrustumMul ?? 0f;
+            bk.ImportanceBoostIntensityDelta      = setting?.neeatImportanceBoostIntensityDelta ?? 0f;
+            bk.ImportanceBoostFrustumMul          = setting?.neeatImportanceBoostFrustumMul ?? 0f;
             bk.ImportanceBoostFrustumFadeDistance = setting?.neeatImportanceBoostFrustumFadeDistance ?? 0f;
 
             // LightsBaker::DebugGUI wiring (LightsBaker.cpp:1059-1061). C++ uses the live mouse
             // cursor for the tile-connection pick; Unity reuses the ShaderDebug debug pixel.
-            bk.DebugDrawType      = (int)(setting?.neeatDbgViewType ?? RtxptLightingDebugViewType.Disabled);
+            bk.DebugDrawType       = (int)(setting?.neeatDbgViewType ?? RtxptLightingDebugViewType.Disabled);
             bk.DebugDrawTileLights = (setting?.neeatDbgDrawTileLightConnections ?? false) ? 1u : 0u;
-            bk.MouseCursorPosX    = (uint)math.max(0, setting?.debugPixelX ?? 0);
-            bk.MouseCursorPosY    = (uint)math.max(0, setting?.debugPixelY ?? 0);
+            bk.MouseCursorPosX     = (uint)math.max(0, setting?.debugPixelX ?? 0);
+            bk.MouseCursorPosY     = (uint)math.max(0, setting?.debugPixelY ?? 0);
 
             // Frustum planes + corners (Gribb-Hartmann, LightsBaker.cpp:884 UpdateFrustumConsts).
             if (_ctx.FrameState != null)
@@ -1146,7 +1147,7 @@ namespace PathTracing
         // Cached frustum planes+corners for the freeze-frustum debug switch
         // (mirrors LightsBaker::m_dbgFrozenFrustum, LightsBaker.cpp:919-922).
         private readonly float[] _frozenFrustum = new float[24 + 32];
-        private bool _frozenFrustumValid;
+        private          bool    _frozenFrustumValid;
 
         private unsafe void ApplyFrustumFreeze(ref RtxptLightsBakerConstants bk, bool freeze)
         {
@@ -1225,11 +1226,11 @@ namespace PathTracing
             {
                 for (int i = 0; i < 8; i++)
                 {
-                    bool bone = (i & 1) != 0;
-                    bool btwo = (i & 2) != 0;
-                    Vector4 a = (bone == btwo) ? right : left;
-                    Vector4 b = (i & 2) != 0 ? bottom : top;
-                    Vector4 c = (i & 4) != 0 ? far : near;
+                    bool    bone   = (i & 1) != 0;
+                    bool    btwo   = (i & 2) != 0;
+                    Vector4 a      = (bone == btwo) ? right : left;
+                    Vector4 b      = (i & 2) != 0 ? bottom : top;
+                    Vector4 c      = (i & 4) != 0 ? far : near;
                     Vector3 corner = IntersectThreePlanes(a, b, c);
                     dstC[i * 4 + 0] = corner.x;
                     dstC[i * 4 + 1] = corner.y;
@@ -1258,9 +1259,9 @@ namespace PathTracing
             m.SetRow(0, new Vector4(a.x, a.y, a.z, 0f));
             m.SetRow(1, new Vector4(b.x, b.y, b.z, 0f));
             m.SetRow(2, new Vector4(c.x, c.y, c.z, 0f));
-            m.SetRow(3, new Vector4(0f,  0f,  0f, 1f));
+            m.SetRow(3, new Vector4(0f, 0f, 0f, 1f));
             Matrix4x4 inv = m.inverse;
-            Vector3 d = new Vector3(a.w, b.w, c.w);
+            Vector3   d   = new Vector3(a.w, b.w, c.w);
             return inv.MultiplyPoint3x4(d);
         }
 
@@ -1348,10 +1349,10 @@ namespace PathTracing
             float r        = NodeAverageScale(light);
             float outerRad = Mathf.Deg2Rad * (light.spotAngle * 0.5f);
             // softness from the authored inner/outer cone (LightsBaker.cpp:484), not a fixed 0.8 ratio.
-            float softness = Mathf.Clamp01(1f - light.innerSpotAngle / light.spotAngle);
+            float   softness = Mathf.Clamp01(1f - light.innerSpotAngle / light.spotAngle);
             Vector3 radiance = LinearColor(light) * light.intensity / (Mathf.PI * r * r);
             PackLightColor(radiance, ref info, (uint)RtxptLightType.Sphere);
-            info.ColorTypeAndFlags         |= kShapingEnableBit;
+            info.ColorTypeAndFlags |= kShapingEnableBit;
             // SampleGame forces kUseMinSpotlightFalloff=true (GameModel.cpp:233), encoded via a
             // negative outerAngle that ConvertLight turns into this flag (LightsBaker.cpp:486).
             info.ColorTypeAndFlags         |= kShapingUseMinFalloffBit;

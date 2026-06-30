@@ -6,20 +6,33 @@ namespace PathTracing.NativeInterop.Streamline
 {
     public sealed class SLReflexOverlay : MonoBehaviour
     {
-        [SerializeField] private Key toggleKey = Key.F7;
-        [SerializeField] private bool visible = true;
-        [SerializeField] private bool showStatsReport = true;
-        [SerializeField] private int reflexMode = (int)SLReflexRuntime.Mode.On;
-        [SerializeField] private bool useReflexFpsCap;
-        [SerializeField] private int reflexFpsCap = 60;
-        [SerializeField] private int frameWindow = 3;
+        [SerializeField]
+        private Key toggleKey = Key.F7;
 
-        private Rect _windowRect = new Rect(24, 80, 360, 300);
-        private bool _windowInited;
-        private GUIStyle _mono;
-        private GUIStyle _header;
-        private GUIStyle _small;
-        private Vector2 _scrollPos;
+        [SerializeField]
+        private bool visible = true;
+
+        [SerializeField]
+        private bool showStatsReport = true;
+
+        [SerializeField]
+        private int reflexMode = (int)SLReflexRuntime.Mode.On;
+
+        [SerializeField]
+        private bool useReflexFpsCap;
+
+        [SerializeField]
+        private int reflexFpsCap = 60;
+
+        [SerializeField]
+        private int frameWindow = 3;
+
+        private          Rect                        _windowRect = new Rect(24, 80, 360, 300);
+        private          bool                        _windowInited;
+        private          GUIStyle                    _mono;
+        private          GUIStyle                    _header;
+        private          GUIStyle                    _small;
+        private          Vector2                     _scrollPos;
         private readonly List<SLReflexRuntime.Stats> _history = new List<SLReflexRuntime.Stats>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -57,7 +70,7 @@ namespace PathTracing.NativeInterop.Streamline
 
             if (!_windowInited)
             {
-                _windowRect = new Rect(24, 80, 620, 680);
+                _windowRect   = new Rect(24, 80, 620, 680);
                 _windowInited = true;
             }
 
@@ -66,7 +79,7 @@ namespace PathTracing.NativeInterop.Streamline
 
         private void DrawWindow(int id)
         {
-            bool hasStats = SLReflexRuntime.TryGetStats(out var stats);
+            bool hasStats  = SLReflexRuntime.TryGetStats(out var stats);
             bool supported = hasStats && stats.lowLatencyAvailable;
             if (hasStats && stats.frameID != 0)
                 RecordStats(stats);
@@ -76,8 +89,8 @@ namespace PathTracing.NativeInterop.Streamline
             using (new GUILayout.HorizontalScope())
             {
                 GUILayout.Label("Reflex Low Latency", GUILayout.Width(145));
-                string[] modes = { "Off", "On", "On + Boost" };
-                int nextMode = GUILayout.Toolbar(Mathf.Clamp(reflexMode, 0, 2), modes);
+                string[] modes    = { "Off", "On", "On + Boost" };
+                int      nextMode = GUILayout.Toolbar(Mathf.Clamp(reflexMode, 0, 2), modes);
                 if (nextMode != reflexMode)
                 {
                     reflexMode = nextMode;
@@ -96,7 +109,7 @@ namespace PathTracing.NativeInterop.Streamline
 
                 using (new GUIEnabledScope(useReflexFpsCap))
                 {
-                    int nextFps = Mathf.Clamp((int)GUILayout.HorizontalSlider(reflexFpsCap, 20, 240, GUILayout.Width(95)), 20, 240);
+                    int    nextFps = Mathf.Clamp((int)GUILayout.HorizontalSlider(reflexFpsCap, 20, 240, GUILayout.Width(95)), 20, 240);
                     string fpsText = GUILayout.TextField(nextFps.ToString(), GUILayout.Width(42));
                     if (int.TryParse(fpsText, out int typedFps))
                         nextFps = Mathf.Clamp(typedFps, 20, 240);
@@ -114,7 +127,7 @@ namespace PathTracing.NativeInterop.Streamline
                 using (new GUILayout.HorizontalScope())
                 {
                     GUILayout.Label("Frame Window", GUILayout.Width(145));
-                    int nextWindow = Mathf.Clamp((int)GUILayout.HorizontalSlider(frameWindow, 1, 8, GUILayout.Width(120)), 1, 8);
+                    int    nextWindow = Mathf.Clamp((int)GUILayout.HorizontalSlider(frameWindow, 1, 8, GUILayout.Width(120)), 1, 8);
                     string windowText = GUILayout.TextField(nextWindow.ToString(), GUILayout.Width(42));
                     if (int.TryParse(windowText, out int typedWindow))
                         nextWindow = Mathf.Clamp(typedWindow, 1, 8);
@@ -138,6 +151,7 @@ namespace PathTracing.NativeInterop.Streamline
                 {
                     GUILayout.Label("Latency Report Unavailable", _mono);
                 }
+
                 GUILayout.EndScrollView();
             }
 
@@ -229,8 +243,8 @@ namespace PathTracing.NativeInterop.Streamline
             };
 
             ulong origin = GetTimelineOrigin(stats, segments);
-            ulong end = MaxEnd(segments);
-            ulong total = Delta(end, origin);
+            ulong end    = MaxEnd(segments);
+            ulong total  = Delta(end, origin);
 
             if (total == 0)
             {
@@ -247,8 +261,8 @@ namespace PathTracing.NativeInterop.Streamline
         private void DrawTimelineWindow()
         {
             List<FrameSegments> frames = new List<FrameSegments>(_history.Count);
-            ulong origin = ulong.MaxValue;
-            ulong end = 0;
+            ulong               origin = ulong.MaxValue;
+            ulong               end    = 0;
 
             foreach (var stats in _history)
             {
@@ -256,7 +270,7 @@ namespace PathTracing.NativeInterop.Streamline
                 frames.Add(frame);
 
                 ulong frameOrigin = GetTimelineOrigin(stats, frame.segments);
-                ulong frameEnd = MaxEnd(frame.segments);
+                ulong frameEnd    = MaxEnd(frame.segments);
                 if (frameOrigin != 0 && frameOrigin < origin)
                     origin = frameOrigin;
                 if (frameEnd > end)
@@ -287,10 +301,10 @@ namespace PathTracing.NativeInterop.Streamline
 
         private void DrawMergedRow(string label, List<FrameSegments> frames, int stageIndex, ulong originUs, ulong totalUs, bool markOverlaps)
         {
-            Rect row = GUILayoutUtility.GetRect(580, 22);
-            const float labelW = 82f;
-            Rect labelRect = new Rect(row.x, row.y, labelW, row.height);
-            Rect barRect = new Rect(row.x + labelW, row.y + 4, row.width - labelW - 4, row.height - 8);
+            Rect        row       = GUILayoutUtility.GetRect(580, 22);
+            const float labelW    = 82f;
+            Rect        labelRect = new Rect(row.x, row.y, labelW, row.height);
+            Rect        barRect   = new Rect(row.x + labelW, row.y + 4, row.width - labelW - 4, row.height - 8);
 
             GUI.Label(labelRect, label, _small);
             DrawBarBackground(barRect);
@@ -299,8 +313,8 @@ namespace PathTracing.NativeInterop.Streamline
             for (int frameIndex = 0; frameIndex < frames.Count; ++frameIndex)
             {
                 var segments = frames[frameIndex].segments;
-                int first = stageIndex < 0 ? 0 : stageIndex;
-                int last = stageIndex < 0 ? segments.Length - 1 : stageIndex;
+                int first    = stageIndex < 0 ? 0 : stageIndex;
+                int last     = stageIndex < 0 ? segments.Length - 1 : stageIndex;
 
                 for (int i = first; i <= last; ++i)
                 {
@@ -322,9 +336,9 @@ namespace PathTracing.NativeInterop.Streamline
             if (frameCount <= 1)
                 return baseColor;
 
-            float t = frameIndex / (float)(frameCount - 1);
-            Color older = Color.Lerp(baseColor, Color.black, 0.35f);
-            Color newer = Color.Lerp(baseColor, Color.white, 0.12f);
+            float t      = frameIndex / (float)(frameCount - 1);
+            Color older  = Color.Lerp(baseColor, Color.black, 0.35f);
+            Color newer  = Color.Lerp(baseColor, Color.white, 0.12f);
             Color result = Color.Lerp(older, newer, t);
             result.a = 0.72f;
             return result;
@@ -341,10 +355,10 @@ namespace PathTracing.NativeInterop.Streamline
                     if (segments[i].frameIndex == segments[j].frameIndex)
                         continue;
 
-                    Segment a = segments[i].segment;
-                    Segment b = segments[j].segment;
-                    ulong start = a.startUs > b.startUs ? a.startUs : b.startUs;
-                    ulong end = a.endUs < b.endUs ? a.endUs : b.endUs;
+                    Segment a     = segments[i].segment;
+                    Segment b     = segments[j].segment;
+                    ulong   start = a.startUs > b.startUs ? a.startUs : b.startUs;
+                    ulong   end   = a.endUs < b.endUs ? a.endUs : b.endUs;
                     if (end <= start) continue;
 
                     DrawSegmentInRect(
@@ -392,12 +406,12 @@ namespace PathTracing.NativeInterop.Streamline
 
         private void DrawStageRow(Segment segment, ulong originUs, ulong totalUs)
         {
-            Rect row = GUILayoutUtility.GetRect(520, 18);
-            const float labelW = 118f;
-            const float valueW = 72f;
-            Rect labelRect = new Rect(row.x, row.y, labelW, row.height);
-            Rect barRect = new Rect(row.x + labelW, row.y + 3, row.width - labelW - valueW - 8, row.height - 6);
-            Rect valueRect = new Rect(row.x + row.width - valueW, row.y, valueW, row.height);
+            Rect        row       = GUILayoutUtility.GetRect(520, 18);
+            const float labelW    = 118f;
+            const float valueW    = 72f;
+            Rect        labelRect = new Rect(row.x, row.y, labelW, row.height);
+            Rect        barRect   = new Rect(row.x + labelW, row.y + 3, row.width - labelW - valueW - 8, row.height - 6);
+            Rect        valueRect = new Rect(row.x + row.width - valueW, row.y, valueW, row.height);
 
             GUI.Label(labelRect, segment.name, _small);
             DrawBarBackground(barRect);
@@ -424,9 +438,9 @@ namespace PathTracing.NativeInterop.Streamline
         {
             if (durationUs == 0 || totalUs == 0) return;
 
-            float x = rect.x + rect.width * ((float)startUs / totalUs);
-            float w = Mathf.Max(1f, rect.width * ((float)durationUs / totalUs));
-            var prev = GUI.color;
+            float x    = rect.x + rect.width * ((float)startUs / totalUs);
+            float w    = Mathf.Max(1f, rect.width * ((float)durationUs / totalUs));
+            var   prev = GUI.color;
             GUI.color = color;
             GUI.DrawTexture(new Rect(x, rect.y, Mathf.Min(w, rect.xMax - x), rect.height), Texture2D.whiteTexture);
             GUI.color = prev;
@@ -450,6 +464,7 @@ namespace PathTracing.NativeInterop.Streamline
                 if (segment.IsValid && segment.startUs < min)
                     min = segment.startUs;
             }
+
             return min == ulong.MaxValue ? 0 : min;
         }
 
@@ -461,6 +476,7 @@ namespace PathTracing.NativeInterop.Streamline
                 if (segment.IsValid && segment.endUs > max)
                     max = segment.endUs;
             }
+
             return max;
         }
 
@@ -468,51 +484,51 @@ namespace PathTracing.NativeInterop.Streamline
         {
             _mono ??= new GUIStyle(GUI.skin.label)
             {
-                font = Font.CreateDynamicFontFromOSFont("Consolas", 12),
+                font     = Font.CreateDynamicFontFromOSFont("Consolas", 12),
                 fontSize = 12,
-                normal = { textColor = Color.white },
+                normal   = { textColor = Color.white },
                 wordWrap = false
             };
 
             _header ??= new GUIStyle(GUI.skin.label)
             {
                 fontStyle = FontStyle.Bold,
-                normal = { textColor = Color.white }
+                normal    = { textColor = Color.white }
             };
 
             _small ??= new GUIStyle(GUI.skin.label)
             {
                 fontSize = 11,
-                normal = { textColor = Color.white }
+                normal   = { textColor = Color.white }
             };
         }
 
         private readonly struct Segment
         {
             public readonly string name;
-            public readonly ulong startUs;
-            public readonly ulong endUs;
-            public readonly Color color;
+            public readonly ulong  startUs;
+            public readonly ulong  endUs;
+            public readonly Color  color;
             public bool IsValid => startUs != 0 && endUs > startUs;
             public ulong DurationUs => Delta(endUs, startUs);
 
             public Segment(string name, ulong startUs, ulong endUs, Color color)
             {
-                this.name = name;
+                this.name    = name;
                 this.startUs = startUs;
-                this.endUs = endUs;
-                this.color = color;
+                this.endUs   = endUs;
+                this.color   = color;
             }
         }
 
         private readonly struct FrameSegments
         {
-            public readonly ulong frameID;
+            public readonly ulong     frameID;
             public readonly Segment[] segments;
 
             public FrameSegments(ulong frameID, Segment[] segments)
             {
-                this.frameID = frameID;
+                this.frameID  = frameID;
                 this.segments = segments;
             }
         }
@@ -520,11 +536,11 @@ namespace PathTracing.NativeInterop.Streamline
         private readonly struct RowSegment
         {
             public readonly Segment segment;
-            public readonly int frameIndex;
+            public readonly int     frameIndex;
 
             public RowSegment(Segment segment, int frameIndex)
             {
-                this.segment = segment;
+                this.segment    = segment;
                 this.frameIndex = frameIndex;
             }
         }
@@ -535,7 +551,7 @@ namespace PathTracing.NativeInterop.Streamline
 
             public GUIEnabledScope(bool enabled)
             {
-                _previous = GUI.enabled;
+                _previous   = GUI.enabled;
                 GUI.enabled = enabled;
             }
 

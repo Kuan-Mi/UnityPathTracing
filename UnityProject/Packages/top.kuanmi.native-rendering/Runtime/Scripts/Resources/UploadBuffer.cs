@@ -66,6 +66,7 @@ namespace NativeRender
             public readonly int ElementOffset;
             public readonly int ElementCount;
             public readonly int PayloadByteOffset;
+
             public Range(int elementOffset, int elementCount, int payloadByteOffset)
             {
                 ElementOffset     = elementOffset;
@@ -76,14 +77,14 @@ namespace NativeRender
 
         // --- Ranges mode --- packed bytes + one range entry per SetData. Capacity reused across flushes.
         private readonly List<Range> _ranges;
-        private byte[] _payload = Array.Empty<byte>();
-        private int    _payloadLen;
+        private          byte[]      _payload = Array.Empty<byte>();
+        private          int         _payloadLen;
 
         // --- Whole mode --- full CPU mirror + dirty [min,max) element span.
         private readonly byte[] _mirror;
-        private int  _dirtyMinElem;
-        private int  _dirtyMaxElem; // half-open
-        private bool _wholeDirty;
+        private          int    _dirtyMinElem;
+        private          int    _dirtyMaxElem; // half-open
+        private          bool   _wholeDirty;
 
         /// <summary>
         /// Allocates a fixed-capacity structured buffer with <paramref name="capacity"/> elements.
@@ -92,7 +93,7 @@ namespace NativeRender
         /// </summary>
         public UploadBuffer(int capacity, int elementStride, UploadMode mode = UploadMode.Ranges, bool allowUAV = false, string debugName = null)
         {
-            if (capacity      <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+            if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
             if (elementStride <= 0) throw new ArgumentOutOfRangeException(nameof(elementStride));
             count     = capacity;
             stride    = elementStride;
@@ -200,7 +201,7 @@ namespace NativeRender
                 else
                 {
                     if (dstElementOffset < _dirtyMinElem) _dirtyMinElem = dstElementOffset;
-                    if (end > _dirtyMaxElem)              _dirtyMaxElem = end;
+                    if (end > _dirtyMaxElem) _dirtyMaxElem              = end;
                 }
             }
             else
@@ -242,7 +243,11 @@ namespace NativeRender
             int totalSize      = HeaderSize + rangeTableSize + payloadLen;
 
             IntPtr blob = NativeRenderPlugin.NR_NSB_AllocFlushBuffer((uint)totalSize);
-            if (blob == IntPtr.Zero) { ResetAccumulator(); return; }
+            if (blob == IntPtr.Zero)
+            {
+                ResetAccumulator();
+                return;
+            }
 
             byte* p = (byte*)blob;
             *(ulong*)(p + 0) = Handle;

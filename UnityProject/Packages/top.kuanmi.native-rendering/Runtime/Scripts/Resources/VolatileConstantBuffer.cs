@@ -21,8 +21,8 @@ namespace NativeRender
     /// </summary>
     public sealed class VolatileConstantBuffer : IDisposable
     {
-        public  ulong Handle { get; private set; }
-        private bool  _disposed;
+        public ulong Handle { get; private set; }
+        private bool _disposed;
 
         private readonly int _sizeInBytes;
 
@@ -98,7 +98,7 @@ namespace NativeRender
         private class InternalUploadPass : ScriptableRenderPass
         {
             private readonly VolatileConstantBuffer _owner;
-            private          IntPtr       _blob;
+            private          IntPtr                 _blob;
 
             public void Setup(IntPtr blob) => _blob = blob;
 
@@ -136,6 +136,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_DestroyNativeBuffer(Handle);
                 Handle = 0;
             }
+
             _disposed = true;
         }
     }

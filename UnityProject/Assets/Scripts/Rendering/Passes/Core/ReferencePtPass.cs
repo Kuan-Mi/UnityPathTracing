@@ -8,18 +8,16 @@ using PathTracing.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
-
-
 using static PathTracing.ShaderIDs;
 
 
 namespace PathTracing
 {
-    public class ReferencePtPass: ScriptableRenderPass
+    public class ReferencePtPass : ScriptableRenderPass
     {
         private readonly RayTracingShader _ReferencePtTs;
-        private Resource _resource;
-        private Settings _settings;
+        private          Resource         _resource;
+        private          Settings         _settings;
 
 
         public ReferencePtPass(RayTracingShader ReferencePtTs)
@@ -36,11 +34,11 @@ namespace PathTracing
         public class Resource
         {
             public GraphicsBuffer ConstantBuffer;
-            
+
             public GraphicsBuffer SpotLightBuffer;
             public GraphicsBuffer AreaLightBuffer;
             public GraphicsBuffer PointLightBuffer;
-            
+
             public GraphicsBuffer AeExposureBuffer;
 
             public RTHandle Output;
@@ -48,18 +46,18 @@ namespace PathTracing
 
         public class Settings
         {
-            public int2 m_RenderResolution;
+            public int2  m_RenderResolution;
             public float resolutionScale;
-            public int referenceBounceNum;
-            public int convergenceStep;
+            public int   referenceBounceNum;
+            public int   convergenceStep;
             public float split;
         }
 
         class PassData
         {
             public RayTracingShader ReferencePtTs;
-            public Resource Resource;
-            public Settings Settings;
+            public Resource         Resource;
+            public Settings         Settings;
 
             public TextureHandle OutputTexture;
         }
@@ -79,8 +77,6 @@ namespace PathTracing
             natCmd.SetRayTracingConstantBufferParam(data.ReferencePtTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
 
             natCmd.SetRayTracingBufferParam(data.ReferencePtTs, _AE_ExposureBufferID, data.Resource.AeExposureBuffer);
-
-
 
 
             natCmd.SetRayTracingTextureParam(data.ReferencePtTs, g_OutputID, data.OutputTexture);
@@ -103,14 +99,13 @@ namespace PathTracing
             natCmd.DispatchRays(data.ReferencePtTs, "MainRayGenShader", rectWmod, rectHmod, 1);
 
             natCmd.EndSample(referencePtTracingMarker);
-
         }
 
 
         private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)
         {
             textureDesc.format = format;
-            textureDesc.name = name;
+            textureDesc.name   = name;
             return renderGraph.CreateTexture(textureDesc);
         }
 
@@ -126,7 +121,7 @@ namespace PathTracing
 
             passData.OutputTexture = renderGraph.ImportTexture(_resource.Output);
 
-            builder.UseTexture(passData.OutputTexture,  AccessFlags.ReadWrite);
+            builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
