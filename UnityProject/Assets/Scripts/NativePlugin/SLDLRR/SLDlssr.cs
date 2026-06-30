@@ -126,8 +126,9 @@ namespace SLDLRR
 
             return new SLDlssrFrameData
             {
-                // This frame's shared SL token (minted on the main thread by SL_GetNewFrameToken and
-                // forwarded to the present latch). Zero in editor edit-mode → native self-mints.
+                // This camera render's SL token: the shared per-frame token in the player, or a
+                // per-camera-render token in editor edit mode (see CurrentFrameTokenPtr). Non-null
+                // whenever the evaluate runs; native bails if it is null.
                 frameToken = SLStreamlineFrameLoop.CurrentFrameTokenPtr,
 
                 inputTex    = res.input.NativePtr,

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.LowLevel;
+using UnityEngine.Rendering;
 
 namespace SLDLRR
 {
@@ -22,6 +23,12 @@ namespace SLDLRR
         private struct SLReflexFrameBegin { }
         private struct SLReflexSimulationEnd { }
 
+        // This frame's Streamline token. In the PLAYER it is minted once per frame at EarlyUpdate
+        // (OnPlayerLoopFrameBegin) and shared by Reflex, the RR/SR evaluate and DLSS-G present
+        // tagging. In the EDITOR's edit mode it is re-minted per camera render
+        // (OnEditorBeginCameraRendering), because the Scene/Game view repaint pump runs outside the
+        // PlayerLoop and can render a camera several times per tick — a single shared token would be
+        // tagged more than once, which Streamline forbids.
         public static IntPtr CurrentFrameTokenPtr => _frameToken;
 
         public static IntPtr GetRenderSubmitStartEventFunc()
@@ -67,8 +74,31 @@ namespace SLDLRR
             // residual Unity.exe process behind after the editor window is closed.
             UnityEditor.EditorApplication.quitting -= Teardown;
             UnityEditor.EditorApplication.quitting += Teardown;
+
+            // Edit mode only: the editor's Scene/Game view repaint pump runs OUTSIDE the PlayerLoop
+            // and can render the same camera several times per PlayerLoop tick, while the shared
+            // token is minted only once per tick. Sharing it across those repaints makes Streamline
+            // reject the 2nd slSetConstants / PCL submit for the same (token, viewport). Mint a fresh
+            // token at the start of each camera render instead. See OnEditorBeginCameraRendering.
+            RenderPipelineManager.beginCameraRendering -= OnEditorBeginCameraRendering;
+            RenderPipelineManager.beginCameraRendering += OnEditorBeginCameraRendering;
 #endif
         }
+
+#if UNITY_EDITOR
+        // Runs immediately before each camera's AddRenderPasses (edit mode only — play mode keeps the
+        // shared per-tick token that Reflex/FG depend on). Mints this camera render its own SL token
+        // so the evaluate-time features (DLSS-RR/-SR) and the PCL submit markers tag a unique token
+        // even when the editor repaint pump renders a camera multiple times per PlayerLoop tick.
+        private static void OnEditorBeginCameraRendering(ScriptableRenderContext _, Camera cam)
+        {
+            if (Application.isPlaying) return;
+            if (!SLNative.Available) return;
+            if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
+            try { _frameToken = SLNative.SL_GetNewFrameToken(); }
+            catch (DllNotFoundException) { SLNative.MarkUnavailable(); }
+        }
+#endif
 
         private static void InstallPlayerLoop()
         {
@@ -161,6 +191,9 @@ namespace SLDLRR
             SLPclLatencyPing.Unregister();
             SLReflexFlash.Unregister();
             RemovePlayerLoop();
+#if UNITY_EDITOR
+            RenderPipelineManager.beginCameraRendering -= OnEditorBeginCameraRendering;
+#endif
             SLDlssg.Dispose();
         }
 
