@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NativeRender;
+using PathTracing.NativeInterop.DXGI;
 using PathTracing.NativeInterop.NRI;
 using PathTracing.Profiling;
 using PathTracing.Rendering.Data.RTXDI;

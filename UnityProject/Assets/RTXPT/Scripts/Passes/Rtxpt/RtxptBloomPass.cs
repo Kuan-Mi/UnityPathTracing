@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using NativeRender;
+using PathTracing.NativeInterop.DXGI;
 using PathTracing.NativeInterop.NRI;
 using PathTracing.Profiling;
 using Unity.Mathematics;

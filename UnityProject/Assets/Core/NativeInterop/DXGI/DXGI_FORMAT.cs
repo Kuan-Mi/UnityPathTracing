@@ -1,4 +1,4 @@
-namespace PathTracing.NativeInterop.NRI
+namespace PathTracing.NativeInterop.DXGI
 {
     public enum DXGI_FORMAT : uint
     {

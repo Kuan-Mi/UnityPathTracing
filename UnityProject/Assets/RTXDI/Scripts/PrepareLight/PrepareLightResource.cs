@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using DefaultNamespace;
+using PathTracing.NativeInterop.DXGI;
 using PathTracing.NativeInterop.NRI;
 using PathTracing.Rendering.Data.RTXDI;
 using Unity.Collections;

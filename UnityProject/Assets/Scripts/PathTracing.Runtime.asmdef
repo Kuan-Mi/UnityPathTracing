@@ -4,7 +4,7 @@
     "references": [
         "PathTracing.Core",
         "PathTracing.Streamline",
-        "PathTracing.NriImageProcessing",
+        "PathTracing.NRI",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
         "Unity.Mathematics",

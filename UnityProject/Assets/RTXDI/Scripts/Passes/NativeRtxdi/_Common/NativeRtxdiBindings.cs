@@ -1,4 +1,5 @@
 using NativeRender;
+using PathTracing.NativeInterop.DXGI;
 using PathTracing.NativeInterop.NRI;
 
 namespace PathTracing

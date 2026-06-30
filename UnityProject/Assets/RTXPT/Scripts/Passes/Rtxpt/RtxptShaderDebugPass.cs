@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using NativeRender;
+using PathTracing.NativeInterop.DXGI;
 using PathTracing.NativeInterop.NRI;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;

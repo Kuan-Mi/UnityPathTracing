@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using NativeRender;
-using Nri = PathTracing.NativeInterop.NRI;
+using PathTracing.NativeInterop.DXGI;
 using Unity.Mathematics;
 using UnityEngine;
 using PathTracing;
@@ -73,7 +73,7 @@ namespace PathTracing
 
         // Output RT format (LdrColor is RGBA16F in both the NRD and RTXDI features). Used both to bake
         // the pipeline's RTV format and as the per-draw colorFormats entry.
-        private const    uint     kRGBA16F  = (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
+        private const    uint     kRGBA16F  = (uint)DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
         private readonly uint[]   _colorFmt = { kRGBA16F };
         private readonly IntPtr[] _colorRes = new IntPtr[1]; // scratch length-1, refilled per draw
 
@@ -263,7 +263,7 @@ namespace PathTracing
             // Build
             data.HistogramDs.SetRootConstants("c_ToneMapping", &cb);
             data.HistogramDs.SetTexture("t_Source", res.SourceTexture);
-            data.HistogramDs.SetRWTypedBuffer("u_Histogram", data.HistogramBuffer, 256, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            data.HistogramDs.SetRWTypedBuffer("u_Histogram", data.HistogramBuffer, 256, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             cb.logLuminanceScale = MaxLogLuminance - MinLogLuminance;
             cb.logLuminanceBias  = MinLogLuminance;
@@ -274,8 +274,8 @@ namespace PathTracing
 
             // ── Pass 2: Compute Exposure ─────────────────────────────────────
             data.ExposureDs.SetRootConstants("c_ToneMapping", &cb);
-            data.ExposureDs.SetTypedBuffer("t_Histogram", data.HistogramBuffer, 256, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
-            data.ExposureDs.SetRWTypedBuffer("u_Exposure", expPtr, 1, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            data.ExposureDs.SetTypedBuffer("t_Histogram", data.HistogramBuffer, 256, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            data.ExposureDs.SetRWTypedBuffer("u_Exposure", expPtr, 1, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             data.ExposureCs.Dispatch(cmd, data.ExposureDs, 1, 1, 1);
 
@@ -284,7 +284,7 @@ namespace PathTracing
             // covers the viewport and main() writes SV_Target, indexing t_Source by SV_Position.
             data.TonemapDs.SetRootConstants("c_ToneMapping", &cb);
             data.TonemapDs.SetTexture("t_Source", res.SourceTexture);
-            data.TonemapDs.SetTypedBuffer("t_Exposure", expPtr, 1, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            data.TonemapDs.SetTypedBuffer("t_Exposure", expPtr, 1, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
             if (res.ColorLUT != IntPtr.Zero)
                 data.TonemapDs.SetTexture("t_ColorLUT", res.ColorLUT);
 

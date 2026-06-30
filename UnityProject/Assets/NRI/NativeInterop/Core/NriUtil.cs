@@ -1,4 +1,5 @@
 using UnityEngine.Experimental.Rendering;
+using PathTracing.NativeInterop.DXGI;
 
 namespace PathTracing.NativeInterop.NRI
 {

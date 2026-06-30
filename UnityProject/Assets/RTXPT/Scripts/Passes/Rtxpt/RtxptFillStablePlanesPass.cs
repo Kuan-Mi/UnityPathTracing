@@ -1,5 +1,6 @@
 using System;
 using NativeRender;
+using PathTracing.NativeInterop.DXGI;
 using PathTracing.NativeInterop.NRI;
 using Unity.Mathematics;
 using UnityEngine;

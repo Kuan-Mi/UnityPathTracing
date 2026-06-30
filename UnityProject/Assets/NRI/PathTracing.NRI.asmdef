@@ -1,5 +1,5 @@
 {
-    "name": "PathTracing.NriImageProcessing",
+    "name": "PathTracing.NRI",
     "rootNamespace": "PathTracing",
     "references": [
         "PathTracing.Core",
