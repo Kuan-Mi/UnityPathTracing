@@ -9,6 +9,12 @@ using UnityEngine;
 
 namespace DLRR
 {
+    /// <summary>
+    /// DEPRECATED — NRI/NGX DLSS Ray Reconstruction path. Cannot run concurrently with
+    /// DLSS-G frame generation (it drives a separate NGX upscaler outside the Streamline
+    /// slInit). Use <see cref="SLDLRR.SLDlssrr"/> instead; retained for offline A/B only.
+    /// </summary>
+    [Obsolete("Use SLDLRR.SLDlssrr (Streamline) — the NRI DLSS-RR path cannot run concurrently with DLSS-G frame generation.")]
     public class DlrrDenoiser : IDisposable
     {
         [DllImport("Denoiser")]

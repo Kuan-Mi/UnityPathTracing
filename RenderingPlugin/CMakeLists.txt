@@ -421,6 +421,7 @@ add_library(SLDenoiser SHARED
     SLDenoiser/src/SLCore.cpp
     SLDenoiser/src/SLHooks.cpp
     SLDenoiser/src/SLDlssrr.cpp
+    SLDenoiser/src/SLDlssr.cpp
     SLDenoiser/src/SLDlssg.cpp
     SLDenoiser/src/SLReflex.cpp
 )
@@ -458,10 +459,12 @@ if(NOT NR_SKIP_UNITY_COPY)
         )
     endforeach()
 
-    # Streamline runtime DLLs required by SLDenoiser. sl.dlss_d + nvngx_dlssd = Ray
-    # Reconstruction (evaluate); sl.dlss_g + sl.reflex + nvngx_dlssg = Frame Generation
-    # (present-path, player-only). WinPixEventRuntime is required by sl.dlss_g.
+    # Streamline runtime DLLs required by SLDenoiser. sl.dlss + nvngx_dlss = Super
+    # Resolution (evaluate); sl.dlss_d + nvngx_dlssd = Ray Reconstruction (evaluate);
+    # sl.dlss_g + sl.reflex + nvngx_dlssg = Frame Generation (present-path, player-only).
+    # WinPixEventRuntime is required by sl.dlss_g.
     foreach(_SLDLL sl.interposer.dll sl.common.dll sl.pcl.dll
+                   sl.dlss.dll nvngx_dlss.dll
                    sl.dlss_d.dll nvngx_dlssd.dll
                    sl.dlss_g.dll sl.reflex.dll nvngx_dlssg.dll WinPixEventRuntime.dll)
         add_custom_command(TARGET SLDenoiser POST_BUILD

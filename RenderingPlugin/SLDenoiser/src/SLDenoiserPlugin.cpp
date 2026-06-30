@@ -1,8 +1,9 @@
 // SLDenoiserPlugin.cpp
-// Unity native plugin entry for DLSS Ray Reconstruction (evaluate-time) AND DLSS-G Frame
-// Generation (present-path) via Streamline. One shared slInit via SLCore (loads
-// DLSS_RR + DLSS_G + Reflex + PCL). SLCore owns the SL lifecycle + logging so future
-// features (DLSS-SR, NIS, …) can be added without touching init/device/shutdown.
+// Unity native plugin entry for DLSS Super Resolution + Ray Reconstruction (both
+// evaluate-time) AND DLSS-G Frame Generation (present-path) via Streamline. One shared
+// slInit via SLCore (loads DLSS + DLSS_RR + DLSS_G + Reflex + PCL). SLCore owns the SL
+// lifecycle + logging so future features (NIS, …) can be added without touching
+// init/device/shutdown.
 //
 // LOAD MODEL: this must be a LOAD-ON-STARTUP plugin so the DLSS-G queue/swapchain hooks are
 // installed before Unity creates its device/swapchain. The FG hooks are installed ONLY in a
@@ -23,6 +24,8 @@
 #include "SLCore.h"
 #include "SLDlssrr.h"
 #include "SLDlssrrFrameData.h"
+#include "SLDlssr.h"
+#include "SLDlssrFrameData.h"
 #include "SLDlssg.h"
 #include "SLHooks.h"
 #include "SLReflex.h"
@@ -76,6 +79,7 @@ namespace
             SLHooks::Shutdown();
             SLDlssg::Shutdown();
             SLDlssrr::Shutdown();
+            SLDlssr::Shutdown();
             SLCore::Shutdown();
             s_D3D12 = nullptr;
         }
@@ -88,6 +92,15 @@ namespace
         UnityGraphicsD3D12RecordingState state{};
         if (!s_D3D12->CommandRecordingState(&state) || !state.commandList) return;
         SLDlssrr::Dispatch(reinterpret_cast<SLDlssrrFrameData*>(data), state.commandList);
+    }
+
+    // DLSS-SR render-event-and-data (evaluate on Unity's command list).
+    void UNITY_INTERFACE_API OnSRRenderEventAndData(int /*eventId*/, void* data)
+    {
+        if (!data || !s_D3D12) return;
+        UnityGraphicsD3D12RecordingState state{};
+        if (!s_D3D12->CommandRecordingState(&state) || !state.commandList) return;
+        SLDlssr::Dispatch(reinterpret_cast<SLDlssrFrameData*>(data), state.commandList);
     }
 
     // Render-thread submit-start event: data is the FrameToken* minted on the main thread by
@@ -168,6 +181,7 @@ extern "C"
         SLHooks::Shutdown();
         SLDlssg::Shutdown();
         SLDlssrr::Shutdown();
+        SLDlssr::Shutdown();
         SLCore::Shutdown();
         LogBridge(0, "[NR/SLDlssg] SLDenoiser plugin unloaded.");
     }
@@ -184,6 +198,20 @@ extern "C"
         unsigned* outRenderWidth, unsigned* outRenderHeight)
     {
         return SLDlssrr::QueryOptimalRenderSize(outputWidth, outputHeight, mode, outRenderWidth, outRenderHeight);
+    }
+
+    // ---- DLSS-SR (evaluate) ----
+    UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+    GetSLDlssrRenderEventAndDataFunc() { return OnSRRenderEventAndData; }
+
+    int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CreateSLDlssrInstance() { return SLDlssr::CreateInstance(); }
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API DestroySLDlssrInstance(int id) { SLDlssr::DestroyInstance(id); }
+
+    bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SLDlssr_QueryOptimalRenderSize(
+        unsigned outputWidth, unsigned outputHeight, unsigned char mode,
+        unsigned* outRenderWidth, unsigned* outRenderHeight)
+    {
+        return SLDlssr::QueryOptimalRenderSize(outputWidth, outputHeight, mode, outRenderWidth, outRenderHeight);
     }
 
     // ---- Streamline render-submit PCL markers ----

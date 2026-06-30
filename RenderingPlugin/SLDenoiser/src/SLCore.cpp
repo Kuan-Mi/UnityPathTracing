@@ -143,8 +143,8 @@ namespace SLCore
         // not requested by the host"; it only loads with development SL binaries (no-op in
         // production) and renders through presentCommon, so it needs the SL proxy present path.
         static const sl::Feature kFeatures[] = {
-            sl::kFeatureDLSS_RR, sl::kFeatureDLSS_G, sl::kFeatureReflex, sl::kFeaturePCL,
-            sl::kFeatureImGUI,
+            sl::kFeatureDLSS, sl::kFeatureDLSS_RR, sl::kFeatureDLSS_G, sl::kFeatureReflex,
+            sl::kFeaturePCL, sl::kFeatureImGUI,
         };
         sl::Preferences pref{};
         pref.showConsole        = false;
@@ -204,11 +204,12 @@ namespace SLCore
         // present path still runs (Reflex/PCL + presentCommon) and only the DLSS-G mode is gated
         // off.
         auto supported = [&](sl::Feature f) { return slIsFeatureSupported(f, ai) == sl::Result::eOk; };
+        const bool srOk = supported(sl::kFeatureDLSS);
         const bool rrOk = supported(sl::kFeatureDLSS_RR);
         g_fgSupported.store(supported(sl::kFeatureDLSS_G),  std::memory_order_release);
         g_reflexSupported.store(supported(sl::kFeatureReflex), std::memory_order_release);
-        Logf("SLCore", 0, "feature support: DLSS_RR=%d DLSS_G=%d Reflex=%d",
-             (int)rrOk, (int)g_fgSupported.load(), (int)g_reflexSupported.load());
+        Logf("SLCore", 0, "feature support: DLSS_SR=%d DLSS_RR=%d DLSS_G=%d Reflex=%d",
+             (int)srOk, (int)rrOk, (int)g_fgSupported.load(), (int)g_reflexSupported.load());
     }
 
     bool IsDeviceSet()      { return g_deviceSet; }

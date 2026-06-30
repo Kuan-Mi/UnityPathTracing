@@ -11,6 +11,12 @@ using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
+    /// <summary>
+    /// DEPRECATED — issues the NRI/NGX DLSS Ray Reconstruction evaluate through the
+    /// <c>Denoiser</c> plugin. Cannot run concurrently with DLSS-G frame generation; use
+    /// <see cref="SLDlssrrPass"/> (Streamline) instead. Retained for offline A/B only.
+    /// </summary>
+    [Obsolete("Use SLDlssrrPass (Streamline) — the NRI DLSS-RR path cannot run concurrently with DLSS-G frame generation.")]
     public class DlssRRPass : ScriptableRenderPass
     {
 

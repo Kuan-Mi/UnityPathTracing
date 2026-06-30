@@ -9,6 +9,12 @@ using UnityEngine;
 
 namespace DLSR
 {
+    /// <summary>
+    /// DEPRECATED — NRI/NGX DLSS Super Resolution path. Cannot run concurrently with
+    /// DLSS-G frame generation (it drives a separate NGX upscaler outside the Streamline
+    /// slInit). Use <see cref="SLDLRR.SLDlssr"/> instead; retained for offline A/B only.
+    /// </summary>
+    [Obsolete("Use SLDLRR.SLDlssr (Streamline) — the NRI DLSS-SR path cannot run concurrently with DLSS-G frame generation.")]
     public class DlsrUpscaler : IDisposable
     {
         [DllImport("Denoiser")]

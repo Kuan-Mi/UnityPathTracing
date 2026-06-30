@@ -6,6 +6,12 @@ using UnityEngine.Rendering.Universal;
 
 namespace PathTracing
 {
+    /// <summary>
+    /// DEPRECATED — issues the NRI/NGX DLSS Super Resolution evaluate through the
+    /// <c>Denoiser</c> plugin. Cannot run concurrently with DLSS-G frame generation; use
+    /// <see cref="SLDlssrPass"/> (Streamline) instead. Retained for offline A/B only.
+    /// </summary>
+    [Obsolete("Use SLDlssrPass (Streamline) — the NRI DLSS-SR path cannot run concurrently with DLSS-G frame generation.")]
     public class DlssSRPass : ScriptableRenderPass
     {
         private IntPtr _dataPtr;
