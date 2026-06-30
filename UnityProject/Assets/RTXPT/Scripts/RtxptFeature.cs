@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NativeRender;
-using SLDLRR;
+using PathTracing.NativeInterop.NRI;
+using PathTracing.NativeInterop.Streamline;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -1063,7 +1064,7 @@ namespace PathTracing
             AppendUIntStats(sb, label, data);
         }
 
-        private static void AppendFloatTextureStats(System.Text.StringBuilder sb, string label, Nri.NriTextureResource tex, int maxSamples)
+        private static void AppendFloatTextureStats(System.Text.StringBuilder sb, string label, NriTextureResource tex, int maxSamples)
         {
             if (tex?.Handle == null)
             {
@@ -1099,7 +1100,7 @@ namespace PathTracing
             sb.AppendLine($"  {label}: read={count}/{data.Length} nonZero={nonZero} min={min:G4} max={max:G4} sum={sum:G5}");
         }
 
-        private static void AppendUIntTextureStats(System.Text.StringBuilder sb, string label, Nri.NriTextureResource tex, int maxSamples)
+        private static void AppendUIntTextureStats(System.Text.StringBuilder sb, string label, NriTextureResource tex, int maxSamples)
         {
             if (tex?.Handle == null)
             {

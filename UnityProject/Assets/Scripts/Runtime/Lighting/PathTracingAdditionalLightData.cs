@@ -1,4 +1,6 @@
-// PathTracingAdditionalLightData.cs
+namespace PathTracing
+{
+    // PathTracingAdditionalLightData.cs
 // Attach to any GameObject that also has a Light (Point or Spot).
 // Provides per-light properties used by the GPU path-tracing pipeline.
 // Currently exposes 'radius' (sphere/disk light radius for soft shadows).
@@ -22,4 +24,6 @@ public class PathTracingAdditionalLightData : MonoBehaviour
         if (radius < 0f) radius = 0f;
     }
 #endif
+}
+
 }

@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using SLDLRR;
 using NativeRender;
-using NIS;
-using Nrd;
-using Nri;
+using PathTracing.NativeInterop.NIS;
+using PathTracing.NativeInterop.NRD;
+using PathTracing.NativeInterop.NRI;
+using PathTracing.NativeInterop.Streamline;
+using PathTracing.Profiling;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -757,13 +758,13 @@ namespace PathTracing
             {
                 if (setting.FGViaSL != _slFgLastEnabled)
                 {
-                    SLDLRR.SLDlssg.SetFrameGeneration(setting.FGViaSL);
+                    SLDlssg.SetFrameGeneration(setting.FGViaSL);
                     _slFgLastEnabled = setting.FGViaSL;
                 }
 
                 if (setting.FGViaSL)
                 {
-                    var fgEventFunc = SLDLRR.SLDlssg.GetFrameInputsEventFunc();
+                    var fgEventFunc = SLDlssg.GetFrameInputsEventFunc();
                     if (fgEventFunc != IntPtr.Zero)
                     {
                         var viewToWorld   = frameState.worldToView.inverse;
@@ -777,13 +778,13 @@ namespace PathTracing
                         float rW     = math.max(1, frameState.renderResolution.x);
                         float rH     = math.max(1, frameState.renderResolution.y);
 
-                        var fg = new SLDLRR.SLDlssg.FrameInputs
+                        var fg = new SLDlssg.FrameInputs
                         {
                             depth                = pool.ViewZ.NativePtr,
                             motionVectors        = pool.Mv.NativePtr,
-                            frameToken           = SLDLRR.SLStreamlineFrameLoop.CurrentFrameTokenPtr,
-                            depthState           = SLDLRR.SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
-                            mvecState            = SLDLRR.SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
+                            frameToken           = SLStreamlineFrameLoop.CurrentFrameTokenPtr,
+                            depthState           = SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
+                            mvecState            = SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
                             mvecDepthW           = (uint)frameState.renderResolution.x,
                             mvecDepthH           = (uint)frameState.renderResolution.y,
                             colorW               = (uint)outputResolution.x,
@@ -810,7 +811,7 @@ namespace PathTracing
                             reset                = 0,
                         };
 
-                        var fgPtr = SLDLRR.SLDlssg.GetInteropDataPtr(fg, curFrame);
+                        var fgPtr = SLDlssg.GetInteropDataPtr(fg, curFrame);
                         _slDlssgInputsPass.Setup(fgEventFunc, fgPtr);
                         renderer.EnqueuePass(_slDlssgInputsPass);
                     }

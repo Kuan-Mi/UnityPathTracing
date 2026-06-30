@@ -1,4 +1,6 @@
-// RandomLightMotion.cs
+namespace PathTracing
+{
+    // RandomLightMotion.cs
 // 附加到每盏随机灯光上，使其在指定包围盒内平滑漫游。
 // 由 RandomLightSpawner.GenerateLights() 自动挂载并初始化。
 
@@ -96,4 +98,6 @@ public class RandomLightMotion : MonoBehaviour
             Random.Range(0f, 360f),
             Random.Range(0f, 360f));
     }
+}
+
 }

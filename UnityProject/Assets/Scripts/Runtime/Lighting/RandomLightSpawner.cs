@@ -1,4 +1,6 @@
-// RandomLightSpawner.cs
+namespace PathTracing
+{
+    // RandomLightSpawner.cs
 // 测试灯光用工具组件。
 // 在指定范围内随机生成若干个灯光，灯光类型随机，位置随机。
 // 范围（Bounds）可在 Scene 视图中通过拖拽句柄调整（见配套 Editor 脚本）。
@@ -216,4 +218,6 @@ public class RandomLightSpawner : MonoBehaviour
         Gizmos.DrawWireCube(Vector3.zero, boundsSize);
     }
 #endif
+}
+
 }

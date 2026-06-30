@@ -1,4 +1,6 @@
-// PointLightRadius.cs
+namespace PathTracing
+{
+    // PointLightRadius.cs
 // Attach this component to any GameObject that also has a Point Light.
 // The 'radius' value is read by PathTracingPass and uploaded to the GPU
 // so that the sphere-area-light sampling path in PointLights.hlsl is used.
@@ -32,4 +34,6 @@ public class PointLightRadius : MonoBehaviour
         }
     }
 #endif
+}
+
 }

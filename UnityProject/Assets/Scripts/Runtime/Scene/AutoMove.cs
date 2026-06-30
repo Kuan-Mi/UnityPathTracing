@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using UnityEngine;
 
-namespace DefaultNamespace
+namespace PathTracing
 {
     [ExecuteAlways]
     public class AutoMove : MonoBehaviour

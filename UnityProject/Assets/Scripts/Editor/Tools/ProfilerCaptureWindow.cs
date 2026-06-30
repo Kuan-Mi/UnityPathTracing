@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 
-namespace ProjectTools.Editor
+namespace PathTracing.Editor.Tools
 {
     /// <summary>
     /// Small front-end for <see cref="ProfilerCaptureExporter"/>: load a .data capture,

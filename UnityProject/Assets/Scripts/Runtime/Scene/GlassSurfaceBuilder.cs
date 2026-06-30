@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+namespace PathTracing
+{
+    using System.Collections.Generic;
 using NativeRender;
 using UnityEngine;
 
@@ -77,4 +79,5 @@ public class GlassSurfaceBuilder : MonoBehaviour
             }
         }
     }
+}
 }

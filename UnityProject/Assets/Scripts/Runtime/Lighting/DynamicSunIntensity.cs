@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+namespace PathTracing
+{
+    using UnityEngine;
 
 [ExecuteAlways]
 [RequireComponent(typeof(Light))]
@@ -88,4 +90,5 @@ public class DynamicSunIntensity : MonoBehaviour
         float t = Mathf.Clamp01((x - edge0) / (edge1 - edge0));
         return t * t * (3.0f - 2.0f * t);
     }
+}
 }

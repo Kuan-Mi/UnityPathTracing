@@ -1,3 +1,5 @@
+using PathTracing.Profiling;
+
 using NativeRender;
 using UnityEngine;
 using UnityEngine.Rendering;

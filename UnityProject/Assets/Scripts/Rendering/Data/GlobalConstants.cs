@@ -1,4 +1,5 @@
-﻿using Unity.Mathematics;
+using Unity.Mathematics;
+using PathTracing;
 using UnityEngine.Rendering;
 
 namespace PathTracing

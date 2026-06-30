@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -33,7 +33,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to<http://unlicense.org/>
 */
 
-namespace LeetProfiling {
+namespace PathTracing.Profiling {
     /// <summary>
     /// This is a testing script for find out which of Unity's samplers can report GPU times on your given platform.
     ///

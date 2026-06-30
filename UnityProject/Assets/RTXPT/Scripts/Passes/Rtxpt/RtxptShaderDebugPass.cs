@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 using NativeRender;
-using Nri;
+using PathTracing.NativeInterop.NRI;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;

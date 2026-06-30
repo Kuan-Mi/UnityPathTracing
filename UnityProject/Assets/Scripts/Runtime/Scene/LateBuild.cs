@@ -1,6 +1,6 @@
-﻿using UnityEngine;
+using UnityEngine;
 
-namespace DefaultNamespace
+namespace PathTracing
 {
     public class LateBuild : MonoBehaviour
     {

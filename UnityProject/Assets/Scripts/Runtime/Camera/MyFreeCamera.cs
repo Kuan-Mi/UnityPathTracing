@@ -1,8 +1,11 @@
-﻿// #if ENABLE_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM_PACKAGE
+// #if ENABLE_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM_PACKAGE
+using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
+
 // #endif
 
-namespace UnityEngine.Rendering
+namespace PathTracing
 {
     /// <summary>
     /// Utility Free Camera component.

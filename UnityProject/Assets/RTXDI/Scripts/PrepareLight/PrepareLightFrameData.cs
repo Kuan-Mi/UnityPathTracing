@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using PathTracing.NativeInterop.NRI;
 
 namespace DefaultNamespace
 {

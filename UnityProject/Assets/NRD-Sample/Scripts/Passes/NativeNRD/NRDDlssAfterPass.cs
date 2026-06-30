@@ -1,5 +1,6 @@
 using System;
 using NativeRender;
+using PathTracing.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;

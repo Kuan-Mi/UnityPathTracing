@@ -1,6 +1,6 @@
-﻿using UnityEngine;
+using UnityEngine;
 
-namespace Runtime
+namespace PathTracing
 {
     public class Tool : MonoBehaviour
     {

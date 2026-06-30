@@ -1,8 +1,8 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.InputSystem;
 
-namespace Runtime
+namespace PathTracing
 {
     public class KeyToggleActive : MonoBehaviour
     {

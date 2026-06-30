@@ -8,7 +8,7 @@ namespace PathTracing
 {
     [CustomEditor(typeof(RtxptRenderer))]
     [CanEditMultipleObjects]
-    public class RtxptRendererEditor : Editor
+    public class RtxptRendererEditor : UnityEditor.Editor
     {
         private bool[] _slotFoldouts = Array.Empty<bool>();
 

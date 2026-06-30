@@ -1,4 +1,5 @@
 using NativeRender;
+using PathTracing.NativeInterop.NRI;
 
 namespace PathTracing
 {
@@ -48,8 +49,8 @@ namespace PathTracing
             var rtx = ctx.Resources;
 
             ds.SetStructuredBuffer("t_LightDataBuffer", rtx.LightDataBuffer.GetNativeBufferPtr(), rtx.LightDataBuffer.count, rtx.LightDataBuffer.stride);
-            ds.SetTypedBuffer("t_NeighborOffsets", rtx.NeighborOffsetsBuffer.GetNativeBufferPtr(), rtx.NeighborOffsetsBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32_FLOAT);
-            ds.SetTypedBuffer("t_LightIndexMappingBuffer", rtx.LightIndexMappingBuffer.GetNativeBufferPtr(), rtx.LightIndexMappingBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_NeighborOffsets", rtx.NeighborOffsetsBuffer.GetNativeBufferPtr(), rtx.NeighborOffsetsBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32G32_FLOAT);
+            ds.SetTypedBuffer("t_LightIndexMappingBuffer", rtx.LightIndexMappingBuffer.GetNativeBufferPtr(), rtx.LightIndexMappingBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             if (ctx.EnvironmentPdfTexturePtr != System.IntPtr.Zero)
                 ds.SetTexture("t_EnvironmentPdfTexture", ctx.EnvironmentPdfTexturePtr);
@@ -64,8 +65,8 @@ namespace PathTracing
             ds.SetStructuredBuffer("t_GeometryInstanceToLight", rtx.GeometryInstanceToLight.GetNativeBufferPtr(), rtx.GeometryInstanceToLight.count, rtx.GeometryInstanceToLight.stride);
 
             ds.SetRWStructuredBuffer("u_LightReservoirs", rtx.LightReservoirBuffer.GetNativeBufferPtr(), rtx.LightReservoirBuffer.count, rtx.LightReservoirBuffer.stride);
-            ds.SetRWTypedBuffer("u_RisBuffer", rtx.RisBuffer.GetNativeBufferPtr(), rtx.RisBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32_UINT);
-            ds.SetRWTypedBuffer("u_RisLightDataBuffer", rtx.RisLightDataBuffer.GetNativeBufferPtr(), rtx.RisLightDataBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32B32A32_UINT);
+            ds.SetRWTypedBuffer("u_RisBuffer", rtx.RisBuffer.GetNativeBufferPtr(), rtx.RisBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32G32_UINT);
+            ds.SetRWTypedBuffer("u_RisLightDataBuffer", rtx.RisLightDataBuffer.GetNativeBufferPtr(), rtx.RisLightDataBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32G32B32A32_UINT);
             ds.SetRWStructuredBuffer("u_GIReservoirs", rtx.GIReservoirBuffer.GetNativeBufferPtr(), rtx.GIReservoirBuffer.count, rtx.GIReservoirBuffer.stride);
 
             if (rtx.PTReservoirBuffer != null)
@@ -129,10 +130,10 @@ namespace PathTracing
 
 
             // Buffer<float2> requires a typed SRV: DXGI_FORMAT_R32G32_FLOAT
-            ds.SetTypedBuffer("t_NeighborOffsets", rtx.NeighborOffsetsBuffer.GetNativeBufferPtr(), rtx.NeighborOffsetsBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32_FLOAT);
+            ds.SetTypedBuffer("t_NeighborOffsets", rtx.NeighborOffsetsBuffer.GetNativeBufferPtr(), rtx.NeighborOffsetsBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32G32_FLOAT);
 
             // Buffer<uint> requires a typed SRV: DXGI_FORMAT_R32_UINT
-            ds.SetTypedBuffer("t_LightIndexMappingBuffer", rtx.LightIndexMappingBuffer.GetNativeBufferPtr(), rtx.LightIndexMappingBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightIndexMappingBuffer", rtx.LightIndexMappingBuffer.GetNativeBufferPtr(), rtx.LightIndexMappingBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             // EnvironmentPdfTexture: prefer the IntPtr explicitly set by the feature; fall back
             // to the RTHandle owned by NativeRtxdiResources.
@@ -154,10 +155,10 @@ namespace PathTracing
             ds.SetRWStructuredBuffer("u_LightReservoirs", rtx.LightReservoirBuffer.GetNativeBufferPtr(), rtx.LightReservoirBuffer.count, rtx.LightReservoirBuffer.stride);
 
             // RWBuffer<uint2> requires a typed UAV: DXGI_FORMAT_R32G32_UINT
-            ds.SetRWTypedBuffer("u_RisBuffer", rtx.RisBuffer.GetNativeBufferPtr(), rtx.RisBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32_UINT);
+            ds.SetRWTypedBuffer("u_RisBuffer", rtx.RisBuffer.GetNativeBufferPtr(), rtx.RisBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32G32_UINT);
 
             // RWBuffer<uint4> requires a typed UAV: DXGI_FORMAT_R32G32B32A32_UINT
-            ds.SetRWTypedBuffer("u_RisLightDataBuffer", rtx.RisLightDataBuffer.GetNativeBufferPtr(), rtx.RisLightDataBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32B32A32_UINT);
+            ds.SetRWTypedBuffer("u_RisLightDataBuffer", rtx.RisLightDataBuffer.GetNativeBufferPtr(), rtx.RisLightDataBuffer.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32G32B32A32_UINT);
 
             ds.SetRWStructuredBuffer("u_GIReservoirs", rtx.GIReservoirBuffer.GetNativeBufferPtr(), rtx.GIReservoirBuffer.count, rtx.GIReservoirBuffer.stride);
 

@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 namespace PathTracing
 {
     [CustomEditor(typeof(NativeNrdFeature))]
-    public class NativeNrdFeatureEditor : Editor
+    public class NativeNrdFeatureEditor : UnityEditor.Editor
     {
         public override void OnInspectorGUI()
         {

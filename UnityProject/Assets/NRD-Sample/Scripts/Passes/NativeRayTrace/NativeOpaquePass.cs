@@ -1,4 +1,6 @@
-﻿using System;
+using PathTracing.Profiling;
+
+using System;
 using NativeRender;
 using Unity.Mathematics;
 using Unity.Profiling;

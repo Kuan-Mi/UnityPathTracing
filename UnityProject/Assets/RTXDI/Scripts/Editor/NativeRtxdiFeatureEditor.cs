@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 namespace PathTracing
 {
     [CustomEditor(typeof(NativeRtxdiFeature))]
-    public class NativeRtxdiFeatureEditor : Editor
+    public class NativeRtxdiFeatureEditor : UnityEditor.Editor
     {
         private string GetKey(string headerName) => $"PT_NativeRtxdi_Foldout_{target.GetInstanceID()}_{headerName}";
 

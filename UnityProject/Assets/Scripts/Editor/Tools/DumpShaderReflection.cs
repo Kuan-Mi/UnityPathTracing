@@ -7,7 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace ProjectTools.Editor
+namespace PathTracing.Editor.Tools
 {
     /// <summary>
     /// Dumps each native shader asset's reflection JSON to a sibling

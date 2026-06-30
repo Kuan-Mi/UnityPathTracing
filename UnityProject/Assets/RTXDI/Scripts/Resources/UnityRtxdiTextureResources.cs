@@ -1,5 +1,5 @@
 using System;
-using Nri;
+using PathTracing.NativeInterop.NRI;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;

@@ -1,3 +1,5 @@
+using PathTracing.Profiling;
+
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;

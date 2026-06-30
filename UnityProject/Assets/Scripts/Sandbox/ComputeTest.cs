@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+namespace PathTracing.Sandbox
+{
+    using UnityEngine;
 using System.Runtime.InteropServices;
 
 public class ComputeTest : MonoBehaviour
@@ -65,4 +67,5 @@ public class ComputeTest : MonoBehaviour
         RenderTexture.active = null;
         Destroy(temp);
     }
+}
 }

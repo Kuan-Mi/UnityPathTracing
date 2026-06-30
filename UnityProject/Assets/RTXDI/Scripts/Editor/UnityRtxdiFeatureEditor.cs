@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 namespace PathTracing
 {
     [CustomEditor(typeof(UnityRtxdiFeature))]
-    public class UnityRtxdiFeatureEditor : Editor
+    public class UnityRtxdiFeatureEditor : UnityEditor.Editor
     {
         private RtxdiSettingPreset _presetTarget;
 

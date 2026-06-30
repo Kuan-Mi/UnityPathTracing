@@ -1,0 +1,141 @@
+using System;
+using System.Runtime.InteropServices;
+using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
+
+namespace PathTracing.NativeInterop.NRI
+{
+    public class NriTextureResource
+    {
+        [DllImport("Denoiser")]
+        private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
+
+        [DllImport("Denoiser")]
+        private static extern void ReleaseTexture(IntPtr nriTex);
+
+        /// <summary>Exposed for subclasses that need to wrap a non-2D resource.</summary>
+        protected static IntPtr WrapD3D12TextureInternal(IntPtr resource, DXGI_FORMAT format)
+            => WrapD3D12Texture(resource, format);
+
+        public RenderTexture rt;
+        public RTHandle      Handle; // Unity RTHandle封装
+        public IntPtr        NativePtr; // DX12底层指针
+        public IntPtr        NriPtr; // NRD封装指针
+
+
+        public string           Name;
+        public NriResourceState ResourceState;
+        public GraphicsFormat   GraphicsFormat;
+        public bool             SRGB;
+
+        public bool IsCreated => Handle != null && rt != null;
+
+
+        public NriTextureResource(string name, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
+        {
+            Name           = name;
+            ResourceState  = initialState;
+            GraphicsFormat = graphicsFormat;
+            SRGB           = srgb;
+        }
+
+        public void Allocate(int2 resolution, int slices = 1, bool useMipMap = false)
+        {
+            Release(); // 确保先释放旧的
+            var dxgiFormat = NriUtil.GetDXGIFormat(GraphicsFormat);
+
+            var desc = new RenderTextureDescriptor(resolution.x, resolution.y, GraphicsFormat, 0)
+            {
+                enableRandomWrite = true,
+                useMipMap         = useMipMap,
+                autoGenerateMips  = false,
+                msaaSamples       = 1,
+                sRGB              = SRGB
+            };
+
+            if (slices > 1)
+            {
+                desc.dimension   = TextureDimension.Tex2DArray;
+                desc.volumeDepth = slices;
+            }
+
+            // 创建 RT
+            rt = new RenderTexture(desc)
+            {
+                name       = Name,
+                filterMode = FilterMode.Point,
+                wrapMode   = TextureWrapMode.Clamp
+            };
+            rt.hideFlags = HideFlags.DontSave;
+            rt.Create();
+
+            Handle    = RTHandles.Alloc(rt);
+            NativePtr = Handle.rt.GetNativeTexturePtr();
+            NriPtr    = WrapD3D12Texture(NativePtr, dxgiFormat);
+        }
+
+        /// <summary>
+        /// Allocates a cubemap render texture. NriPtr is left zero — cubemaps are not used with NRD.
+        /// </summary>
+        public void AllocateCube(int size, bool useMipMap = false, bool enableRandomWrite = true, int mipCount = 0)
+        {
+            Release();
+
+            var desc = new RenderTextureDescriptor(size, size, GraphicsFormat, 0)
+            {
+                dimension         = TextureDimension.Cube,
+                enableRandomWrite = enableRandomWrite,
+                useMipMap         = useMipMap,
+                autoGenerateMips  = false,
+                msaaSamples       = 1,
+                sRGB              = SRGB,
+            };
+
+            // Cap the chain to an explicit mip count (mirrors the original EnvMapBaker, which
+            // allocates exactly log2(cubeDim/4) mips). Leaving it at the default would let Unity
+            // build the full chain down to 1×1, exposing unwritten mips through the SRV.
+            if (useMipMap && mipCount > 0)
+                desc.mipCount = mipCount;
+
+            rt = new RenderTexture(desc)
+            {
+                name       = Name,
+                filterMode = FilterMode.Bilinear,
+                wrapMode   = TextureWrapMode.Clamp,
+                hideFlags  = HideFlags.DontSave,
+            };
+            rt.Create();
+
+            Handle    = RTHandles.Alloc(rt);
+            NativePtr = Handle.rt.GetNativeTexturePtr();
+            NriPtr    = IntPtr.Zero; // cubemaps are not used with NRD
+        }
+
+        public void Release()
+        {
+            if (NriPtr != IntPtr.Zero)
+            {
+                ReleaseTexture(NriPtr);
+                NriPtr = IntPtr.Zero;
+            }
+
+            NativePtr = IntPtr.Zero;
+
+            if (Handle != null)
+            {
+                RTHandles.Release(Handle);
+                Handle = null;
+                if (rt != null)
+                {
+                    if (Application.isPlaying)
+                        Object.Destroy(rt);
+                    else
+                        Object.DestroyImmediate(rt);
+                }
+            }
+        }
+    }
+}

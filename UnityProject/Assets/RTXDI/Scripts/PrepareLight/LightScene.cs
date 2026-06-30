@@ -2,12 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using PathTracing;
+using PathTracing.Rendering.Data.RTXDI;
 using Rtxdi;
 using Unity.Mathematics;
 using UnityEngine;
 
 using UnityEngine.Rendering;
+using InstanceData = PathTracing.Rendering.Data.RTXDI.InstanceData;
 using Object = UnityEngine.Object;
+using PrimitiveData = PathTracing.Rendering.Data.RTXDI.PrimitiveData;
 
 namespace RTXDI
 {

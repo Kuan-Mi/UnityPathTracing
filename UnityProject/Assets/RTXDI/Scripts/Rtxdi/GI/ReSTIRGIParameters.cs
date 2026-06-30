@@ -7,6 +7,7 @@
 // license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 using System.Runtime.InteropServices;
+using PathTracing;
 using Unity.Mathematics;
 using UnityEngine;
 

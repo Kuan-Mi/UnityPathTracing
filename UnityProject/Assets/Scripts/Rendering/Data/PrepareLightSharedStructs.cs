@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace RTXDI
+namespace PathTracing.Rendering.Data.RTXDI
 {
     // Shared GPU scene/light data structs consumed across the path-tracing pipelines
     // (Core, RTXPT, NRD-Sample) as well as RTXDI. Kept in the Core assembly so every

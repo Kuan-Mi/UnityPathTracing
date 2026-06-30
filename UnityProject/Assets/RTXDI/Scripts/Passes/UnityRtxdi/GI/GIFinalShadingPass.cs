@@ -1,3 +1,5 @@
+using PathTracing.Profiling;
+
 using mini;
 using Unity.Mathematics;
 using Unity.Profiling;

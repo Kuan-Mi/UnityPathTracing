@@ -1,4 +1,6 @@
-﻿using System;
+using PathTracing.Profiling;
+
+using System;
 using System.Runtime.InteropServices;
 using RTXDI;
 using Unity.Mathematics;

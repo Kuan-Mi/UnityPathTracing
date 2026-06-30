@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using mini;
+using PathTracing.Rendering.Data.RTXDI;
 using Rtxdi;
 using RTXDI;
 using Rtxdi.DI;

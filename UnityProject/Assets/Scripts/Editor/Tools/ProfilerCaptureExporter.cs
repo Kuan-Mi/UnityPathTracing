@@ -10,7 +10,7 @@ using UnityEditor.Profiling;
 using UnityEditorInternal;
 using UnityEngine;
 
-namespace ProjectTools.Editor
+namespace PathTracing.Editor.Tools
 {
     /// <summary>
     /// Loads a Unity Profiler binary capture (.data) and writes a human-readable text

@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using UnityEngine;
 
-namespace Runtime
+namespace PathTracing
 {
     public class CameraHelper : MonoBehaviour
     {

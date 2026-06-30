@@ -1,4 +1,6 @@
-using UnityEditor;
+namespace PathTracing.Editor
+{
+    using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
@@ -45,4 +47,6 @@ public class PatchAgilitySdkPostBuild : IPostprocessBuildWithReport
             Debug.Log($"[AgilitySDK Patch] Patched {count} occurrence(s). (SDK 618 -> 619)");
         }
     }
+}
+
 }

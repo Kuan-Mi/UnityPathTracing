@@ -1,3 +1,5 @@
+using PathTracing.Profiling;
+
 using System;
 using System.Runtime.InteropServices;
 using NativeRender;

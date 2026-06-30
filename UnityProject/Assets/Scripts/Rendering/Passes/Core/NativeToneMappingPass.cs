@@ -1,8 +1,11 @@
 using System;
 using System.Runtime.InteropServices;
 using NativeRender;
+using Nri = PathTracing.NativeInterop.NRI;
 using Unity.Mathematics;
 using UnityEngine;
+using PathTracing;
+using PathTracing.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;

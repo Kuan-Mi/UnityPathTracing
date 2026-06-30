@@ -1,6 +1,6 @@
 {
     "name": "PathTracing.Core",
-    "rootNamespace": "",
+    "rootNamespace": "PathTracing",
     "references": [
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",

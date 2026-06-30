@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+namespace PathTracing
+{
+    using UnityEngine;
 
 [ExecuteInEditMode] // 允许在编辑器不运行游戏时也能实时看到效果
 public class RealisticSunController : MonoBehaviour
@@ -109,4 +111,5 @@ public class RealisticSunController : MonoBehaviour
         Gizmos.DrawRay(transform.position, -transform.forward * 5f);
         Gizmos.DrawWireSphere(transform.position - transform.forward * 5f, 0.5f);
     }
+}
 }

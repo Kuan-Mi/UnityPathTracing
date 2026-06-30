@@ -1,5 +1,6 @@
 using System;
 using NativeRender;
+using PathTracing.NativeInterop.NRI;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -193,9 +194,9 @@ namespace PathTracing
             ds.SetStructuredBuffer("t_LightsCB", buf.LightControlBuffer, buf.LightControlBuffer.count, buf.LightControlBuffer.stride);
             ds.SetStructuredBuffer("t_Lights",   buf.LightBuffer,        buf.LightBuffer.count,        buf.LightBuffer.stride);
 
-            ds.SetTypedBuffer("t_LightProxyCounters",       buf.LightProxyCountersPtr,   buf.LightProxyCounters.count,   (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
-            ds.SetTypedBuffer("t_LightProxyIndices",        buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
-            ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBufferPtr,  buf.LocalSamplingBuffer.count,  (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightProxyCounters",       buf.LightProxyCountersPtr,   buf.LightProxyCounters.count,   (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightProxyIndices",        buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBufferPtr,  buf.LocalSamplingBuffer.count,  (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer, buf.LightExBuffer.count, buf.LightExBuffer.stride);
 

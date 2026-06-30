@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NativeRender;
-using Nri;
+using PathTracing.NativeInterop.NRI;
+using PathTracing.Profiling;
+using PathTracing.Rendering.Data.RTXDI;
 using RTXDI;
 using Rtxdi;
 using Unity.Mathematics;
@@ -75,7 +77,7 @@ namespace PathTracing
     /// <c>PrepareLights.computeshader</c> with 256 threads per group.
     ///
     /// <para><b>Emissive meshes only for now</b> — analytic Unity lights (point / spot /
-    /// directional) are not yet converted to <see cref="RTXDI.PolymorphicLightInfo"/> and are
+    /// directional) are not yet converted to <see cref="PolymorphicLightInfo"/> and are
     /// left for a follow-up.</para>
     /// </summary>
     // =========================================================================
@@ -561,7 +563,7 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_LightIndexMappingBuffer",
                     rtx.LightIndexMappingBuffer.GetNativeBufferPtr(),
                     rtx.LightIndexMappingBuffer.count,
-                    (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+                    (uint)DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             if (rtx.LocalLightPdfTexture?.rt != null)
                 ds.SetRWTexture("u_LocalLightPdfTexture",

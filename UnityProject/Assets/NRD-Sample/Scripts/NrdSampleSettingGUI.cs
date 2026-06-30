@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Nrd;
+using PathTracing.NativeInterop.NRD;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;

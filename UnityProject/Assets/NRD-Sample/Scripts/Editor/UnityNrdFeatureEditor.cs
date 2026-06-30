@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 namespace PathTracing
 {
     [CustomEditor(typeof(UnityNrdFeature))]
-    public class UnityNrdFeatureEditor : Editor
+    public class UnityNrdFeatureEditor : UnityEditor.Editor
     {
         private string GetKey(string headerName)
         {

@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+namespace PathTracing
+{
+    using UnityEngine;
 using System;
 
 // 用来代替原生 [Header]
@@ -10,4 +12,5 @@ public class FoldoutHeaderAttribute : PropertyAttribute
     {
         this.Name = name;
     }
+}
 }

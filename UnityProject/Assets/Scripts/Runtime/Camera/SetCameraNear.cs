@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+namespace PathTracing
+{
+    using UnityEngine;
 
 [ExecuteInEditMode] // 让脚本在编辑模式下也能生效
 public class SetCameraNear : MonoBehaviour
@@ -13,4 +15,5 @@ public class SetCameraNear : MonoBehaviour
             cam.nearClipPlane = nearValue;
         }
     }
+}
 }

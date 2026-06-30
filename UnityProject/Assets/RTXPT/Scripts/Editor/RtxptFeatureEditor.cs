@@ -15,7 +15,7 @@ namespace PathTracing
     /// (NRD leftovers, ReSTIR toggles) are intentionally not drawn but kept serialized.
     /// </summary>
     [CustomEditor(typeof(RtxptFeature))]
-    public class RtxptFeatureEditor : Editor
+    public class RtxptFeatureEditor : UnityEditor.Editor
     {
         // Mirror of shader-side limits (PathTracerConfig is internal to the runtime assembly).
         private const int   kStablePlaneCount          = 3;   // PathTracerConfig.cStablePlaneCount

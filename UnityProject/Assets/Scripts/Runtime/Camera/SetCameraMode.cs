@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using UnityEngine;
 
-namespace DefaultNamespace
+namespace PathTracing
 {
     public class SetCameraMode : MonoBehaviour
     {

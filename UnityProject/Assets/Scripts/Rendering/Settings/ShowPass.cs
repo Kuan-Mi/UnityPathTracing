@@ -1,4 +1,4 @@
-﻿namespace PathTracing
+namespace PathTracing
 {
     // 0 showValidation     Blend Alpha
     // 1 showShadow         解码后输出阴影

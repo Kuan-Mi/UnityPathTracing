@@ -1,4 +1,6 @@
-using System.Linq;
+namespace PathTracing.Profiling
+{
+    using System.Linq;
 using System.Reflection;
 using Unity.Profiling;
 using Unity.Profiling.LowLevel;
@@ -180,4 +182,6 @@ public static class RenderPassMarkers
         var fields = typeof(RenderPassMarkers).GetFields(BindingFlags.Public | BindingFlags.Static);
         return (from f in fields where f.FieldType == typeof(NamedMarker) select (NamedMarker)f.GetValue(null) into nm select nm.Name).ToArray();
     }
+}
+
 }
