@@ -304,7 +304,8 @@ namespace PathTracing
 
             // ---- Resolution -------------------------------------------------
             var displayResolution = ComputeOutputResolution(renderingData.cameraData);
-            var renderResolution  = ComputeRenderResolution(displayResolution, setting.upscalerMode);
+            var dlssRrMode        = NormalizeDlssRrMode(setting.upscalerMode);
+            var renderResolution  = ComputeRenderResolution(displayResolution, dlssRrMode);
 
             // DLSS / DLSS-RR require an output of at least 32x32 (NGX minimum). In a
             // packaged build the window can momentarily come up at a degenerate size
@@ -474,7 +475,7 @@ namespace PathTracing
                         specularMvOrHitTex = texPool.DlssRrSpecMotionVectors,
                     };
                     _dlssRRPass.Setup(
-                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, setting.upscalerMode, setting.dlssRRPreset),
+                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, dlssRrMode, setting.dlssRRPreset),
                         new SLDlssrrPass.Settings { tmpDisableRR = setting.tmpDisableDlssRR });
                     renderer.EnqueuePass(_dlssRRPass);
                 }
@@ -645,6 +646,13 @@ namespace PathTracing
         private static int2 ComputeOutputResolution(CameraData cameraData) =>
             new int2(cameraData.cameraTargetDescriptor.width,
                 cameraData.cameraTargetDescriptor.height);
+
+        private static UpscalerMode NormalizeDlssRrMode(UpscalerMode mode)
+        {
+            // Streamline's DLSS-RR/DLSSD path fails NGX feature creation for eUltraQuality in
+            // the bundled SDK/runtime. Match RTXPT's supported RR mode set by using Quality.
+            return mode == UpscalerMode.ULTRA_QUALITY ? UpscalerMode.QUALITY : mode;
+        }
 
         private static int2 ComputeRenderResolution(int2 outputRes, UpscalerMode mode)
         {
