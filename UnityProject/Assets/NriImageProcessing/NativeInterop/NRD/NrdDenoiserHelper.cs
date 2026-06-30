@@ -64,13 +64,13 @@ namespace PathTracing.NativeInterop.NRD
             commonSettings.isHistoryConfidenceAvailable   = fi.isHistoryConfidenceAvailable;
         }
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         public static extern int CreateDenoiserInstance(IntPtr denoisers, int count);
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         public static extern void DestroyDenoiserInstance(int id);
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         public static extern void UpdateDenoiserResources(int instanceId, IntPtr resources, int count);
     }
 }

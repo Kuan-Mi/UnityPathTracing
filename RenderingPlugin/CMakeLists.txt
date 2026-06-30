@@ -66,7 +66,7 @@ option(NRI_ENABLE_NGX_SDK "" ON)
 add_subdirectory(External/NRI "${CMAKE_CURRENT_SOURCE_DIR}/_ExternalBuild/NRI_build")
 
 # ---------------------------------------------------------------------------
-# NRD – used by Denoiser only; NRI target already present above
+# NRD - used by NRIPlugin only; NRI target already present above
 # ---------------------------------------------------------------------------
 option(NRD_NRI "" OFF)
 option(NRD_STATIC_LIBRARY "" OFF)
@@ -154,7 +154,7 @@ endmacro()
 
 # ---------------------------------------------------------------------------
 # D3D12HeapHook – shared DLL for SetDescriptorHeaps vtable hook
-# Both NativeRenderPlugin and Denoiser link against this so they share
+# Both NativeRenderPlugin and NRIPlugin link against this so they share
 # a single set of globals (one hook, one cache, one TLS counter).
 # ---------------------------------------------------------------------------
 add_library(D3D12HeapHook SHARED
@@ -174,18 +174,18 @@ target_link_directories(D3D12HeapHook PRIVATE "${WIN_SDK_LIB}")
 target_link_libraries(D3D12HeapHook PRIVATE d3d12.lib)
 
 # ---------------------------------------------------------------------------
-# Denoiser DLL  (NRD + NRI denoising plugin)
+# NRIPlugin DLL  (NRI-backed NRD/DLSS/NIS plugin)
 # ---------------------------------------------------------------------------
-add_library(Denoiser SHARED
-    Denoiser/DLRRInstance.cpp
-    Denoiser/DLSRInstance.cpp
-    Denoiser/NISInstance.cpp
-    Denoiser/NrdInstance.cpp
-    Denoiser/RenderingPlugin.cpp
-    Denoiser/RenderSystem.cpp
+add_library(NRIPlugin SHARED
+    NRIPlugin/DLRRInstance.cpp
+    NRIPlugin/DLSRInstance.cpp
+    NRIPlugin/NISInstance.cpp
+    NRIPlugin/NrdInstance.cpp
+    NRIPlugin/RenderingPlugin.cpp
+    NRIPlugin/RenderSystem.cpp
 )
 
-target_include_directories(Denoiser PRIVATE
+target_include_directories(NRIPlugin PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     D3D12HeapHook
     # NRD Integration helper (NRDIntegration.h, NRDIntegration.hpp)
@@ -198,12 +198,12 @@ target_include_directories(Denoiser PRIVATE
 )
 
 # Suppress C4819: treat source and execution character set as UTF-8
-target_compile_options(Denoiser PRIVATE /utf-8)
+target_compile_options(NRIPlugin PRIVATE /utf-8)
 
 # NRD and NRI CMake targets carry their public include dirs transitively
-target_link_libraries(Denoiser PRIVATE NRD NRI D3D12HeapHook)
+target_link_libraries(NRIPlugin PRIVATE NRD NRI D3D12HeapHook)
 
-setup_unity_plugin(Denoiser COPY_NRD)
+setup_unity_plugin(NRIPlugin COPY_NRD)
 
 # ---------------------------------------------------------------------------
 # PrepareLight DLL  (NRI bindless light-preparation plugin)
@@ -293,7 +293,7 @@ set(DXC_LIB "${DXC_DIR}/build/native/lib/x64")
 set(DXC_BIN "${DXC_DIR}/build/native/bin/x64")
 
 # ---------------------------------------------------------------------------
-# Unity plugin API headers (shared with Denoiser/PrepareLight)
+# Unity plugin API headers (shared with NRIPlugin/PrepareLight)
 # ---------------------------------------------------------------------------
 set(UNITY_PLUGIN_API_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Unity")
 if(NOT EXISTS "${UNITY_PLUGIN_API_DIR}/IUnityInterface.h")
@@ -413,7 +413,7 @@ set(SL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Other/streamline-sdk-v2.11.1")
 
 # ---------------------------------------------------------------------------
 # StreamlinePlugin – DLSS Ray Reconstruction via Streamline (standalone A/B comparison
-# against the NRI DLSS-RR path in Denoiser). Evaluate-time feature (no swapchain
+# against the NRI DLSS-RR path in NRIPlugin). Evaluate-time feature (no swapchain
 # proxying), so it is editor-safe and loaded on demand.
 # ---------------------------------------------------------------------------
 add_library(StreamlinePlugin SHARED

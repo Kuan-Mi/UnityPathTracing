@@ -1,6 +1,6 @@
 // SLDlssrr.h
 // Streamline (SL 2.11.1) integration for DLSS Ray Reconstruction (DLSS-RR), used as a
-// standalone A/B comparison against the NRI DLSS-RR path (Denoiser.dll / DLRRInstance).
+// standalone A/B comparison against the NRI DLSS-RR path (NRIPlugin.dll / DLRRInstance).
 //
 // Unlike the DLSS-G frame-generation path (SLDlssg), DLSS-RR is an EVALUATE-time feature:
 // slEvaluateFeature(kFeatureDLSS_RR, ...) runs on the frame's command list during

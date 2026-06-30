@@ -17,13 +17,13 @@ namespace PathTracing.NativeInterop.DLRR
     [Obsolete("Use PathTracing.NativeInterop.Streamline.SLDlssrr (Streamline) — the NRI DLSS-RR path cannot run concurrently with DLSS-G frame generation.")]
     public class DlrrDenoiser : IDisposable
     {
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern int CreateDLRRInstance();
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern void DestroyDLRRInstance(int id);
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern bool DLRR_QueryOptimalRenderSize(
             uint outputWidth, uint outputHeight, byte mode,
             out uint renderWidth, out uint renderHeight);

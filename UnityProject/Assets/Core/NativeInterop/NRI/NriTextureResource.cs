@@ -10,10 +10,10 @@ namespace PathTracing.NativeInterop.NRI
 {
     public class NriTextureResource
     {
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern void ReleaseTexture(IntPtr nriTex);
 
         /// <summary>Exposed for subclasses that need to wrap a non-2D resource.</summary>

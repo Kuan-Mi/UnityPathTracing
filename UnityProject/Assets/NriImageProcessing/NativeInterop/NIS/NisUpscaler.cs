@@ -9,10 +9,10 @@ namespace PathTracing.NativeInterop.NIS
 {
     public class NisUpscaler : IDisposable
     {
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern int CreateNISInstance();
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern void DestroyNISInstance(int id);
 
         private readonly int                       _instanceId;

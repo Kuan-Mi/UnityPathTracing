@@ -17,10 +17,10 @@ namespace PathTracing.NativeInterop.DLSR
     [Obsolete("Use PathTracing.NativeInterop.Streamline.SLDlssr (Streamline) — the NRI DLSS-SR path cannot run concurrently with DLSS-G frame generation.")]
     public class DlsrUpscaler : IDisposable
     {
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern int CreateDLSRInstance();
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern void DestroyDLSRInstance(int id);
 
         private readonly int                        _instanceId;

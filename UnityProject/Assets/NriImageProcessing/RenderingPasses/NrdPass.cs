@@ -27,7 +27,7 @@ namespace PathTracing
             public NamedMarker Marker;
         }
 
-        [DllImport("Denoiser")]
+        [DllImport("NRIPlugin")]
         private static extern IntPtr GetRenderEventAndDataFunc();
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)

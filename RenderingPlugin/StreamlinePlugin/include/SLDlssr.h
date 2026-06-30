@@ -1,7 +1,7 @@
 // SLDlssr.h
 // Streamline (SL 2.11.1) integration for DLSS Super Resolution (DLSS-SR / kFeatureDLSS),
 // the upscaling counterpart of the DLSS-RR path (SLDlssrr). Replaces the NRI DLSS-SR path
-// (Denoiser.dll / DLSRInstance).
+// (NRIPlugin.dll / DLSRInstance).
 //
 // Like DLSS-RR, DLSS-SR is an EVALUATE-time feature: slEvaluateFeature(kFeatureDLSS, ...)
 // runs on the frame's command list during rendering. It does NOT take over the present

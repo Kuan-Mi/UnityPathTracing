@@ -91,9 +91,9 @@ copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxil.dll"       "%
 :: OMM lib
 copy /Y "RenderingPlugin\_deps\omm-src\bin\omm-lib.dll" "%UNITY_PLUGINS%\" >nul
 
-:: Denoiser / PrepareLight -> Assets\Plugins\x86_64
-copy /Y "%OUT_DIR%\Denoiser.dll"              "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "%OUT_DIR%\Denoiser.pdb"              "%UNITY_ASSETS_PLUGINS%\" >nul
+:: NRIPlugin / PrepareLight -> Assets\Plugins\x86_64
+copy /Y "%OUT_DIR%\NRIPlugin.dll"             "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\NRIPlugin.pdb"             "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\PrepareLight.dll"          "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\PrepareLight.pdb"          "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\D3D12HeapHook.dll"         "%UNITY_ASSETS_PLUGINS%\" >nul
@@ -123,7 +123,7 @@ echo    sl.imgui.dll ^(SL debug overlay, toggle Ctrl+Shift+Home^)
 echo    dxcompiler.dll
 echo    dxil.dll
 echo  Assets Plugins:  %UNITY_ASSETS_PLUGINS%\
-echo    Denoiser.dll
+echo    NRIPlugin.dll
 echo    PrepareLight.dll
 echo    D3D12HeapHook.dll
 echo    NRD.dll
