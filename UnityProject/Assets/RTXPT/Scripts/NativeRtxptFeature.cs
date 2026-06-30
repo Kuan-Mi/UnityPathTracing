@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using DLRR;
 using NativeRender;
+using SLDLRR;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -22,7 +22,7 @@ namespace PathTracing
     ///   Phase 2d: NativeRtxptFillStablePlanesPass        - FillStablePlanes RT (PathTrace) / Reference
     ///   Phase 3 : NativeRtxptDenoiseSpecHitTPass         - specular hit-distance bilateral filter x2
     ///   Phase 4 : NativeRtxptDlssBeforePass              - prepare DLSS-RR guide buffers
-    ///   Phase 5 : DlssRRPass                             - DLSS Ray Reconstruction (denoise + upscale)
+    ///   Phase 5 : SLDlssrrPass                           - DLSS Ray Reconstruction (denoise + upscale, via Streamline)
     ///   Phase 7 : NativeRtxptAccumulationPass            - multi-frame accumulation (reference mode only)
     ///
     /// PT_USE_RESTIR_DI = 0, PT_USE_RESTIR_GI = 0 (no RTXDI).
@@ -137,7 +137,7 @@ namespace PathTracing
         private NativeRtxptFillStablePlanesPass       _fillStablePlanesPass;
         private NativeRtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
         private NativeRtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
-        private DlssRRPass                            _dlssRRPass;
+        private SLDlssrrPass                          _dlssRRPass;
         private NativeRtxptBloomPass                  _bloomPass;
         private NativeRtxptToneMappingMipChainPass    _toneMappingMipChainPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
@@ -177,7 +177,7 @@ namespace PathTracing
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
         private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools       = new();
         private readonly Dictionary<long, VolatileConstantBuffer>      _constantBuffers   = new();
-        private readonly Dictionary<long, DlrrDenoiser>                _dlrrDenoisers     = new();
+        private readonly Dictionary<long, SLDlssrr>                    _dlrrDenoisers     = new();
         private readonly Dictionary<long, RtxptCameraFrameState>       _cameraFrameStates = new();
 
         // ---- Lifecycle ------------------------------------------------------
@@ -226,7 +226,7 @@ namespace PathTracing
             _fillStablePlanesPass     ??= new NativeRtxptFillStablePlanesPass(fillStablePlanesShader.asset, referenceShader.asset, ResolveHitGroups(fillHitGroups), ResolveHitGroups(referenceHitGroups)) { renderPassEvent          = renderPassEvent };
             _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs.asset) { renderPassEvent                                                                = renderPassEvent };
             _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs.asset) { renderPassEvent                                                                     = renderPassEvent };
-            _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                                                                           = renderPassEvent };
+            _dlssRRPass               ??= new SLDlssrrPass { renderPassEvent                                                                                                         = renderPassEvent };
             _bloomPass                ??= new NativeRtxptBloomPass(bloomDownsampleRasterShader.asset, bloomBlurRasterShader.asset, bloomCompositeRasterShader.asset) { renderPassEvent                 = renderPassEvent };
             _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader.asset, mipMapGenCs.asset, captureLuminanceCs.asset, toneMapApplyRasterShader.asset) { renderPassEvent = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs.asset) { renderPassEvent                                                                          = renderPassEvent };
@@ -288,7 +288,7 @@ namespace PathTracing
 
             if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
             {
-                dlrr = new DlrrDenoiser(isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name);
+                dlrr = new SLDlssrr(isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
@@ -441,18 +441,25 @@ namespace PathTracing
 
                 // Phase 5: DLSS-RR
                 {
-                    var dlrrInput = new DlrrDenoiser.DlrrFrameInput
+                    var dlrrInput = new SLDlssrr.SLDlssrrFrameInput
                     {
                         worldToView      = frameState.worldToView,
                         viewToClip       = frameState.viewToClip,
+                        worldToClip      = frameState.worldToClip,
+                        prevWorldToClip  = frameState.prevWorldToClip,
+                        camPos           = frameState.camPos,
                         viewportJitter   = frameState.viewportJitter,
                         renderResolution = renderResolution,
+                        outputResolution = displayResolution,
                         frameIndex       = frameState.frameIndex,
-                        outputWidth      = (ushort)displayResolution.x,
-                        outputHeight     = (ushort)displayResolution.y,
-                        useMv            = true
+                        cameraNear       = cam.nearClipPlane,
+                        cameraFar        = cam.farClipPlane,
+                        cameraFOV        = cam.fieldOfView * Mathf.Deg2Rad,
+                        cameraAspect     = cam.aspect,
+                        useSpecularMotionVector = true, // RTXPT supplies specular motion vectors
+                        reset            = false
                     };
-                    var dlrrRes = new DlrrDenoiser.DlrrResources
+                    var dlrrRes = new SLDlssrr.DlssrrResources
                     {
                         input              = texPool.OutputColor,
                         output             = texPool.DlssRrOutput,
@@ -464,8 +471,8 @@ namespace PathTracing
                         specularMvOrHitTex = texPool.DlssRrSpecMotionVectors,
                     };
                     _dlssRRPass.Setup(
-                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode, setting.dlssRRPreset),
-                        new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableDlssRR });
+                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, setting.upscalerMode, setting.dlssRRPreset),
+                        new SLDlssrrPass.Settings { tmpDisableRR = setting.tmpDisableDlssRR });
                     renderer.EnqueuePass(_dlssRRPass);
                 }
 
@@ -550,7 +557,7 @@ namespace PathTracing
         {
             // Query NGX for the SDK-recommended render resolution, matching RTXPT's
             // QueryDLSSOptimalSettings path. Results are cached in the native plugin.
-            if (DlrrDenoiser.TryGetOptimalRenderSize(outputRes, mode, out var nativeRes))
+            if (SLDlssrr.TryGetOptimalRenderSize(outputRes, mode, out var nativeRes))
                 return nativeRes;
             Debug.LogError($"[NativeRtxptFeature] Failed to get optimal render size from native plugin for mode {mode}, falling back to hardcoded scale table.");
 

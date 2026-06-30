@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using DLRR;
 using SLDLRR;
-using DLSR;
 using NativeRender;
 using NIS;
 using Nrd;
@@ -75,13 +73,12 @@ namespace PathTracing
         private NrdPass                 _nrdReferenceDenoisePass;
         private NRDDlssBeforePass       _nrdDlssBeforePass;
         private NRDDlssAfterPass        _nrdDlssAfterPass;
-        private DlssRRPass              _dlssrrPass;
         private SLDlssrrPass            _slDlssrrPass;
         private SLDlssgInputsPass       _slDlssgInputsPass;
         private SLPclRenderSubmitStartPass _slPclRenderSubmitStartPass;
         private SLPclRenderSubmitEndPass   _slPclRenderSubmitEndPass;
         private bool                    _slFgLastEnabled;
-        private DlssSRPass              _dlsssrPass;
+        private SLDlssrPass             _slDlsrPass;
         private NisPass                 _nisPass;
         private NativeNrdOutputBlitPass _outputBlitPass;
         private NativeToneMappingPass   _toneMappingPass;
@@ -102,9 +99,8 @@ namespace PathTracing
         private readonly Dictionary<long, RelaxDenoiser>     _relaxDenoisers     = new();
         private readonly Dictionary<long, ReferenceDenoiser> _referenceDenoisers = new();
 
-        private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers     = new();
         private readonly Dictionary<long, SLDlssrr>                 _slDlrrDenoisers   = new();
-        private readonly Dictionary<long, DlsrUpscaler>              _dlsrUpscalers     = new();
+        private readonly Dictionary<long, SLDlssr>                  _slDlsrUpscalers   = new();
         private readonly Dictionary<long, NisUpscaler>               _nisUpscalers      = new();
         private readonly Dictionary<long, NativeNrdTextureResources> _resourcePools     = new();
         private readonly Dictionary<long, CameraFrameState>          _cameraFrameStates = new();
@@ -167,13 +163,12 @@ namespace PathTracing
             _nrdReferenceDenoisePass ??= new NrdPass { renderPassEvent                                                                             = renderPassEvent };
             _nrdDlssBeforePass       ??= new NRDDlssBeforePass(nrdDlssBeforeShader) { renderPassEvent                                              = renderPassEvent };
             _nrdDlssAfterPass        ??= new NRDDlssAfterPass(nrdDlssAfterShader) { renderPassEvent                                                = renderPassEvent };
-            _dlssrrPass              ??= new DlssRRPass { renderPassEvent                                                                          = renderPassEvent };
             _slDlssrrPass            ??= new SLDlssrrPass { renderPassEvent                                                                        = renderPassEvent };
             _slDlssgInputsPass       ??= new SLDlssgInputsPass { renderPassEvent                                                                  = renderPassEvent };
             // RenderSubmitStart must precede the RR/FG passes + present, so it sits at BeforeRendering.
             _slPclRenderSubmitStartPass ??= new SLPclRenderSubmitStartPass { renderPassEvent                                                      = RenderPassEvent.BeforeRendering };
             _slPclRenderSubmitEndPass   ??= new SLPclRenderSubmitEndPass { renderPassEvent                                                        = RenderPassEvent.AfterRendering };
-            _dlsssrPass              ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
+            _slDlsrPass              ??= new SLDlssrPass { renderPassEvent                                                                         = renderPassEvent };
             _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
             _depthBarrierFixPass     ??= new DepthBarrierFixPass { renderPassEvent                                                                 = RenderPassEvent.AfterRendering };
@@ -259,13 +254,6 @@ namespace PathTracing
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
                 nrdReference = new ReferenceDenoiser(camName + "_Reference", Denoiser.REFERENCE);
                 _referenceDenoisers.Add(uniqueKey, nrdReference);
-            }
-
-            if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
-            {
-                var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
-                dlrr = new DlrrDenoiser(camName);
-                _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
             if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
@@ -622,9 +610,9 @@ namespace PathTracing
                 }
             }
 
-            if (setting.RR && setting.RRViaSL)
+            if (setting.RR)
             {
-                // DLSS Ray Reconstruction through Streamline (SLDenoiser) — A/B vs the NRI path.
+                // DLSS Ray Reconstruction through Streamline (SLDenoiser).
                 if (!_slDlrrDenoisers.TryGetValue(uniqueKey, out var slDlrr))
                 {
                     var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
@@ -673,80 +661,50 @@ namespace PathTracing
 
                 EnqueueDlssAfterPass(renderer, pool, outputResolution, nrdConstantBuffer);
             }
-            else if (setting.RR)
-            {
-                var dlrrRes = new DlrrDenoiser.DlrrResources
-                {
-                    input              = setting.enableAutoExposure ? pool.LdrColor : pool.Composed,
-                    output             = pool.DlssOutput,
-                    mv                 = pool.Mv,
-                    depth              = pool.ViewZ,
-                    diffAlbedo         = pool.RrGuideDiffAlbedo,
-                    specAlbedo         = pool.RrGuideSpecAlbedo,
-                    normalRoughness    = pool.RrGuideNormalRoughness,
-                    specularMvOrHitTex = pool.RrGuideSpecHitDistance
-                };
-
-                var dlrrInput = new DlrrDenoiser.DlrrFrameInput
-                {
-                    worldToView      = frameState.worldToView,
-                    viewToClip       = frameState.viewToClip,
-                    viewportJitter   = frameState.viewportJitter,
-                    renderResolution = frameState.renderResolution,
-                    frameIndex       = curFrame,
-                    outputWidth      = (ushort)outputResolution.x,
-                    outputHeight     = (ushort)outputResolution.y
-                };
-
-                var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode);
-
-                _dlssrrPass.Setup(dlssDataPtr, new DlssRRPass.Settings
-                {
-                    tmpDisableRR = false
-                });
-                renderer.EnqueuePass(_dlssrrPass);
-
-                EnqueueDlssAfterPass(renderer, pool, outputResolution, nrdConstantBuffer);
-            }
             else if (setting.SR)
             {
-                // DLSS-SR: upscale Composed → DlssOutput (replaces TAA + Final)
-                if (!_dlsrUpscalers.TryGetValue(uniqueKey, out var dlsr))
+                // DLSS Super Resolution through Streamline (SLDenoiser): Composed → DlssOutput
+                // (replaces TAA + Final).
+                if (!_slDlsrUpscalers.TryGetValue(uniqueKey, out var slDlsr))
                 {
                     var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
-                    dlsr = new DlsrUpscaler(camName);
-                    _dlsrUpscalers.Add(uniqueKey, dlsr);
+                    slDlsr = new SLDlssr(camName);
+                    _slDlsrUpscalers.Add(uniqueKey, slDlsr);
                 }
 
-                var dlsrRes = new DlsrUpscaler.DlsrResources
+                var slSrRes = new SLDlssr.DlssrResources
                 {
                     input    = setting.enableAutoExposure ? pool.LdrColor : pool.Composed,
                     output   = pool.DlssOutput,
                     mv       = pool.Mv,
                     depth    = pool.ViewZ,
-                    exposure = null,
-                    reactive = null
+                    exposure = null
                 };
 
-                var dlsrInput = new DlsrUpscaler.DlsrFrameInput
+                var slSrInput = new SLDlssr.SLDlssrFrameInput
                 {
-                    viewportJitter   = frameState.viewportJitter,
+                    worldToView      = frameState.worldToView,
+                    viewToClip       = frameState.viewToClip,
+                    worldToClip      = frameState.worldToClip,
+                    prevWorldToClip  = frameState.prevWorldToClip,
+                    camPos           = frameState.camPos,
+                    // Gate by the cameraJitter toggle so the jitter reported to DLSS matches the
+                    // ACTUAL projection offset (0 when off). The native side negates it to match
+                    // the NRI/NGX sign convention.
+                    viewportJitter   = setting.cameraJitter ? frameState.viewportJitter : new float2(0f, 0f),
                     renderResolution = frameState.renderResolution,
+                    outputResolution = outputResolution,
                     frameIndex       = curFrame,
-                    outputWidth      = (ushort)outputResolution.x,
-                    outputHeight     = (ushort)outputResolution.y
+                    cameraNear       = cam.nearClipPlane,
+                    cameraFar        = cam.farClipPlane,
+                    cameraFOV        = cam.fieldOfView * Mathf.Deg2Rad,
+                    cameraAspect     = cam.aspect,
+                    reset            = resourcesChanged
                 };
 
-                var dlsrSettings = new DlsrUpscaler.DlsrSettings
-                {
-                    upscalerMode = setting.upscalerMode,
-                    preset       = 0,
-                    resetHistory = resourcesChanged
-                };
-
-                var dlsrDataPtr = dlsr.GetInteropDataPtr(dlsrInput, dlsrRes, setting.resolutionScale, dlsrSettings);
-                _dlsssrPass.Setup(dlsrDataPtr);
-                renderer.EnqueuePass(_dlsssrPass);
+                var slSrDataPtr = slDlsr.GetInteropDataPtr(slSrInput, slSrRes, setting.upscalerMode);
+                _slDlsrPass.Setup(slSrDataPtr);
+                renderer.EnqueuePass(_slDlsrPass);
 
                 EnqueueDlssAfterPass(renderer, pool, outputResolution, nrdConstantBuffer);
             }
@@ -1067,17 +1025,13 @@ namespace PathTracing
                 denoiser.Dispose();
             _referenceDenoisers.Clear();
 
-            foreach (var denoiser in _dlrrDenoisers.Values)
-                denoiser.Dispose();
-            _dlrrDenoisers.Clear();
-
             foreach (var denoiser in _slDlrrDenoisers.Values)
                 denoiser.Dispose();
             _slDlrrDenoisers.Clear();
 
-            foreach (var upscaler in _dlsrUpscalers.Values)
+            foreach (var upscaler in _slDlsrUpscalers.Values)
                 upscaler.Dispose();
-            _dlsrUpscalers.Clear();
+            _slDlsrUpscalers.Clear();
 
             foreach (var upscaler in _nisUpscalers.Values)
                 upscaler.Dispose();
@@ -1111,8 +1065,8 @@ namespace PathTracing
             _nrdDlssBeforePass = null;
             _nrdDlssAfterPass?.Dispose();
             _nrdDlssAfterPass    = null;
-            _dlssrrPass          = null;
-            _dlsssrPass          = null;
+            _slDlssrrPass        = null;
+            _slDlsrPass          = null;
             _nisPass             = null;
             _outputBlitPass      = null;
             _depthBarrierFixPass = null;

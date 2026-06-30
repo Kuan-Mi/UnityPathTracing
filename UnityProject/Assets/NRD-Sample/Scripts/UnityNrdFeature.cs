@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using DLRR;
 using NativeRender;
 using Nrd;
+using SLDLRR;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -54,7 +54,7 @@ namespace PathTracing
         private AutoExposurePass _autoExposurePass;
         private TaaPass          _taaPass;
         private DlssBeforePass   _dlssBeforePass;
-        private DlssRRPass       _dlssrrPass;
+        private SLDlssrrPass     _dlssrrPass;
         private ReferencePtPass  _referencePtPass;
         private AccumulatePass   _accumulatePass;
 
@@ -81,7 +81,7 @@ namespace PathTracing
 
         private readonly Dictionary<long, SigmaDenoiser>  _nrdSigmaDenoisers  = new();
         private readonly Dictionary<long, ReblurDenoiser> _nrdReblurDenoisers = new();
-        private readonly Dictionary<long, DlrrDenoiser>   _dlrrDenoisers      = new();
+        private readonly Dictionary<long, SLDlssrr>       _dlrrDenoisers      = new();
 
         private readonly Dictionary<long, UnityNrdTextureResources> _resourcePools = new();
 
@@ -188,7 +188,7 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            _dlssrrPass ??= new DlssRRPass()
+            _dlssrrPass ??= new SLDlssrrPass()
             {
                 renderPassEvent = renderPassEvent
             };
@@ -345,7 +345,7 @@ namespace PathTracing
                     camName = $"{cam.name}_Eye{eyeIndex}";
                 }
 
-                dlrr = new DlrrDenoiser(camName);
+                dlrr = new SLDlssrr(camName);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
@@ -733,7 +733,7 @@ namespace PathTracing
                 }
                 else
                 {
-                    var dlrrRes = new DlrrDenoiser.DlrrResources
+                    var dlrrRes = new SLDlssrr.DlssrrResources
                     {
                         input           = pool.Composed,
                         output          = pool.DlssOutput,
@@ -745,19 +745,27 @@ namespace PathTracing
                         specularMvOrHitTex = pool.RrGuideSpecHitDistance,
                     };
 
-                    var dlrrInput = new DlrrDenoiser.DlrrFrameInput
+                    var dlrrInput = new SLDlssrr.SLDlssrrFrameInput
                     {
                         worldToView      = frameState.worldToView,
                         viewToClip       = frameState.viewToClip,
+                        worldToClip      = frameState.worldToClip,
+                        prevWorldToClip  = frameState.prevWorldToClip,
+                        camPos           = frameState.camPos,
                         viewportJitter   = frameState.viewportJitter,
                         renderResolution = frameState.renderResolution,
+                        outputResolution = outputResolution,
                         frameIndex       = curFrame,
-                        outputWidth      = (ushort)outputResolution.x,
-                        outputHeight     = (ushort)outputResolution.y,
+                        cameraNear       = cam.nearClipPlane,
+                        cameraFar        = cam.farClipPlane,
+                        cameraFOV        = cam.fieldOfView * Mathf.Deg2Rad,
+                        cameraAspect     = cam.aspect,
+                        useSpecularMotionVector = false, // pass specular hit distance (matches NRI default)
+                        reset            = false
                     };
-                    var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, nrdSampleSetting.RR ? 1 : nrdSampleSetting.resolutionScale, nrdSampleSetting.upscalerMode);
+                    var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, nrdSampleSetting.upscalerMode);
 
-                    var dlssSettings = new DlssRRPass.Settings
+                    var dlssSettings = new SLDlssrrPass.Settings
                     {
                         tmpDisableRR = nrdSampleSetting.tmpDisableRR
                     };

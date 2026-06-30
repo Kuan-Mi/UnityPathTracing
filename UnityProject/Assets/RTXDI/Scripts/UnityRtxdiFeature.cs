@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using DLRR;
+using SLDLRR;
 using mini;
 using Rtxdi;
 using RTXDI;
@@ -78,7 +78,7 @@ namespace PathTracing
         private GIFinalShadingPass       _giFinalShadingPass;
 
 
-        private DlssRRPass          _dlssrrPass;
+        private SLDlssrrPass        _dlssrrPass;
         private RxtdiDlssBeforePass _rtxdiDlssBeforePass;
 
 
@@ -93,7 +93,7 @@ namespace PathTracing
         private readonly GlobalConstants[]     _globalConstantsArray     = new GlobalConstants[1];
         private readonly ResamplingConstants[] _resamplingConstantsArray = new ResamplingConstants[1];
 
-        private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers     = new();
+        private readonly Dictionary<long, SLDlssrr>                  _dlrrDenoisers     = new();
         private readonly Dictionary<long, UnityRtxdiTextureResources>   _resourcePools     = new();
         private readonly Dictionary<long, RtxdiResources>            _rtxdiResources    = new();
         private readonly Dictionary<long, ImportanceSamplingContext> _isContexts        = new();
@@ -212,7 +212,7 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent
             };
 
-            _dlssrrPass ??= new DlssRRPass()
+            _dlssrrPass ??= new SLDlssrrPass()
             {
                 renderPassEvent = renderPassEvent
             };
@@ -317,7 +317,7 @@ namespace PathTracing
                     camName = $"{cam.name}_Eye{eyeIndex}";
                 }
 
-                dlrr = new DlrrDenoiser(camName);
+                dlrr = new SLDlssrr(camName);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
@@ -581,7 +581,7 @@ namespace PathTracing
 
             #region DLSS
 
-            var dlrrRes = new DlrrDenoiser.DlrrResources
+            var dlrrRes = new SLDlssrr.DlssrrResources
             {
                 input           = pool.DirectLighting,
                 output          = pool.DlssOutput,
@@ -593,17 +593,25 @@ namespace PathTracing
                 specularMvOrHitTex = pool.RrGuideSpecHitDistance,
             };
 
-            var dlrrInput = new DlrrDenoiser.DlrrFrameInput
+            var dlrrInput = new SLDlssrr.SLDlssrrFrameInput
             {
                 worldToView      = frameState.worldToView,
                 viewToClip       = frameState.viewToClip,
+                worldToClip      = frameState.worldToClip,
+                prevWorldToClip  = frameState.prevWorldToClip,
+                camPos           = frameState.camPos,
                 viewportJitter   = frameState.viewportJitter,
                 renderResolution = frameState.renderResolution,
+                outputResolution = outputResolution,
                 frameIndex       = curFrame,
-                outputWidth      = (ushort)outputResolution.x,
-                outputHeight     = (ushort)outputResolution.y,
+                cameraNear       = cam.nearClipPlane,
+                cameraFar        = cam.farClipPlane,
+                cameraFOV        = cam.fieldOfView * Mathf.Deg2Rad,
+                cameraAspect     = cam.aspect,
+                useSpecularMotionVector = false, // pass specular hit distance (matches NRI default)
+                reset            = false
             };
-            var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1, setting.upscalerMode);
+            var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, setting.upscalerMode);
 
             var rectGridW = (int)(renderResolution.x * 1 + 0.5f + 15) / 16;
             var rectGridH = (int)(renderResolution.y * 1 + 0.5f + 15) / 16;
@@ -616,7 +624,7 @@ namespace PathTracing
                 rectGridW, rectGridH);
             renderer.EnqueuePass(_rtxdiDlssBeforePass);
 
-            var dlssSettings = new DlssRRPass.Settings
+            var dlssSettings = new SLDlssrrPass.Settings
             {
                 tmpDisableRR = setting.tmpDisableRR
             };

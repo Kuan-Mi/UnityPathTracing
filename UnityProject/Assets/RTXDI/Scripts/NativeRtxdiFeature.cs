@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using DLSR;
 using NativeRender;
+using SLDLRR;
 using Nrd;
 using Rtxdi;
 using RTXDI;
@@ -133,8 +133,8 @@ namespace PathTracing
 
         private NativeToneMappingPass _toneMappingPass;
 
-        private          DlssSRPass                     _dlssrPass;
-        private readonly Dictionary<long, DlsrUpscaler> _dlsrUpscalers = new();
+        private          SLDlssrPass                    _dlssrPass;
+        private readonly Dictionary<long, SLDlssr>      _dlsrUpscalers = new();
 
         // -------------------------------------------------------------------
         // Managed scaffolding passes (still using RayTracingShader / ComputeShader).
@@ -219,7 +219,7 @@ namespace PathTracing
             _filterGradientsPass          ??= new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent                                           = renderPassEvent };
             _confidencePass               ??= new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                                                     = renderPassEvent };
             _toneMappingPass              ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent             = renderPassEvent };
-            _dlssrPass                    ??= new DlssSRPass { renderPassEvent                                                                                      = renderPassEvent };
+            _dlssrPass                    ??= new SLDlssrPass { renderPassEvent                                                                                     = renderPassEvent };
         }
 
         public void InitializeBuffers()
@@ -778,37 +778,38 @@ namespace PathTracing
                 if (!_dlsrUpscalers.TryGetValue(uniqueKey, out var dlsr))
                 {
                     var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
-                    dlsr = new DlsrUpscaler(camName + "_Rtxdi");
+                    dlsr = new SLDlssr(camName + "_Rtxdi");
                     _dlsrUpscalers.Add(uniqueKey, dlsr);
                 }
 
-                var dlsrRes = new DlsrUpscaler.DlsrResources
+                var dlsrRes = new SLDlssr.DlssrResources
                 {
                     input    = pool.HdrColor,
                     output   = pool.ResolvedColor,
                     mv       = pool.MotionVectors,
                     depth    = pool.DeviceDepth,
-                    exposure = default,
-                    reactive = default,
+                    exposure = null,
                 };
 
-                var dlsrInput = new DlsrUpscaler.DlsrFrameInput
+                var dlsrInput = new SLDlssr.SLDlssrFrameInput
                 {
+                    worldToView      = frameState.worldToView,
+                    viewToClip       = frameState.viewToClip,
+                    worldToClip      = frameState.worldToClip,
+                    prevWorldToClip  = frameState.prevWorldToClip,
+                    camPos           = frameState.camPos,
                     viewportJitter   = frameState.viewportJitter,
                     renderResolution = frameState.renderResolution,
+                    outputResolution = outputResolution,
                     frameIndex       = curFrame,
-                    outputWidth      = (ushort)outputResolution.x,
-                    outputHeight     = (ushort)outputResolution.y,
+                    cameraNear       = cam.nearClipPlane,
+                    cameraFar        = cam.farClipPlane,
+                    cameraFOV        = cam.fieldOfView * Mathf.Deg2Rad,
+                    cameraAspect     = cam.aspect,
+                    reset            = resourcesChanged
                 };
 
-                var dlsrSettings = new DlsrUpscaler.DlsrSettings
-                {
-                    upscalerMode = setting.upscalerMode,
-                    preset       = 0,
-                    resetHistory = resourcesChanged,
-                };
-
-                var dlsrDataPtr = dlsr.GetInteropDataPtr(dlsrInput, dlsrRes, frameState.resolutionScale, dlsrSettings);
+                var dlsrDataPtr = dlsr.GetInteropDataPtr(dlsrInput, dlsrRes, setting.upscalerMode);
                 _dlssrPass.Setup(dlsrDataPtr);
                 renderer.EnqueuePass(_dlssrPass);
             }
