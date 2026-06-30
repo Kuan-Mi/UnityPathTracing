@@ -72,6 +72,10 @@ copy /Y "%SL_BIN%\sl.imgui.dll"           "%UNITY_PLUGINS%\" >nul
 
 copy /Y "%OUT_DIR%\SLDenoiser.dll"        "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\SLDenoiser.pdb"        "%UNITY_PLUGINS%\" >nul
+:: DLSS-SR Streamline plugin + model (kFeatureDLSS; must sit next to SLDenoiser.dll so
+:: SL's pathsToPlugins=SelfModuleDir can load it, else "kFeatureDLSS context is missing").
+copy /Y "%SL_BIN%\sl.dlss.dll"            "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\nvngx_dlss.dll"         "%UNITY_PLUGINS%\" >nul
 :: DLSS-RR Streamline plugin + model (sl.interposer/common/pcl already copied above).
 copy /Y "%SL_BIN%\sl.dlss_d.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssd.dll"        "%UNITY_PLUGINS%\" >nul
@@ -114,7 +118,7 @@ echo    OMMBakerPlugin.dll
 echo    omm-lib.dll
 echo    ShaderCompilerPlugin.dll
 echo    D3D12HeapHook.dll
-echo    sl.*.dll + nvngx_dlssg.dll ^(Streamline 2.11.1 runtime for the probe^)
+echo    sl.*.dll + nvngx_dlss/dlssd/dlssg.dll ^(Streamline 2.11.1 runtime: DLSS-SR/RR/G^)
 echo    sl.imgui.dll ^(SL debug overlay, toggle Ctrl+Shift+Home^)
 echo    dxcompiler.dll
 echo    dxil.dll

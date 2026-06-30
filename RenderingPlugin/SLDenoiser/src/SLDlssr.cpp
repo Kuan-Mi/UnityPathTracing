@@ -134,8 +134,8 @@ namespace SLDlssr
         // --- frame token (passed in from C#) ---
         // All SL features must tag against the SAME per-frame token (see SLCore.h). C# supplies
         // this frame's token (the one SL_GetNewFrameToken minted and forwarded to the present
-        // latch). It is null only in the editor edit-mode game view, where the main-thread tick
-        // is intentionally not run.
+        // latch). The main-thread frame tick mints it every frame in both the editor and the
+        // player (see SLStreamlineFrameLoop.OnPlayerLoopFrameBegin).
         sl::FrameToken* token = reinterpret_cast<sl::FrameToken*>(data->frameToken);
         if (!token) { Logf(1, "no frame token"); return; }
 

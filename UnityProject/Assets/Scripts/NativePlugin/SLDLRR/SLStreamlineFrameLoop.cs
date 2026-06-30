@@ -123,9 +123,11 @@ namespace SLDLRR
         private static void OnPlayerLoopFrameBegin()
         {
             if (!SLNative.Available) return;
-#if UNITY_EDITOR
-            if (!Application.isPlaying) return;
-#endif
+            // Mint this frame's shared SL token every frame in BOTH the editor and the player:
+            // the evaluate-time features (DLSS-RR/-SR) tag against CurrentFrameTokenPtr and run in
+            // the editor's Scene/Game view (edit mode included), so the token must exist there too.
+            // The Reflex sleep + simulation marker below are player-only no-ops in the editor
+            // (native side gates them on s_IsPlayer), so they are harmless to call here.
             using (s_frameBeginMarker.Auto())
             {
                 try
