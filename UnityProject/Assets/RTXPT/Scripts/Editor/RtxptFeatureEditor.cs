@@ -7,15 +7,15 @@ using UnityEngine;
 namespace PathTracing
 {
     /// <summary>
-    /// Custom inspector for <see cref="NativeRtxptFeature"/>. The settings page mirrors the RTXPT
+    /// Custom inspector for <see cref="RtxptFeature"/>. The settings page mirrors the RTXPT
     /// C++ ImGui layout (SampleUI.cpp buildUI): same section structure, ordering, labels, ranges
     /// and realtime/reference conditional visibility. Fields marked with " *" are shader
     /// compile-time macros — they only take effect via the "Apply Shader Macros" button below.
     /// Settings with no C++ counterpart are grouped under "Unity-specific". Inert legacy fields
     /// (NRD leftovers, ReSTIR toggles) are intentionally not drawn but kept serialized.
     /// </summary>
-    [CustomEditor(typeof(NativeRtxptFeature))]
-    public class NativeRtxptFeatureEditor : Editor
+    [CustomEditor(typeof(RtxptFeature))]
+    public class RtxptFeatureEditor : Editor
     {
         // Mirror of shader-side limits (PathTracerConfig is internal to the runtime assembly).
         private const int   kStablePlaneCount          = 3;   // PathTracerConfig.cStablePlaneCount
@@ -25,13 +25,13 @@ namespace PathTracing
         private const int   LightingConfigMaxLights    = 512 * 1024; // LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS
 
         private string GetKey(string headerName) =>
-            $"PT_NativeRtxpt_Foldout_{target.GetInstanceID()}_{headerName}";
+            $"PT_Rtxpt_Foldout_{target.GetInstanceID()}_{headerName}";
 
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
 
-            var feature = (NativeRtxptFeature)target;
+            var feature = (RtxptFeature)target;
 
             DrawSettings(feature);
 
@@ -84,7 +84,7 @@ namespace PathTracing
         // Settings page (mirrors SampleUI.cpp buildUI)
         // ═════════════════════════════════════════════════════════════════════
 
-        private void DrawSettings(NativeRtxptFeature feature)
+        private void DrawSettings(RtxptFeature feature)
         {
             var s = feature.setting;
             if (s == null)
@@ -115,7 +115,7 @@ namespace PathTracing
         }
 
         // ── Scene -> Environment Map (SampleUI.cpp:586) ───────────────────────
-        private void DrawEnvironmentMapSection(NativeRtxptSetting s)
+        private void DrawEnvironmentMapSection(RtxptSetting s)
         {
             if (!Foldout("EnvMap", "Environment Map")) return;
             using var _ = new EditorGUI.IndentLevelScope();
@@ -134,7 +134,7 @@ namespace PathTracing
         }
 
         // ── Camera (SampleUI.cpp:669) ─────────────────────────────────────────
-        private void DrawCameraSection(NativeRtxptSetting s)
+        private void DrawCameraSection(RtxptSetting s)
         {
             if (!Foldout("Camera", "Camera")) return;
             using var _ = new EditorGUI.IndentLevelScope();
@@ -148,7 +148,7 @@ namespace PathTracing
         }
 
         // ── Light pre-processing and sampling (SampleUI.cpp:722) ──────────────
-        private void DrawLightPreprocessingSection(NativeRtxptSetting s)
+        private void DrawLightPreprocessingSection(RtxptSetting s)
         {
             if (!Foldout("Lighting", "Light pre-processing and sampling")) return;
             using var _ = new EditorGUI.IndentLevelScope();
@@ -162,7 +162,7 @@ namespace PathTracing
             {
                 // Counts are filled by the LightingUpdateBegin pass — valid once the RTXPT
                 // renderer has drawn at least one frame (game OR scene view, edit mode included).
-                var lub = (target as NativeRtxptFeature)?.LightingUpdateBeginPass;
+                var lub = (target as RtxptFeature)?.LightingUpdateBeginPass;
                 if (lub != null && lub.TotalLightCount > 0)
                 {
                     string[] modes = { "Uniform", "Power+", "NEE-AT" };
@@ -187,7 +187,7 @@ namespace PathTracing
             Category("Importance sampling:");
             using (new EditorGUI.IndentLevelScope())
             {
-                if (s.neeType != NativeRtxptNeeType.NEEAT)
+                if (s.neeType != RtxptNeeType.NEEAT)
                 {
                     EditorGUILayout.LabelField("NOTE: NEE-AT inactive (enable in `Path Tracer -> NEE settings`).", EditorStyles.wordWrappedMiniLabel);
                 }
@@ -271,7 +271,7 @@ namespace PathTracing
         }
 
         // ── Path Tracer (SampleUI.cpp:794, DefaultOpen) ───────────────────────
-        private void DrawPathTracerSection(NativeRtxptSetting s)
+        private void DrawPathTracerSection(RtxptSetting s)
         {
             if (!Foldout("PathTracer", "Path Tracer", defaultOpen: true)) return;
             using var _ = new EditorGUI.IndentLevelScope();
@@ -386,7 +386,7 @@ namespace PathTracing
                 {
                     Category("NEE settings:");
                     using var __ = new EditorGUI.IndentLevelScope();
-                    s.neeType = (NativeRtxptNeeType)EditorGUILayout.Popup(
+                    s.neeType = (RtxptNeeType)EditorGUILayout.Popup(
                         new GUIContent("Sampling technique", "Light importance sampling technique for NEE. NEE-AT settings under `Light pre-processing and sampling`."),
                         (int)s.neeType, Options("Uniform", "Power+", "NEE-AT"));
                     s.neeCandidateSamples = Mathf.Clamp(
@@ -436,7 +436,7 @@ namespace PathTracing
         }
 
         // ── DLSS settings (SampleUI.cpp:1104, shown when realtime && AA > 1) ──
-        private void DrawDlssSection(NativeRtxptSetting s)
+        private void DrawDlssSection(RtxptSetting s)
         {
             if (!(s.realtimeMode && s.realtimeAA > 1)) return;
             if (!Foldout("DLSS", "DLSS settings")) return;
@@ -458,7 +458,7 @@ namespace PathTracing
         }
 
         // ── Stable Planes (denoising layers) (SampleUI.cpp:1207) ──────────────
-        private void DrawStablePlanesSection(NativeRtxptSetting s)
+        private void DrawStablePlanesSection(RtxptSetting s)
         {
             if (!Foldout("StablePlanes", "Stable Planes (denoising layers)")) return;
             using var _ = new EditorGUI.IndentLevelScope();
@@ -492,7 +492,7 @@ namespace PathTracing
         }
 
         // ── Post-process (SampleUI.cpp:1273) ──────────────────────────────────
-        private void DrawPostProcessSection(NativeRtxptSetting s)
+        private void DrawPostProcessSection(RtxptSetting s)
         {
             if (!Foldout("PostProcess", "Post-process")) return;
             using var _ = new EditorGUI.IndentLevelScope();
@@ -509,7 +509,7 @@ namespace PathTracing
             {
                 using var __ = new EditorGUI.IndentLevelScope();
                 s.enableToneMapping = EditorGUILayout.Toggle("Enable", s.enableToneMapping);
-                s.toneMapOperator   = (NativeRtxptToneMapOperator)EditorGUILayout.EnumPopup("Operator", s.toneMapOperator);
+                s.toneMapOperator   = (RtxptToneMapOperator)EditorGUILayout.EnumPopup("Operator", s.toneMapOperator);
 
                 s.autoExposure = EditorGUILayout.Toggle("Auto Exposure", s.autoExposure);
                 if (s.autoExposure)
@@ -538,7 +538,7 @@ namespace PathTracing
         }
 
         // ── Debugging (SampleUI.cpp:1371) ─────────────────────────────────────
-        private void DrawDebuggingSection(NativeRtxptSetting s)
+        private void DrawDebuggingSection(RtxptSetting s)
         {
             if (!Foldout("Debugging", "Debugging")) return;
             using var _ = new EditorGUI.IndentLevelScope();
@@ -547,7 +547,7 @@ namespace PathTracing
                 new GUIContent("Enable shader debug", "ShaderDebug machinery: DebugPrint → console, DebugLine/DebugTriangle drawing, viz overlay. Allocates a ~100 MB GPU buffer (same as the original)."),
                 s.enableShaderDebug);
 
-            var feature = (NativeRtxptFeature)target;
+            var feature = (RtxptFeature)target;
 
             if (Foldout("DebugSwitches", "Debug switches"))
             {
@@ -606,7 +606,7 @@ namespace PathTracing
 
             // Live pick feedback (mirrors the C++ ImGui "debugPrint %d: ..." block). Valid whenever
             // frames are being rendered — game or scene view, edit mode included.
-            var fb = NativeRtxptShaderDebug.LastFeedback;
+            var fb = RtxptShaderDebug.LastFeedback;
             if (s.continuousDebugFeedback && fb.Valid)
             {
                 EditorGUILayout.LabelField($"Debug line count: {fb.LineVertexCount / 2}   picked materialID: {fb.PickedMaterialID}", EditorStyles.miniLabel);
@@ -621,12 +621,12 @@ namespace PathTracing
         }
 
         // ── Unity-specific (no C++ counterpart) ───────────────────────────────
-        private void DrawUnitySpecificSection(NativeRtxptSetting s)
+        private void DrawUnitySpecificSection(RtxptSetting s)
         {
             if (!Foldout("UnitySpecific", "Unity-specific")) return;
             using var _ = new EditorGUI.IndentLevelScope();
 
-            s.showMode = (NativeRtxptShowMode)EditorGUILayout.EnumPopup(
+            s.showMode = (RtxptShowMode)EditorGUILayout.EnumPopup(
                 new GUIContent("Show mode", "Which buffer the output blit pass displays."), s.showMode);
             s.showValidation   = EditorGUILayout.Toggle(
                 new GUIContent("Show validation", "Show the DLSS validation overlay when available."), s.showValidation);
@@ -658,13 +658,13 @@ namespace PathTracing
 
         /// <summary>
         /// Settings ↔ shader-macro sync (mirrors Sample.cpp SetGlobalShaderMacros). Several
-        /// NativeRtxptSetting fields are shader compile-time macros, not constants — they only
+        /// RtxptSetting fields are shader compile-time macros, not constants — they only
         /// take effect when baked into the .rayshader/.hitgroupshader importer defines and the
         /// shaders are reimported. Shows a warning while the importers are out of sync.
         /// </summary>
-        private void DrawShaderMacroSync(NativeRtxptFeature feature)
+        private void DrawShaderMacroSync(RtxptFeature feature)
         {
-            var stale = NativeRtxptShaderMacroSync.FindOutOfSync(feature);
+            var stale = RtxptShaderMacroSync.FindOutOfSync(feature);
             if (stale.Count > 0)
             {
                 EditorGUILayout.HelpBox(
@@ -682,8 +682,8 @@ namespace PathTracing
                     : "Shader Macros In Sync";
                 if (GUILayout.Button(label))
                 {
-                    int n = NativeRtxptShaderMacroSync.Apply(feature);
-                    Debug.Log($"[NativeRtxptFeature] Shader macros applied; {n} shader asset(s) reimported.");
+                    int n = RtxptShaderMacroSync.Apply(feature);
+                    Debug.Log($"[RtxptFeature] Shader macros applied; {n} shader asset(s) reimported.");
                 }
             }
         }
@@ -712,7 +712,7 @@ namespace PathTracing
 
             var groups = new Dictionary<string, List<string>>();
 
-            var fields = typeof(NativeRtxptFeature)
+            var fields = typeof(RtxptFeature)
                 .GetFields(BindingFlags.Public | BindingFlags.Instance);
 
             foreach (var field in fields)

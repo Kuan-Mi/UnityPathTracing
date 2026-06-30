@@ -8,16 +8,16 @@ namespace PathTracing
     /// <summary>
     /// Builds <see cref="SampleConstants"/> and <see cref="SimpleViewConstants"/>
     /// from Unity camera / rendering-data each frame.
-    /// Separated from <see cref="NativeRtxptFeature"/> to keep the feature class concise.
+    /// Separated from <see cref="RtxptFeature"/> to keep the feature class concise.
     /// </summary>
-    internal static class NativeRtxptConstantsBuilder
+    internal static class RtxptConstantsBuilder
     {
         /// <summary>
         /// Fills a complete <see cref="SampleConstants"/> struct ready for GPU upload.
         /// </summary>
         public static SampleConstants Build(
             RenderingData renderingData,
-            NativeRtxptSetting setting,
+            RtxptSetting setting,
             int2 renderRes,
             int2 displayRes,
             RtxptCameraFrameState fs,
@@ -206,14 +206,14 @@ namespace PathTracing
             // Nothing overrides it later, so ColorMultiplier must be set here just like the
             // original (Sample.cpp:1913): TintColor * (Intensity / c_envMapRadianceScale). The
             // divide cancels the constant compression scale baked into the cube
-            // (NativeRtxptEnvMapBakerPass.EnvMapRadianceScale) → net radiance = source * tint * intensity.
+            // (RtxptEnvMapBakerPass.EnvMapRadianceScale) → net radiance = source * tint * intensity.
             // Original (Sample.cpp:1910-1925): when EnvironmentMapParams.Enabled is off, both
             // ColorMultiplier and Enabled are zeroed — all environment lighting stops, including
             // the directional lights baked into the env cube (analytic-light list is unaffected).
             bool    envEnabled = setting.environmentMapEnabled;
             Color   envTintLin = setting.environmentMapTint.linear;
             float   envColMul  = envEnabled
-                ? setting.environmentMapIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale
+                ? setting.environmentMapIntensity / RtxptEnvMapBakerPass.EnvMapRadianceScale
                 : 0f;
  
             float rad       = setting.environmentMapRotationY * Mathf.Deg2Rad;
@@ -256,7 +256,7 @@ namespace PathTracing
                 pick                      = debugPick ? 1 : 0,
                 debugLineScale            = setting.showDebugLines ? setting.debugLineScale : 0f,
                 showWireframe             = 0u,
-                debugViewType             = (int)(setting.showMode == NativeRtxptShowMode.NEELightColor
+                debugViewType             = (int)(setting.showMode == RtxptShowMode.NEELightColor
                                                 ? RtxptDebugViewType.NEELightColor
                                                 : setting.debugViewType),
                 // Original (Sample.cpp:2114): forced to plane 0 when only one plane is active.

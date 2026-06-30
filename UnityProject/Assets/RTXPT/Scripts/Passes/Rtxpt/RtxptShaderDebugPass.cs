@@ -43,7 +43,7 @@ namespace PathTracing
     ///          feedback readback → <see cref="LastFeedback"/>. AsyncGPUReadback replaces the
     ///          original's 3-deep CPU ring (same few-frames latency).
     /// </summary>
-    public static class NativeRtxptShaderDebug
+    public static class RtxptShaderDebug
     {
         /// <summary>Latest pick feedback for editor display (any camera).</summary>
         public static RtxptDebugFeedback LastFeedback;
@@ -55,18 +55,18 @@ namespace PathTracing
     /// realtime frame, and on accumulation reset in reference mode; otherwise DebugPixel writes
     /// would persist forever once their source toggle is turned off).
     /// </summary>
-    public class NativeRtxptShaderDebugBeginPass : ScriptableRenderPass, IDisposable
+    public class RtxptShaderDebugBeginPass : ScriptableRenderPass, IDisposable
     {
         private const uint kRGBA16F = (uint)DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
 
-        private NativeRtxptPassContext _ctx;
-        private readonly uint[] _header = new uint[NativeRtxptBufferResources.ShaderDebugHeaderBytes / 4];
+        private RtxptPassContext _ctx;
+        private readonly uint[] _header = new uint[RtxptBufferResources.ShaderDebugHeaderBytes / 4];
 
         public void Dispose()
         {
         }
 
-        public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
+        public void Setup(RtxptPassContext ctx) => _ctx = ctx;
 
         private class PassData
         {
@@ -132,7 +132,7 @@ namespace PathTracing
     }
 
     /// <summary>End-of-frame debug geometry draw + viz overlay + readbacks (EndFrameAndOutput).</summary>
-    public class NativeRtxptShaderDebugDrawPass : ScriptableRenderPass, IDisposable
+    public class RtxptShaderDebugDrawPass : ScriptableRenderPass, IDisposable
     {
         private const uint kRGBA16F = (uint)DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
 
@@ -153,14 +153,14 @@ namespace PathTracing
 
         private readonly uint[] _colorFmt = { kRGBA16F };
 
-        private NativeRtxptPassContext _ctx;
+        private RtxptPassContext _ctx;
         private IntPtr                 _targetPtr;
         private int2                   _targetRes;
 
         private static int s_pendingPrintReadbacks;
         private static int s_pendingFeedbackReadbacks;
 
-        public NativeRtxptShaderDebugDrawPass(NativeRasterShader trianglesShader,
+        public RtxptShaderDebugDrawPass(NativeRasterShader trianglesShader,
                                               NativeRasterShader linesShader,
                                               NativeRasterShader feedbackLinesShader,
                                               NativeRasterShader blendVizShader)
@@ -198,7 +198,7 @@ namespace PathTracing
         }
 
         /// <summary>Target = the LDR/display image the output blit will show (C++ LdrColor).</summary>
-        public void Setup(NativeRtxptPassContext ctx, NriTextureResource target, int2 targetRes)
+        public void Setup(RtxptPassContext ctx, NriTextureResource target, int2 targetRes)
         {
             _ctx       = ctx;
             _targetPtr = target.NativePtr;
@@ -209,7 +209,7 @@ namespace PathTracing
         {
             internal NativeRasterPipeline      TrianglesRaster, LinesRaster, FeedbackLinesRaster, BlendVizRaster;
             internal NativeRasterDescriptorSet TrianglesDs, LinesDs, FeedbackLinesDs, BlendVizDs;
-            internal NativeRtxptPassContext    Ctx;
+            internal RtxptPassContext    Ctx;
             internal IntPtr                    TargetPtr;
             internal int2                      TargetRes;
             internal uint[]                    ColorFmt;
@@ -242,7 +242,7 @@ namespace PathTracing
             // While a debug view is selected the output blit shows the viz texture fullscreen;
             // blending it over the LDR image as well would double-display it.
             pd.DrawVizOverlay      = s.debugViewType == RtxptDebugViewType.Disabled
-                                     && s.showMode != NativeRtxptShowMode.NEELightColor;
+                                     && s.showMode != RtxptShowMode.NEELightColor;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -298,8 +298,8 @@ namespace PathTracing
             {
                 var ds = data.FeedbackLinesDs;
                 ds.SetStructuredBuffer("t_DebugLines", buf.DebugLinesBufferPtr,
-                                       NativeRtxptBufferResources.MaxDebugLines,
-                                       NativeRtxptBufferResources.DebugLineStructSize);
+                                       RtxptBufferResources.MaxDebugLines,
+                                       RtxptBufferResources.DebugLineStructSize);
                 ds.SetBuffer("t_ShaderDebugBuffer", debugBufPtr);
                 ds.SetBuffer("t_Feedback", buf.FeedbackBufferPtr);
                 ds.SetTexture("t_Depth", depthPtr);
@@ -307,7 +307,7 @@ namespace PathTracing
                 {
                     numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
                     depthResource = IntPtr.Zero, viewport = viewport,
-                    vertexCount = NativeRtxptBufferResources.MaxDebugLines, instanceCount = 1,
+                    vertexCount = RtxptBufferResources.MaxDebugLines, instanceCount = 1,
                 };
                 data.FeedbackLinesRaster.Draw(cmd, ds, in draw);
             }
@@ -331,7 +331,7 @@ namespace PathTracing
             {
                 s_pendingPrintReadbacks++;
                 cmd.RequestAsyncReadback(buf.ShaderDebugBuffer,
-                    NativeRtxptBufferResources.ShaderDebugNoTrianglesBytes, 0,
+                    RtxptBufferResources.ShaderDebugNoTrianglesBytes, 0,
                     req =>
                     {
                         s_pendingPrintReadbacks--;
@@ -346,7 +346,7 @@ namespace PathTracing
             {
                 s_pendingFeedbackReadbacks++;
                 cmd.RequestAsyncReadback(buf.FeedbackBuffer,
-                    NativeRtxptBufferResources.FeedbackStructSize, 0,
+                    RtxptBufferResources.FeedbackStructSize, 0,
                     req =>
                     {
                         s_pendingFeedbackReadbacks--;
@@ -361,7 +361,7 @@ namespace PathTracing
         // ── DebugFeedbackStruct parsing (PathTracerDebug.hlsli:170) ───────────
         private static unsafe void ParseFeedback(NativeArray<byte> bytes)
         {
-            if (bytes.Length < NativeRtxptBufferResources.FeedbackStructSize) return;
+            if (bytes.Length < RtxptBufferResources.FeedbackStructSize) return;
             byte* p = (byte*)bytes.GetUnsafeReadOnlyPtr();
 
             var fb = new RtxptDebugFeedback
@@ -375,12 +375,12 @@ namespace PathTracing
             int* ints = (int*)(p + 16 * 16);
             fb.LineVertexCount  = ints[0];
             fb.PickedMaterialID = ints[1];
-            NativeRtxptShaderDebug.LastFeedback = fb;
+            RtxptShaderDebug.LastFeedback = fb;
         }
 
         // ── DebugPrint parsing (ShaderDebug.cpp:288 OutputLastBufferPrints) ───
-        private const int kHeaderBytes  = NativeRtxptBufferResources.ShaderDebugHeaderBytes;
-        private const int kPrintBytes   = NativeRtxptBufferResources.ShaderDebugPrintBytes;
+        private const int kHeaderBytes  = RtxptBufferResources.ShaderDebugHeaderBytes;
+        private const int kPrintBytes   = RtxptBufferResources.ShaderDebugPrintBytes;
         private const int kMaxPrintArgs = 8; // SHADER_PRINTF_MAX_DEBUG_PRINT_ARGS
 
         private static unsafe void ParseAndLogPrints(NativeArray<byte> bytes)

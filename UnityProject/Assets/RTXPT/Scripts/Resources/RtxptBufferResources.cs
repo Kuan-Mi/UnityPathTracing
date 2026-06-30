@@ -8,14 +8,14 @@ using UnityEngine.Rendering;
 namespace PathTracing
 {
     /// <summary>
-    /// Owns all per-camera structured GPU buffers for <see cref="NativeRtxptFeature"/>.
+    /// Owns all per-camera structured GPU buffers for <see cref="RtxptFeature"/>.
     ///
     /// Layout notes (from RTXPT Config.h / RenderTargets.cpp):
     ///   cStablePlaneCount      = 3
     ///   sizeof(StablePlane)    = 80 bytes
     ///   sizeof(PackedPathTracerSurfaceData) = 64 bytes  (TODO: verify from HLSL)
     /// </summary>
-    public class NativeRtxptBufferResources : IDisposable
+    public class RtxptBufferResources : IDisposable
     { 
         // sizeof(StablePlane) in bytes — must match HLSL struct StablePlane layout.
         public const int StablePlaneStride = 80;
@@ -259,7 +259,7 @@ namespace PathTracing
             // Each tile covers RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE × TILE_SIZE pixels.
             // +1 border tile on each axis to accommodate the jitter offset — must match
             // LightsBaker.cpp:340-341 and the LocalSamplingResolution uploaded to the control
-            // buffer (NativeRtxptLightingUpdateBeginPass), since that value is the addressing stride.
+            // buffer (RtxptLightingUpdateBeginPass), since that value is the addressing stride.
             int tileW    = (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
             int tileH    = (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
             int localSampCount = tileW * tileH * LightingConfig.RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
@@ -381,9 +381,9 @@ namespace PathTracing
             // Volatile CBs (pool suballocations) — names mirror the original RTXPT debugName
             // strings for symmetry, though volatile buffers have no stable PIX resource name.
             EnvBakerCb?.Dispose();
-            EnvBakerCb = new VolatileConstantBuffer(NativeRtxptEnvMapBakerPass.EnvBakerCbSize, "EnvMapBakerConstants");
+            EnvBakerCb = new VolatileConstantBuffer(RtxptEnvMapBakerPass.EnvBakerCbSize, "EnvMapBakerConstants");
             ImportanceBakerCb?.Dispose();
-            ImportanceBakerCb = new VolatileConstantBuffer(NativeRtxptEnvMapBakerPass.ImportanceBakerCbSize, "EnvMapImportanceSamplingBakerConstants");
+            ImportanceBakerCb = new VolatileConstantBuffer(RtxptEnvMapBakerPass.ImportanceBakerCbSize, "EnvMapImportanceSamplingBakerConstants");
         }
 
         private void ReleaseResolutionBuffers()

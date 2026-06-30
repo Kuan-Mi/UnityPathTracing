@@ -1,5 +1,5 @@
 """Compare the DXIL shader hashes of every compute Dispatch executed in the two
-captures under Other/ (Rtxpt.wpix = original RTXPT, Unity.wpix = NativeRtxptFeature
+captures under Other/ (Rtxpt.wpix = original RTXPT, Unity.wpix = RtxptFeature
 replica). Prints a per-marker table and a verdict on whether each capture ran the
 exact same shader binaries.
 

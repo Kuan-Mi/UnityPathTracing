@@ -6,7 +6,7 @@ namespace PathTracing
     /// Mirrors SampleUIData::NEEType / LightingControlData::ImportanceSamplingType.
     /// Numeric values are part of the shader ABI.
     /// </summary>
-    public enum NativeRtxptNeeType
+    public enum RtxptNeeType
     {
         Uniform = 0,
         Power   = 1,
@@ -35,7 +35,7 @@ namespace PathTracing
     /// <summary>
     /// Mirrors RTXPT ToneMapping_cb.h ToneMapperOperator. Numeric values are the shader ABI.
     /// </summary>
-    public enum NativeRtxptToneMapOperator
+    public enum RtxptToneMapOperator
     {
         Linear           = 0,
         Reinhard         = 1,
@@ -46,12 +46,12 @@ namespace PathTracing
     }
 
     /// <summary>
-    /// Inspector-facing settings for <see cref="NativeRtxptFeature"/>.
+    /// Inspector-facing settings for <see cref="RtxptFeature"/>.
     /// Mirrors <c>SampleUIData</c> from RTXPT/Rtxpt/SampleUI.h, adapted for Unity.
     /// Denoising is handled exclusively by DLSS Ray Reconstruction (DLSS-RR).
     /// </summary>
     [System.Serializable]
-    public class NativeRtxptSetting
+    public class RtxptSetting
     {
         // ── Mode ─────────────────────────────────────────────────────────────
         /// <summary>false = Realtime (stable planes + DLSS-RR), true = Reference (accumulation).</summary>
@@ -98,7 +98,7 @@ namespace PathTracing
         // ── NEE / Lighting ────────────────────────────────────────────────────
         public bool  useNEE              = true;
         // C++ default: CommandLineOptions::NEEType = 2 (NEE-AT).
-        public NativeRtxptNeeType neeType = NativeRtxptNeeType.NEEAT;
+        public RtxptNeeType neeType = RtxptNeeType.NEEAT;
         [Range(1, 16)]
         public int   neeCandidateSamples = 5;
         // C++ default: SampleUIData::NEEFullSamples = 1 (each full sample casts a shadow ray).
@@ -214,7 +214,7 @@ namespace PathTracing
         public float     environmentMapRotationY = 0.0f;
         public Color     environmentMapTint      = Color.white;
         /// <summary>HDR environment map: either an equirectangular Texture2D or a Cubemap. Baked into
-        /// the radiance cube (t_EnvironmentMap, t10) by NativeRtxptEnvMapBakerPass.</summary>
+        /// the radiance cube (t_EnvironmentMap, t10) by RtxptEnvMapBakerPass.</summary>
         public Texture environmentMap          = null;
 
         // ── Tone mapping ──────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ namespace PathTracing
         public bool enableToneMapping = true;
 
         /// <summary>Tone-map operator. Matches the RTXPT reference capture (HableUc2).</summary>
-        public NativeRtxptToneMapOperator toneMapOperator = NativeRtxptToneMapOperator.HableUc2;
+        public RtxptToneMapOperator toneMapOperator = RtxptToneMapOperator.HableUc2;
 
         /// <summary>
         /// Enable histogram-free auto-exposure (geometric-mean luminance). Off by default, matching
@@ -287,7 +287,7 @@ namespace PathTracing
         public bool dbgDisableSERTerminationHint = false;
 
         /// <summary>Which buffer to display in the output blit pass.</summary>
-        public NativeRtxptShowMode showMode = NativeRtxptShowMode.DlssRrOutput;
+        public RtxptShowMode showMode = RtxptShowMode.DlssRrOutput;
 
         /// <summary>
         /// Selects which surface attribute to visualise via the path tracer's
@@ -309,9 +309,9 @@ namespace PathTracing
 
         /// <summary>
         /// Shallow copy used to build a per-frame snapshot when URP Volume overrides
-        /// (see <see cref="NativeRtxptExposureVolume"/>) are applied on top of the authored
+        /// (see <see cref="RtxptExposureVolume"/>) are applied on top of the authored
         /// inspector values, so the serialized settings are never mutated.
         /// </summary>
-        public NativeRtxptSetting Clone() => (NativeRtxptSetting)MemberwiseClone();
+        public RtxptSetting Clone() => (RtxptSetting)MemberwiseClone();
     }
 }

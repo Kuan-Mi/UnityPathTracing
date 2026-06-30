@@ -18,7 +18,7 @@ namespace PathTracing
     public class RtxptDebugPixelPicker : MonoBehaviour
     {
         [Tooltip("RTXPT renderer feature whose setting.debugPixel is written. Auto-found when left empty.")]
-        public NativeRtxptFeature feature;
+        public RtxptFeature feature;
 
         [Tooltip("Mouse button used for picking (0 = left, 1 = right, 2 = middle).")]
         public int pickButton = 1;
@@ -36,13 +36,13 @@ namespace PathTracing
         [Tooltip("Log the picked render-resolution pixel coordinates to the console.")]
         public bool logPicks = true;
 
-        private NativeRtxptFeature Feature
+        private RtxptFeature Feature
         {
             get
             {
                 if (feature == null)
                 {
-                    var all = Resources.FindObjectsOfTypeAll<NativeRtxptFeature>();
+                    var all = Resources.FindObjectsOfTypeAll<RtxptFeature>();
                     if (all.Length > 0) feature = all[0];
                 }
                 return feature;

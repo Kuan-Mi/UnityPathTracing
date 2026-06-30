@@ -23,7 +23,7 @@ namespace PathTracing
     /// Pass 0  (Ping=1): reads SpecularHitT, writes ScratchFloat1
     /// Pass 1  (Ping=0): reads ScratchFloat1, writes SpecularHitT
     /// </summary>
-    public class NativeRtxptDenoisingGuidesBakePass : ScriptableRenderPass, IDisposable
+    public class RtxptDenoisingGuidesBakePass : ScriptableRenderPass, IDisposable
     {
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct DenoisingGuidesBakerConstants
@@ -40,9 +40,9 @@ namespace PathTracing
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _pingDs;
         private readonly NativeComputeDescriptorSet _pongDs;
-        private          NativeRtxptPassContext     _ctx;
+        private          RtxptPassContext     _ctx;
 
-        public NativeRtxptDenoisingGuidesBakePass(NativeComputeShader shader)
+        public RtxptDenoisingGuidesBakePass(NativeComputeShader shader)
         {
             // Root-constant hints (g_denoisingConstants) live on the .computeshader asset (the importer).
             _cs = new NativeComputePipeline(shader);
@@ -57,7 +57,7 @@ namespace PathTracing
             _cs?.Dispose();
         }
 
-        public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
+        public void Setup(RtxptPassContext ctx) => _ctx = ctx;
 
         // ── Pass data ─────────────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ namespace PathTracing
             internal NativeComputePipeline           Cs;
             internal NativeComputeDescriptorSet      PingDs;
             internal NativeComputeDescriptorSet      PongDs;
-            internal NativeRtxptPassContext          Ctx;
+            internal RtxptPassContext          Ctx;
         }
 
         // ── RenderGraph ───────────────────────────────────────────────────────
@@ -112,8 +112,8 @@ namespace PathTracing
             uint ping,
             uint gx,
             uint gy,
-            NativeRtxptTextureResources res,
-            NativeRtxptPassContext ctx)
+            RtxptTextureResources res,
+            RtxptPassContext ctx)
         {
             var cb = new DenoisingGuidesBakerConstants
             {

@@ -24,8 +24,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 324cab2d455449e4b9e70b945e4d8e49, type: 3}
-  m_Name: NativeRtxptFeature
-  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptFeature
+  m_Name: RtxptFeature
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxptFeature
   m_Active: 1
   setting:
     realtimeMode: 1

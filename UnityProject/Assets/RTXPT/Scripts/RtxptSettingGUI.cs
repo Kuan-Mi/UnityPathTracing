@@ -1,10 +1,10 @@
 namespace PathTracing
 {
-    public class NativeRtxptSettingGUI : SettingGUI<NativeRtxptFeature, NativeRtxptSetting>
+    public class RtxptSettingGUI : SettingGUI<RtxptFeature, RtxptSetting>
     {
         protected override string GetSettingName()
         {
-            return "Native RTXPT";
+            return "RTXPT";
         }
 
         protected override object GetSettingValue()

@@ -6,20 +6,20 @@ using UnityEngine.Rendering.Universal;
 namespace PathTracing
 {
     /// <summary>
-    /// URP <see cref="VolumeComponent"/> that exposes <see cref="NativeRtxptFeature"/>'s environment-map
+    /// URP <see cref="VolumeComponent"/> that exposes <see cref="RtxptFeature"/>'s environment-map
     /// controls to the Volume framework, so different scenes or world regions can override the sky /
     /// HDRI via global or box/sphere-collider Volumes instead of editing the feature's inspector
     /// defaults.
     ///
     /// Each parameter has an independent <c>overrideState</c>: when off, the authored inspector value
-    /// from <see cref="NativeRtxptSetting"/> is kept; when on, the (blended) Volume value wins. The
+    /// from <see cref="RtxptSetting"/> is kept; when on, the (blended) Volume value wins. The
     /// authored settings object is never mutated — <see cref="ApplyOverrides"/> mutates only the
     /// per-frame clone supplied by the caller.
     /// </summary>
     [Serializable]
-    [VolumeComponentMenu("Path Tracing/Native RTXPT Environment Map")]
+    [VolumeComponentMenu("Path Tracing/RTXPT Environment Map")]
     [SupportedOnRenderPipeline(typeof(UniversalRenderPipelineAsset))]
-    public sealed class NativeRtxptEnvironmentMapVolume : VolumeComponent
+    public sealed class RtxptEnvironmentMapVolume : VolumeComponent
     {
         /// <summary>Enable the baked environment map as a distant light / sky.</summary>
         public BoolParameter environmentMapEnabled = new BoolParameter(true);
@@ -52,7 +52,7 @@ namespace PathTracing
         /// inspector object is never mutated and chained volume overrides share one clone. No-op when
         /// the Volume stack isn't ready or no override is active.
         /// </summary>
-        public static void ApplyOverrides(ref NativeRtxptSetting setting, NativeRtxptSetting authored)
+        public static void ApplyOverrides(ref RtxptSetting setting, RtxptSetting authored)
         {
             if (authored == null)
                 return;
@@ -63,7 +63,7 @@ namespace PathTracing
             if (mgr == null || !mgr.isInitialized || mgr.stack == null)
                 return;
 
-            var v = mgr.stack.GetComponent<NativeRtxptEnvironmentMapVolume>();
+            var v = mgr.stack.GetComponent<RtxptEnvironmentMapVolume>();
             if (v == null || !v.IsActive())
                 return;
 

@@ -37,7 +37,7 @@ namespace PathTracing
 
         private static readonly List<RtxptRenderer> s_All = new();
 
-        /// <summary>All currently enabled RTXPT renderers. Consumed by <see cref="NativeRtxptGPUScene"/>.</summary>
+        /// <summary>All currently enabled RTXPT renderers. Consumed by <see cref="RtxptGPUScene"/>.</summary>
         public static IReadOnlyList<RtxptRenderer> All => s_All;
 
         /// <summary>
@@ -92,7 +92,7 @@ namespace PathTracing
         /// <summary>
         /// True when any slot parameter has changed since the last GPU upload.
         /// Set automatically when any referenced asset changes (via its Modified event)
-        /// or via OnValidate. Cleared by <see cref="NativeRtxptGPUScene"/> after upload.
+        /// or via OnValidate. Cleared by <see cref="RtxptGPUScene"/> after upload.
         /// Note: texture assignment changes require a full scene rebuild.
         /// </summary>
         public bool IsDirty { get; private set; }

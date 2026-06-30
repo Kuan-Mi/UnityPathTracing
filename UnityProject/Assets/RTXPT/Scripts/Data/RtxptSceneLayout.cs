@@ -9,7 +9,7 @@ namespace PathTracing
     /// One TLAS instance in the RTXPT scene: a (renderer, SubmeshGroup) pair with its
     /// pre-resolved BLAS inputs. Built once per topology change by <see cref="RtxptSceneLayout"/>
     /// and consumed by BOTH the acceleration-structure sync (<see cref="RtxptAccelRegistry"/>)
-    /// and the GPU-buffer build (<see cref="NativeRtxptGPUScene"/>), so the TLAS emission order,
+    /// and the GPU-buffer build (<see cref="RtxptGPUScene"/>), so the TLAS emission order,
     /// t_InstanceData, the flat per-geometry arrays, and the hit-group shader table all derive
     /// from the same list and can never drift apart.
     /// </summary>
@@ -26,7 +26,7 @@ namespace PathTracing
 
         // Skinned path only — the per-instance donut SoA buffer (refreshed each frame by the
         // repack compute) and the shared uint32 donut IB, attached by
-        // NativeRtxptGPUScene.PrepareSkinnedRecords before the AS sync. The BLAS is built from
+        // RtxptGPUScene.PrepareSkinnedRecords before the AS sync. The BLAS is built from
         // these (positions at offset 0, stride 12) instead of the mesh's native buffers.
         public GraphicsBuffer SkinnedVb;
         public GraphicsBuffer SkinnedIb;

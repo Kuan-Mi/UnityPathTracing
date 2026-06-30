@@ -6,7 +6,7 @@ using static PathTracing.PathTracingUtils;
 namespace PathTracing
 {
     /// <summary>
-    /// Native RTXPT camera state.
+    /// RTXPT camera state.
     /// Stores effective RTXPT camera jitter, matching Sample::ComputeCameraJitter gating.
     /// </summary>
     public class RtxptCameraFrameState
@@ -47,7 +47,7 @@ namespace PathTracing
             prevResolutionScale = initialResolutionScale;
         }
 
-        public void Update(RenderingData renderingData, bool settingsChanged, float currentResolutionScale, NativeRtxptSetting setting)
+        public void Update(RenderingData renderingData, bool settingsChanged, float currentResolutionScale, RtxptSetting setting)
         {
             prevWorldToView       = worldToView;
             prevWorldToClip       = worldToClip;
@@ -102,12 +102,12 @@ namespace PathTracing
                 accumulationSampleIndex = math.min(accumulationSampleIndex + 1, setting.accumulationTarget);
         }
 
-        private static bool UseCameraJitter(NativeRtxptSetting setting)
+        private static bool UseCameraJitter(RtxptSetting setting)
         {
             return setting.cameraJitter && setting.realtimeMode && setting.realtimeAA != 0;
         }
 
-        private static float ComputePerPixelJitterAAScale(NativeRtxptSetting setting)
+        private static float ComputePerPixelJitterAAScale(RtxptSetting setting)
         {
             if (!setting.realtimeMode && setting.accumulationAA)
                 return 1.0f;

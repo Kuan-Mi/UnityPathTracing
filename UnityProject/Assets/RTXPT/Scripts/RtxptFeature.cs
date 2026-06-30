@@ -14,24 +14,24 @@ namespace PathTracing
     /// ScriptableRendererFeature for the RTXPT (Path Tracing with Stable Planes + DLSS-RR) pipeline.
     ///
     /// Pass execution order:
-    ///   Phase 0 : NativeRtxptBuildTlasPass              - TLAS rebuild
+    ///   Phase 0 : RtxptBuildTlasPass              - TLAS rebuild
     ///   Phase 1 : LightsBaker passes                    - env map / emissive / proxies / feedback (TODO)
-    ///   Phase 2a: NativeRtxptBuildStablePlanesPass       - BuildStablePlanes RT (PathTracePrePass)
-    ///   Phase 2b: NativeRtxptExportVisibilityBufferPass  - depth + motion vectors export
-    ///   Phase 2c: NativeRtxptLightingUpdateEndPass       - NEE-AT feedback processing (stub)
-    ///   Phase 2d: NativeRtxptFillStablePlanesPass        - FillStablePlanes RT (PathTrace) / Reference
-    ///   Phase 3 : NativeRtxptDenoiseSpecHitTPass         - specular hit-distance bilateral filter x2
-    ///   Phase 4 : NativeRtxptDlssBeforePass              - prepare DLSS-RR guide buffers
+    ///   Phase 2a: RtxptBuildStablePlanesPass       - BuildStablePlanes RT (PathTracePrePass)
+    ///   Phase 2b: RtxptExportVisibilityBufferPass  - depth + motion vectors export
+    ///   Phase 2c: RtxptLightingUpdateEndPass       - NEE-AT feedback processing (stub)
+    ///   Phase 2d: RtxptFillStablePlanesPass        - FillStablePlanes RT (PathTrace) / Reference
+    ///   Phase 3 : RtxptDenoiseSpecHitTPass         - specular hit-distance bilateral filter x2
+    ///   Phase 4 : RtxptDlssBeforePass              - prepare DLSS-RR guide buffers
     ///   Phase 5 : SLDlssrrPass                           - DLSS Ray Reconstruction (denoise + upscale, via Streamline)
-    ///   Phase 7 : NativeRtxptAccumulationPass            - multi-frame accumulation (reference mode only)
+    ///   Phase 7 : RtxptAccumulationPass            - multi-frame accumulation (reference mode only)
     ///
     /// PT_USE_RESTIR_DI = 0, PT_USE_RESTIR_GI = 0 (no RTXDI).
     /// cStablePlaneCount = 3.
     /// </summary>
-    public class NativeRtxptFeature : ScriptableRendererFeature
+    public class RtxptFeature : ScriptableRendererFeature
     {
         // ---- Inspector fields -----------------------------------------------
-        public NativeRtxptSetting setting;
+        public RtxptSetting setting;
         public RenderPassEvent    renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
         public SampleConstants sampleConstants;
@@ -128,34 +128,34 @@ namespace PathTracing
         public Material outputBlitMaterial;
 
         // ---- Pass instances -------------------------------------------------
-        private NativeRtxptBuildTlasPass              _buildTlasPass;
-        private NativeRtxptEnvMapBakerPass            _envMapBakerPass;
-        private NativeRtxptLightingUpdateBeginPass    _lightingUpdateBeginPass;
-        private NativeRtxptBuildStablePlanesPass      _buildStablePlanesPass;
-        private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
-        private NativeRtxptLightingUpdateEndPass      _lightingUpdateEndPass;
-        private NativeRtxptFillStablePlanesPass       _fillStablePlanesPass;
-        private NativeRtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
-        private NativeRtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
+        private RtxptBuildTlasPass              _buildTlasPass;
+        private RtxptEnvMapBakerPass            _envMapBakerPass;
+        private RtxptLightingUpdateBeginPass    _lightingUpdateBeginPass;
+        private RtxptBuildStablePlanesPass      _buildStablePlanesPass;
+        private RtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
+        private RtxptLightingUpdateEndPass      _lightingUpdateEndPass;
+        private RtxptFillStablePlanesPass       _fillStablePlanesPass;
+        private RtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
+        private RtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
         private SLDlssrrPass                          _dlssRRPass;
         private SLDlssgInputsPass                     _slDlssgInputsPass;
         private bool                                  _slFgLastEnabled;
-        private NativeRtxptBloomPass                  _bloomPass;
-        private NativeRtxptToneMappingMipChainPass    _toneMappingMipChainPass;
-        private NativeRtxptAccumulationPass           _accumulationPass;
-        private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
-        private NativeRtxptShaderDebugBeginPass       _shaderDebugBeginPass;
-        private NativeRtxptShaderDebugDrawPass        _shaderDebugDrawPass;
-        private NativeRtxptOutputBlitPass             _outputBlitPass;
+        private RtxptBloomPass                  _bloomPass;
+        private RtxptToneMappingMipChainPass    _toneMappingMipChainPass;
+        private RtxptAccumulationPass           _accumulationPass;
+        private RtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
+        private RtxptShaderDebugBeginPass       _shaderDebugBeginPass;
+        private RtxptShaderDebugDrawPass        _shaderDebugDrawPass;
+        private RtxptOutputBlitPass             _outputBlitPass;
 
 
         private DepthBarrierFixPass _depthBarrierFixPass;
 
         // ---- Shared scene resources -----------------------------------------
-        private NativeRtxptGPUScene _gpuScene;
+        private RtxptGPUScene _gpuScene;
 
         /// <summary>Editor access for the "Info and statistics:" block (LightsBaker::InfoGUI).</summary>
-        public NativeRtxptLightingUpdateBeginPass LightingUpdateBeginPass => _lightingUpdateBeginPass;
+        public RtxptLightingUpdateBeginPass LightingUpdateBeginPass => _lightingUpdateBeginPass;
 
         /// <summary>
         /// Sets setting.debugPixelX/Y from a normalized viewport position (top-left origin, [0,1])
@@ -176,8 +176,8 @@ namespace PathTracing
         }
 
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
-        private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
-        private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools       = new();
+        private readonly Dictionary<long, RtxptTextureResources> _texturePools      = new();
+        private readonly Dictionary<long, RtxptBufferResources>  _bufferPools       = new();
         private readonly Dictionary<long, VolatileConstantBuffer>      _constantBuffers   = new();
         private readonly Dictionary<long, SLDlssrr>                    _dlrrDenoisers     = new();
         private readonly Dictionary<long, RtxptCameraFrameState>       _cameraFrameStates = new();
@@ -188,23 +188,23 @@ namespace PathTracing
 
         public override void Create()
         {
-            setting         ??= new NativeRtxptSetting();
+            setting         ??= new RtxptSetting();
             blackTexturePtr =   Texture2D.blackTexture.GetNativeTexturePtr();
         }
 
         private void CreatePasses()
         {
-            _buildTlasPass ??= new NativeRtxptBuildTlasPass(skinnedRepackCs)
+            _buildTlasPass ??= new RtxptBuildTlasPass(skinnedRepackCs)
             {
                 renderPassEvent = renderPassEvent,
             };
 
-            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs.asset, mipReduceCs.asset, envMapImportanceBakerCs.asset, mipMapGenCs.asset, bc6uCompressCs.asset)
+            _envMapBakerPass ??= new RtxptEnvMapBakerPass(baseLayerCs.asset, mipReduceCs.asset, envMapImportanceBakerCs.asset, mipMapGenCs.asset, bc6uCompressCs.asset)
             {
                 renderPassEvent = renderPassEvent,
             };
 
-            _lightingUpdateBeginPass ??= new NativeRtxptLightingUpdateBeginPass(
+            _lightingUpdateBeginPass ??= new RtxptLightingUpdateBeginPass(
                     envLightsBackupPastCs.asset, envLightsSubdivideBaseCs.asset, envLightsSubdivideBoostCs.asset,
                     envLightsFillLookupMapCs.asset, envLightsMapPastToCurrentCs.asset,
                     resetLightProxyCountersCs.asset, resetPastToCurrentHistoryCs.asset,
@@ -215,39 +215,39 @@ namespace PathTracing
                     debugDrawLightsCs.asset)
                 { renderPassEvent = renderPassEvent };
 
-            _buildStablePlanesPass      ??= new NativeRtxptBuildStablePlanesPass(buildStablePlanesShader.asset, ResolveHitGroups(buildHitGroups)) { renderPassEvent = renderPassEvent };
-            _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs.asset) { renderPassEvent           = renderPassEvent };
+            _buildStablePlanesPass      ??= new RtxptBuildStablePlanesPass(buildStablePlanesShader.asset, ResolveHitGroups(buildHitGroups)) { renderPassEvent = renderPassEvent };
+            _exportVisibilityBufferPass ??= new RtxptExportVisibilityBufferPass(exportVisibilityBufferCs.asset) { renderPassEvent           = renderPassEvent };
 
-            _lightingUpdateEndPass ??= new NativeRtxptLightingUpdateEndPass(
+            _lightingUpdateEndPass ??= new RtxptLightingUpdateEndPass(
                     processFeedbackHistoryP1aCs.asset, processFeedbackHistoryP1bCs.asset,
                     processFeedbackHistoryP2Cs.asset, processFeedbackHistoryP3Cs.asset,
                     clearFeedbackHistoryCs.asset,
                     processFeedbackHistoryDebugVizCs.asset)
                 { renderPassEvent = renderPassEvent };
 
-            _fillStablePlanesPass     ??= new NativeRtxptFillStablePlanesPass(fillStablePlanesShader.asset, referenceShader.asset, ResolveHitGroups(fillHitGroups), ResolveHitGroups(referenceHitGroups)) { renderPassEvent          = renderPassEvent };
-            _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs.asset) { renderPassEvent                                                                = renderPassEvent };
-            _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs.asset) { renderPassEvent                                                                     = renderPassEvent };
+            _fillStablePlanesPass     ??= new RtxptFillStablePlanesPass(fillStablePlanesShader.asset, referenceShader.asset, ResolveHitGroups(fillHitGroups), ResolveHitGroups(referenceHitGroups)) { renderPassEvent          = renderPassEvent };
+            _denoisingGuidesBakePass  ??= new RtxptDenoisingGuidesBakePass(denoiseSpecHitTCs.asset) { renderPassEvent                                                                = renderPassEvent };
+            _dlssRrPrepareInputsPass  ??= new RtxptDlssRRPrepareInputsPass(dlssBeforeCs.asset) { renderPassEvent                                                                     = renderPassEvent };
             _dlssRRPass               ??= new SLDlssrrPass { renderPassEvent                                                                                                         = renderPassEvent };
             _slDlssgInputsPass        ??= new SLDlssgInputsPass { renderPassEvent                                                                                                    = renderPassEvent };
-            _bloomPass                ??= new NativeRtxptBloomPass(bloomDownsampleRasterShader.asset, bloomBlurRasterShader.asset, bloomCompositeRasterShader.asset) { renderPassEvent                 = renderPassEvent };
-            _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader.asset, mipMapGenCs.asset, captureLuminanceCs.asset, toneMapApplyRasterShader.asset) { renderPassEvent = renderPassEvent };
-            _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs.asset) { renderPassEvent                                                                          = renderPassEvent };
-            _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs.asset) { renderPassEvent                                                          = renderPassEvent };
+            _bloomPass                ??= new RtxptBloomPass(bloomDownsampleRasterShader.asset, bloomBlurRasterShader.asset, bloomCompositeRasterShader.asset) { renderPassEvent                 = renderPassEvent };
+            _toneMappingMipChainPass  ??= new RtxptToneMappingMipChainPass(luminanceRasterShader.asset, mipMapGenCs.asset, captureLuminanceCs.asset, toneMapApplyRasterShader.asset) { renderPassEvent = renderPassEvent };
+            _accumulationPass         ??= new RtxptAccumulationPass(accumulationCs.asset) { renderPassEvent                                                                          = renderPassEvent };
+            _stablePlanesDebugVizPass ??= new RtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs.asset) { renderPassEvent                                                          = renderPassEvent };
             // The begin pass also clears the debug-viz texture via the plugin's UAV-clear event
             // (ClearUnorderedAccessViewFloat, matching the original's nvrhi clearTextureFloat).
-            _shaderDebugBeginPass ??= new NativeRtxptShaderDebugBeginPass { renderPassEvent = renderPassEvent };
+            _shaderDebugBeginPass ??= new RtxptShaderDebugBeginPass { renderPassEvent = renderPassEvent };
             if (_shaderDebugDrawPass == null
                 && shaderDebugTrianglesRasterShader.asset != null && shaderDebugLinesRasterShader.asset != null
                 && shaderDebugFeedbackLinesRasterShader.asset != null && shaderDebugBlendVizRasterShader.asset != null)
-                _shaderDebugDrawPass = new NativeRtxptShaderDebugDrawPass(
+                _shaderDebugDrawPass = new RtxptShaderDebugDrawPass(
                     shaderDebugTrianglesRasterShader.asset, shaderDebugLinesRasterShader.asset,
                     shaderDebugFeedbackLinesRasterShader.asset, shaderDebugBlendVizRasterShader.asset) { renderPassEvent = renderPassEvent };
-            _outputBlitPass      ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent = renderPassEvent };
+            _outputBlitPass      ??= new RtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent = renderPassEvent };
             _depthBarrierFixPass ??= new DepthBarrierFixPass { renderPassEvent                           = RenderPassEvent.AfterRendering };
         }
 
-        private NativeRtxptPassContext passCtx;
+        private RtxptPassContext passCtx;
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
@@ -266,7 +266,7 @@ namespace PathTracing
             if (eyeIndex == 1 && setting.skipRightEyeInVR) return;
 
             // ---- Shared scene resources -------------------------------------
-            _gpuScene ??= new NativeRtxptGPUScene();
+            _gpuScene ??= new RtxptGPUScene();
 
             if (eyeIndex == 0)
             {
@@ -279,13 +279,13 @@ namespace PathTracing
 
             if (!_texturePools.TryGetValue(uniqueKey, out var texPool))
             {
-                texPool = new NativeRtxptTextureResources();
+                texPool = new RtxptTextureResources();
                 _texturePools.Add(uniqueKey, texPool);
             }
 
             if (!_bufferPools.TryGetValue(uniqueKey, out var bufPool))
             {
-                bufPool = new NativeRtxptBufferResources();
+                bufPool = new RtxptBufferResources();
                 _bufferPools.Add(uniqueKey, bufPool);
             }
 
@@ -349,8 +349,8 @@ namespace PathTracing
             // override is actually active, so the serialized inspector object is never mutated. Done
             // before PrepareBake so env-map overrides drive this frame's bake gating.
             var effectiveSetting = setting;
-            NativeRtxptEnvironmentMapVolume.ApplyOverrides(ref effectiveSetting, setting);
-            NativeRtxptExposureVolume.ApplyOverrides(ref effectiveSetting, setting);
+            RtxptEnvironmentMapVolume.ApplyOverrides(ref effectiveSetting, setting);
+            RtxptExposureVolume.ApplyOverrides(ref effectiveSetting, setting);
 
             // Env bake gating must be decided before frameState.Update so a re-bake resets
             // accumulation this frame — original: Sample.cpp:1383, if (m_envMapBaker->Update(...))
@@ -367,12 +367,12 @@ namespace PathTracing
             float preExposedGrayLuminance = _toneMappingMipChainPass.GetPreExposedGrayLuminance(effectiveSetting);
             // MaterialCount (Sample.cpp:2095 = GetMaterialDataCount): shaders bounds-check material
             // indices against it (Bridge::loadIoR / loadHomogeneousVolumeData) — 0 disables IoR/volumes.
-            sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, effectiveSetting, renderResolution, displayResolution, frameState, preExposedGrayLuminance, _gpuScene.MaterialDataCount);
+            sampleConstants = RtxptConstantsBuilder.Build(renderingData, effectiveSetting, renderResolution, displayResolution, frameState, preExposedGrayLuminance, _gpuScene.MaterialDataCount);
 
             constantBuffer.Upload(renderer, sampleConstants);
 
             // ---- Build shared pass context ----------------------------------
-            passCtx ??= new NativeRtxptPassContext();
+            passCtx ??= new RtxptPassContext();
 
             passCtx.ConstantBuffer    = constantBuffer;
             passCtx.GpuScene          = _gpuScene;
@@ -529,8 +529,8 @@ namespace PathTracing
                 // place of the raw HDR DLSS-RR output unless the user picked an explicit debug view.
                 var  displayMode = setting.showMode;
                 bool toneMapRan  = setting.realtimeMode && setting.enableToneMapping && _toneMappingMipChainPass != null;
-                if (toneMapRan && displayMode == NativeRtxptShowMode.DlssRrOutput)
-                    displayMode = NativeRtxptShowMode.ProcessedOutput;
+                if (toneMapRan && displayMode == RtxptShowMode.DlssRrOutput)
+                    displayMode = RtxptShowMode.ProcessedOutput;
 
                 _outputBlitPass.Setup(texPool, displayMode, 1.0f, setting.debugViewType);
                 renderer.EnqueuePass(_outputBlitPass);
@@ -542,8 +542,8 @@ namespace PathTracing
         // ---- Helpers -------------------------------------------------------
 
         private void PushDlssgFrameInputs(ScriptableRenderer renderer, Camera cam, RtxptCameraFrameState frameState,
-                                          NativeRtxptTextureResources texPool, int2 displayResolution, int2 renderResolution,
-                                          bool texturesChanged, NativeRtxptSetting effectiveSetting, int eyeIndex)
+                                          RtxptTextureResources texPool, int2 displayResolution, int2 renderResolution,
+                                          bool texturesChanged, RtxptSetting effectiveSetting, int eyeIndex)
         {
             if (eyeIndex != 0)
                 return;
@@ -660,7 +660,7 @@ namespace PathTracing
             // QueryDLSSOptimalSettings path. Results are cached in the native plugin.
             if (SLDlssrr.TryGetOptimalRenderSize(outputRes, mode, out var nativeRes))
                 return nativeRes;
-            Debug.LogError($"[NativeRtxptFeature] Failed to get optimal render size from native plugin for mode {mode}, falling back to hardcoded scale table.");
+            Debug.LogError($"[RtxptFeature] Failed to get optimal render size from native plugin for mode {mode}, falling back to hardcoded scale table.");
 
             // Fallback (native plugin unavailable): hardcoded scale table.
             float scale = mode switch
@@ -737,7 +737,7 @@ namespace PathTracing
 #if UNITY_EDITOR
         private void Reset()
         {
-            setting = new NativeRtxptSetting();
+            setting = new RtxptSetting();
             AutoFillShaders();
         }
 
@@ -749,11 +749,11 @@ namespace PathTracing
         {
             if (_lightingUpdateBeginPass == null)
             {
-                Debug.LogWarning("[NativeRtxptFeature] LightingUpdateBeginPass not created — run the scene first.");
+                Debug.LogWarning("[RtxptFeature] LightingUpdateBeginPass not created — run the scene first.");
                 return;
             }
 
-            NativeRtxptBufferResources buf = null;
+            RtxptBufferResources buf = null;
             foreach (var kv in _bufferPools)
             {
                 buf = kv.Value;
@@ -762,7 +762,7 @@ namespace PathTracing
 
             if (buf?.LightBuffer == null)
             {
-                Debug.LogWarning("[NativeRtxptFeature] LightBuffer is null — run the scene first.");
+                Debug.LogWarning("[RtxptFeature] LightBuffer is null — run the scene first.");
                 return;
             }
 
@@ -770,7 +770,7 @@ namespace PathTracing
             uint triCount  = _lightingUpdateBeginPass.EmissiveTriangleCount;
 
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"[Rtxpt Emissive Triangles] offset={triOffset}  count={triCount}  analyticCount={triOffset - 5368}  MaxLights={NativeRtxptBufferResources.MaxLights}");
+            sb.AppendLine($"[Rtxpt Emissive Triangles] offset={triOffset}  count={triCount}  analyticCount={triOffset - 5368}  MaxLights={RtxptBufferResources.MaxLights}");
 
             // ---- CPU-side: SubInstanceData EmissiveLightMappingOffset ----
             if (_gpuScene != null)
@@ -948,8 +948,8 @@ namespace PathTracing
         /// </summary>
         public void TestNeeAtReadback()
         {
-            NativeRtxptBufferResources  buf = null;
-            NativeRtxptTextureResources tex = null;
+            RtxptBufferResources  buf = null;
+            RtxptTextureResources tex = null;
 
             foreach (var kv in _bufferPools)
             {
@@ -965,7 +965,7 @@ namespace PathTracing
 
             if (buf?.LightControlBuffer == null || tex == null)
             {
-                Debug.LogWarning("[NativeRtxptFeature] NEE-AT readback unavailable - run the scene for a few frames first.");
+                Debug.LogWarning("[RtxptFeature] NEE-AT readback unavailable - run the scene for a few frames first.");
                 return;
             }
 
@@ -998,7 +998,7 @@ namespace PathTracing
             AppendUIntTextureStats(sb, "FeedbackCandidatesBlended", tex.FeedbackCandidatesBlended, 8192);
 
             if (ctrl.ImportanceSamplingType != 2 || ctrl.TemporalFeedbackRequired == 0)
-                sb.AppendLine("  RESULT: NEE-AT is not enabled in LightingControl. Set NativeRtxptSetting.neeType = NEEAT and useNEE = true.");
+                sb.AppendLine("  RESULT: NEE-AT is not enabled in LightingControl. Set RtxptSetting.neeType = NEEAT and useNEE = true.");
             else if (ctrl.SamplingProxyCount == 0)
                 sb.AppendLine("  RESULT: NEE-AT config is active, but proxy data is empty. Check light counts, env/emissive setup, and proxy build passes.");
             else if (ctrl.LastFrameTemporalFeedbackAvailable == 0)
@@ -1171,7 +1171,7 @@ namespace PathTracing
             shaderDebugBlendVizRasterShader      = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugBlendViz");
             skinnedRepackCs                      = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>($"{shaderRoot}/Misc/SkinnedRepack.compute");
             if (skinnedRepackCs == null)
-                Debug.LogWarning($"[NativeRtxptFeature] Missing ComputeShader at: {shaderRoot}/Misc/SkinnedRepack.compute");
+                Debug.LogWarning($"[RtxptFeature] Missing ComputeShader at: {shaderRoot}/Misc/SkinnedRepack.compute");
 
             string lightRoot   = $"{shaderRoot}/Lighting";
             string distantRoot = $"{lightRoot}/Distant";
@@ -1208,7 +1208,7 @@ namespace PathTracing
             {
                 var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path + ".computeshader");
                 if (s == null)
-                    Debug.LogWarning($"[NativeRtxptFeature] Missing NativeComputeShader at: {path}");
+                    Debug.LogWarning($"[RtxptFeature] Missing NativeComputeShader at: {path}");
                 return s;
             }
 
@@ -1216,7 +1216,7 @@ namespace PathTracing
             {
                 var s = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTraceShader>(path + ".rayshader");
                 if (s == null)
-                    Debug.LogWarning($"[NativeRtxptFeature] Missing RayTraceShader at: {path}");
+                    Debug.LogWarning($"[RtxptFeature] Missing RayTraceShader at: {path}");
                 return s;
             }
 
@@ -1224,7 +1224,7 @@ namespace PathTracing
             {
                 var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeRasterShader>(path + ".rastershader");
                 if (s == null)
-                    Debug.LogWarning($"[NativeRtxptFeature] Missing NativeRasterShader at: {path}");
+                    Debug.LogWarning($"[RtxptFeature] Missing NativeRasterShader at: {path}");
                 return s;
             }
         }

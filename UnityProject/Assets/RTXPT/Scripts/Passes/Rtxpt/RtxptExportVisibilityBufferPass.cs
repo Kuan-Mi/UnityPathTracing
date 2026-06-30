@@ -16,13 +16,13 @@ namespace PathTracing
     /// Shader: ExportVisibilityBuffer.computeshader  numthreads [8,8,1]
     /// Bindings: g_Const (b0), u_MotionVectors (u5), u_Depth (u6)
     /// </summary>
-    public class NativeRtxptExportVisibilityBufferPass : ScriptableRenderPass, IDisposable
+    public class RtxptExportVisibilityBufferPass : ScriptableRenderPass, IDisposable
     {
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
-        private          NativeRtxptPassContext     _ctx;
+        private          RtxptPassContext     _ctx;
 
-        public NativeRtxptExportVisibilityBufferPass(NativeComputeShader shader)
+        public RtxptExportVisibilityBufferPass(NativeComputeShader shader)
         {
             _cs = new NativeComputePipeline(shader);
             _ds = new NativeComputeDescriptorSet(_cs);
@@ -34,7 +34,7 @@ namespace PathTracing
             _cs?.Dispose();
         }
 
-        public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
+        public void Setup(RtxptPassContext ctx) => _ctx = ctx;
 
         // ── Pass data ─────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ namespace PathTracing
         {
             internal NativeComputePipeline      Cs;
             internal NativeComputeDescriptorSet Ds;
-            internal NativeRtxptPassContext     Ctx;
+            internal RtxptPassContext     Ctx;
         }
 
         // ── RenderGraph ───────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 A self-contained **MCP server** for inspecting and **comparing shader inputs/outputs**
 between two PIX `.wpix` GPU captures, at the pixel level — without the PIX GUI.
 
-It was built to verify the Unity-replicated `NativeRtxptFeature` passes against the
+It was built to verify the Unity-replicated `RtxptFeature` passes against the
 original C++ Rtxpt by diffing the exact GPU resources a shader reads and writes.
 
 ## How it works

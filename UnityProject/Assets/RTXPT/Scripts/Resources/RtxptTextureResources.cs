@@ -8,13 +8,13 @@ using UnityEngine.Rendering;
 namespace PathTracing
 {
     /// <summary>
-    /// Owns all per-camera render textures for <see cref="NativeRtxptFeature"/>.
+    /// Owns all per-camera render textures for <see cref="RtxptFeature"/>.
     /// Formats mirror RenderTargets.cpp from the RTXPT sample.
     ///
     /// Denoising is performed by DLSS Ray Reconstruction (DLSS-RR) — no NRD.
     /// Stable plane count = 3 (cStablePlaneCount).
     /// </summary>
-    public class NativeRtxptTextureResources : IDisposable
+    public class RtxptTextureResources : IDisposable
     {
         // ── Path tracer primary outputs ───────────────────────────────────────
         /// <summary>Main PT output color. RGBA16_FLOAT. Written by PT shader → NoDenoiserFinalMerge input.</summary>
@@ -124,7 +124,7 @@ namespace PathTracing
         public NriTextureResource ProcessedOutputColor;
 
         // ── Env map baking outputs (fixed size, shared across frames) ─────────
-        /// <summary>Baked env cubemap (NativeRtxptEnvMapBakerPass.CubeDim, e.g. 2048²), full solid-angle
+        /// <summary>Baked env cubemap (RtxptEnvMapBakerPass.CubeDim, e.g. 2048²), full solid-angle
         /// mip chain. RGBA16F, UAV. Mirrors the original EnvMapBaker m_cubemap: BaseLayerCS writes mip 0+1,
         /// MIPReduceCS fills mips 2…N. Bound as t_EnvironmentMap / t_EnvMapCube.</summary>
         public NriTextureResource EnvCubemap;
@@ -148,7 +148,7 @@ namespace PathTracing
         /// <summary>
         /// Final BC6H_UFLOAT compressed env cube (plugin-owned ID3D12Resource*, not a Unity
         /// RenderTexture — Unity cannot create BC6H RTs). Sampled as t_EnvironmentMap at trace
-        /// time when <see cref="NativeRtxptEnvMapBakerPass.EnableBC6UCompression"/> is on. Mirrors
+        /// time when <see cref="RtxptEnvMapBakerPass.EnableBC6UCompression"/> is on. Mirrors
         /// the original EnvMapBaker m_cubemapBC6H returned by GetEnvMapCube() when m_outputIsCompressed.
         /// </summary>
         public IntPtr EnvCubemapBC6H;
@@ -178,7 +178,7 @@ namespace PathTracing
         public int2 renderResolution  { get; private set; }
         public int2 displayResolution { get; private set; }
 
-        public NativeRtxptTextureResources()
+        public RtxptTextureResources()
         {
             var srv = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE,         layout = Layout.SHADER_RESOURCE,         stageBits = 1 << 7  };
             var uav = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
@@ -246,15 +246,15 @@ namespace PathTracing
         public bool EnsureEnvMapResources()
         {
             if (EnvCubemap.IsCreated) return false;
-            int cubeDim  = NativeRtxptEnvMapBakerPass.CubeDim;
-            int cubeMips = NativeRtxptEnvMapBakerPass.CubeMipCount;
+            int cubeDim  = RtxptEnvMapBakerPass.CubeDim;
+            int cubeMips = RtxptEnvMapBakerPass.CubeMipCount;
             EnvCubemap.AllocateCube(cubeDim, useMipMap: true, mipCount: cubeMips);
             EnvImportanceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvRadianceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvDummyCube.AllocateCube(4, enableRandomWrite: false);
             EnvLightLookupMap.Allocate(new int2(1024, 1024), useMipMap: false);
 
-            // if (NativeRtxptEnvMapBakerPass.EnableBC6UCompression)
+            // if (RtxptEnvMapBakerPass.EnableBC6UCompression)
             // {
             //     // Scratch base = cubeDim / BC block size (4); same mip count as the cube so each
             //     // BC6H subresource has a matching RGBA32_UINT block grid. Mirrors EnvMapBaker.cpp

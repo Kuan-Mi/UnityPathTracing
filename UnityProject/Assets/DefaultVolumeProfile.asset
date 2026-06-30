@@ -412,8 +412,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dd6495a2100536c49afd6366bc0bb564, type: 3}
-  m_Name: NativeRtxptExposureVolume
-  m_EditorClassIdentifier: PathTracing.Rtxpt::PathTracing.NativeRtxptExposureVolume
+  m_Name: RtxptExposureVolume
+  m_EditorClassIdentifier: PathTracing.Rtxpt::PathTracing.RtxptExposureVolume
   active: 1
   autoExposure:
     m_OverrideState: 1
@@ -674,8 +674,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 48d06e2c9b65f1c48a8be712b513c326, type: 3}
-  m_Name: NativeRtxptEnvironmentMapVolume
-  m_EditorClassIdentifier: PathTracing.Rtxpt::PathTracing.NativeRtxptEnvironmentMapVolume
+  m_Name: RtxptEnvironmentMapVolume
+  m_EditorClassIdentifier: PathTracing.Rtxpt::PathTracing.RtxptEnvironmentMapVolume
   active: 1
   environmentMapEnabled:
     m_OverrideState: 1

@@ -5,20 +5,20 @@ using UnityEngine.Rendering.Universal;
 namespace PathTracing
 {
     /// <summary>
-    /// URP <see cref="VolumeComponent"/> that exposes <see cref="NativeRtxptFeature"/>'s exposure /
+    /// URP <see cref="VolumeComponent"/> that exposes <see cref="RtxptFeature"/>'s exposure /
     /// auto-exposure controls to the Volume framework, so different scenes or world regions can
     /// override them via global or box/sphere-collider Volumes (with blending) instead of editing
     /// the feature's inspector defaults.
     ///
     /// Each parameter has an independent <c>overrideState</c>: when off, the authored inspector value
-    /// from <see cref="NativeRtxptSetting"/> is kept; when on, the (blended) Volume value wins. The
+    /// from <see cref="RtxptSetting"/> is kept; when on, the (blended) Volume value wins. The
     /// authored settings object is never mutated — <see cref="ApplyOverrides"/> returns a per-frame
     /// clone only when at least one override is active.
     /// </summary>
     [Serializable]
-    [VolumeComponentMenu("Path Tracing/Native RTXPT Exposure")]
+    [VolumeComponentMenu("Path Tracing/RTXPT Exposure")]
     [SupportedOnRenderPipeline(typeof(UniversalRenderPipelineAsset))]
-    public sealed class NativeRtxptExposureVolume : VolumeComponent
+    public sealed class RtxptExposureVolume : VolumeComponent
     {
         /// <summary>Enable histogram-free auto-exposure (geometric-mean luminance).</summary>
         public BoolParameter autoExposure = new BoolParameter(false);
@@ -59,7 +59,7 @@ namespace PathTracing
         /// <c>VolumeManager.instance.stack</c> for the rendering camera before render passes set up, so
         /// this reflects the camera's Volumes.
         /// </summary>
-        public static void ApplyOverrides(ref NativeRtxptSetting setting, NativeRtxptSetting authored)
+        public static void ApplyOverrides(ref RtxptSetting setting, RtxptSetting authored)
         {
             if (authored == null)
                 return;
@@ -70,7 +70,7 @@ namespace PathTracing
             if (mgr == null || !mgr.isInitialized || mgr.stack == null)
                 return;
 
-            var v = mgr.stack.GetComponent<NativeRtxptExposureVolume>();
+            var v = mgr.stack.GetComponent<RtxptExposureVolume>();
             if (v == null || !v.IsActive())
                 return;
 

@@ -18,13 +18,13 @@ namespace PathTracing
     ///   u42 u_StablePlanesBuffer  (RWByteAddressBuffer)
     ///   u44 u_StableRadiance
     /// </summary>
-    public class NativeRtxptNoDenoiserFinalMergePass : ScriptableRenderPass, IDisposable
+    public class RtxptNoDenoiserFinalMergePass : ScriptableRenderPass, IDisposable
     {
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
-        private          NativeRtxptPassContext     _ctx;
+        private          RtxptPassContext     _ctx;
 
-        public NativeRtxptNoDenoiserFinalMergePass(NativeComputeShader shader)
+        public RtxptNoDenoiserFinalMergePass(NativeComputeShader shader)
         {
             _cs = new NativeComputePipeline(shader);
             _ds = new NativeComputeDescriptorSet(_cs);
@@ -36,7 +36,7 @@ namespace PathTracing
             _cs?.Dispose();
         }
 
-        public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
+        public void Setup(RtxptPassContext ctx) => _ctx = ctx;
 
         // ── Pass data ─────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ namespace PathTracing
         {
             internal NativeComputePipeline      Cs;
             internal NativeComputeDescriptorSet Ds;
-            internal NativeRtxptPassContext     Ctx;
+            internal RtxptPassContext     Ctx;
         }
 
         // ── RenderGraph ───────────────────────────────────────────────────────

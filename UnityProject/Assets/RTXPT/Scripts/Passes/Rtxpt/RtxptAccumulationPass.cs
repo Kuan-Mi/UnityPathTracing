@@ -20,7 +20,7 @@ namespace PathTracing
     ///   u1  u_OutputColor         (UAV write — ProcessedOutputColor)
     ///   s0  s_Sampler
     /// </summary>
-    public class NativeRtxptAccumulationPass : ScriptableRenderPass, IDisposable
+    public class RtxptAccumulationPass : ScriptableRenderPass, IDisposable
     {
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct AccumulationConstants
@@ -34,9 +34,9 @@ namespace PathTracing
 
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
-        private          NativeRtxptPassContext     _ctx;
+        private          RtxptPassContext     _ctx;
 
-        public NativeRtxptAccumulationPass(NativeComputeShader shader)
+        public RtxptAccumulationPass(NativeComputeShader shader)
         {
             // Root-constant hints (g_Const) live on the .computeshader asset (the importer).
             _cs = new NativeComputePipeline(shader);
@@ -49,7 +49,7 @@ namespace PathTracing
             _cs?.Dispose();
         }
 
-        public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
+        public void Setup(RtxptPassContext ctx) => _ctx = ctx;
 
         // ── Pass data ─────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ namespace PathTracing
         {
             internal NativeComputePipeline      Cs;
             internal NativeComputeDescriptorSet Ds;
-            internal NativeRtxptPassContext     Ctx;
+            internal RtxptPassContext     Ctx;
         }
 
         // ── RenderGraph ───────────────────────────────────────────────────────

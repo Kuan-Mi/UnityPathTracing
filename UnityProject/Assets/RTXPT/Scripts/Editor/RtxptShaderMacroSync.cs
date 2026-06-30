@@ -7,7 +7,7 @@ namespace PathTracing
 {
     /// <summary>
     /// Mirrors RTXPT's Sample::SetGlobalShaderMacros (Sample.cpp:990-1043): derives the path-tracer
-    /// compile-time macros from <see cref="NativeRtxptSetting"/> and writes them into the
+    /// compile-time macros from <see cref="RtxptSetting"/> and writes them into the
     /// .rayshader / .hitgroupshader importer defines, reimporting (= recompiling via DXC) only the
     /// assets whose values actually changed.
     ///
@@ -22,18 +22,18 @@ namespace PathTracing
     /// Unmanaged defines on the assets (PATH_TRACER_MODE, permutation names, USE_NVAPI_* — the
     /// plugin has no NVAPI integration) are preserved untouched.
     /// </summary>
-    internal static class NativeRtxptShaderMacroSync
+    internal static class RtxptShaderMacroSync
     {
         /// <summary>
         /// Computes the settings-derived macros for one pipeline.
         /// Order and names follow Sample.cpp:1004-1038.
         /// </summary>
-        public static Dictionary<string, string> ComputeManagedMacros(NativeRtxptSetting s, bool referencePipeline)
+        public static Dictionary<string, string> ComputeManagedMacros(RtxptSetting s, bool referencePipeline)
         {
             static string B(bool b) => b ? "1" : "0";
 
             // ActualNEEAT_LocalToGlobalSampleRatio (SampleUI.h:124): no local samples unless NEE-AT.
-            float localToGlobalRatio = s.neeType == NativeRtxptNeeType.NEEAT ? s.neeatLocalToGlobalSampleRatio : 0f;
+            float localToGlobalRatio = s.neeType == RtxptNeeType.NEEAT ? s.neeatLocalToGlobalSampleRatio : 0f;
 
             // ComputeCandidateSampleLocalCount / GlobalCount (LightingTypes.hlsli:148-163):
             // local = (total-1)*ratio + 0.75 — always allow at least 1 global, then even out.
@@ -45,9 +45,9 @@ namespace PathTracing
             bool fireflyFilter  = referencePipeline ? s.referenceFireflyFilterEnabled : s.realtimeFireflyFilterEnabled;
 
             // Sample.cpp:995 — DebugView != Disabled. The NEELightColor show mode also reads the
-            // viz texture (NativeRtxptConstantsBuilder forces debugViewType for it), so include it.
+            // viz texture (RtxptConstantsBuilder forces debugViewType for it), so include it.
             bool debugSurfaceViz = s.debugViewType != RtxptDebugViewType.Disabled
-                                   || s.showMode == NativeRtxptShowMode.NEELightColor;
+                                   || s.showMode == RtxptShowMode.NEELightColor;
 
             return new Dictionary<string, string>
             {
@@ -77,7 +77,7 @@ namespace PathTracing
         }
 
         /// <summary>Asset names whose importer defines do not match the current settings.</summary>
-        public static List<string> FindOutOfSync(NativeRtxptFeature feature)
+        public static List<string> FindOutOfSync(RtxptFeature feature)
         {
             var stale = new List<string>();
             if (feature == null || feature.setting == null)
@@ -100,7 +100,7 @@ namespace PathTracing
         /// Writes the settings-derived macros into all assigned PT shader importers and reimports
         /// the changed ones. Returns the number of reimported assets.
         /// </summary>
-        public static int Apply(NativeRtxptFeature feature)
+        public static int Apply(RtxptFeature feature)
         {
             if (feature == null || feature.setting == null)
                 return 0;
@@ -124,7 +124,7 @@ namespace PathTracing
                     EditorUtility.SetDirty(importer);
                     importer.SaveAndReimport();
                     changedCount++;
-                    Debug.Log($"[NativeRtxptShaderMacroSync] Updated shader macros: {path}");
+                    Debug.Log($"[RtxptShaderMacroSync] Updated shader macros: {path}");
                 }
             }
             finally
@@ -136,7 +136,7 @@ namespace PathTracing
 
         // ─────────────────────────────────────────────────────────────────────
 
-        private static IEnumerable<(Object asset, bool referencePipeline)> EnumerateShaderAssets(NativeRtxptFeature f)
+        private static IEnumerable<(Object asset, bool referencePipeline)> EnumerateShaderAssets(RtxptFeature f)
         {
             if (f.buildStablePlanesShader.asset != null) yield return (f.buildStablePlanesShader.asset, false);
             if (f.fillStablePlanesShader.asset  != null) yield return (f.fillStablePlanesShader.asset,  false);

@@ -9,7 +9,7 @@ using RayTracingAccelerationStructure = NativeRender.RayTracingAccelerationStruc
 namespace PathTracing
 {
     // =========================================================================
-    // NativeRtxptGPUScene
+    // RtxptGPUScene
     // =========================================================================
 
     /// <summary>
@@ -27,7 +27,7 @@ namespace PathTracing
     /// persistent BLASes), and the GPU-side arrays are rebuilt from the same list — so the TLAS
     /// instance order and every CPU/GPU array can never drift apart.
     /// </summary>
-    public sealed class NativeRtxptGPUScene : IDisposable
+    public sealed class RtxptGPUScene : IDisposable
     {
         // Acceleration structure + incremental TLAS registration
         private RayTracingAccelerationStructure _accelStructure;
@@ -103,7 +103,7 @@ namespace PathTracing
         private readonly HashSet<int>                      _usedMeshIds        = new();
 
         // One repack dispatch per skinned renderer, rebuilt on topology change and consumed by
-        // NativeRtxptBuildTlasPass every frame before the TLAS/BLAS build.
+        // RtxptBuildTlasPass every frame before the TLAS/BLAS build.
         private readonly List<RtxptSkinnedDispatch> _skinnedDispatches   = new();
         private readonly HashSet<int>               _skinnedSeenScratch  = new();
 
@@ -136,7 +136,7 @@ namespace PathTracing
         private readonly List<(int subIdx, int lightId)> _proxySubInstances = new();
 
         // Max task count: MaxLights / LLB_MAX_TRIANGLES_PER_TASK * 2
-        private const int MaxEmissiveProcTasks = NativeRtxptBufferResources.MaxLights / 32 * 2;
+        private const int MaxEmissiveProcTasks = RtxptBufferResources.MaxLights / 32 * 2;
         private static readonly RtxptEmissiveTrianglesProcTask[] s_emissiveTaskStaging =
             new RtxptEmissiveTrianglesProcTask[MaxEmissiveProcTasks];
 
@@ -198,7 +198,7 @@ namespace PathTracing
         /// </summary>
         public IReadOnlyList<EmissiveGeometryEntry> GetEmissiveGeometries() => _emissiveCache;
 
-        public NativeRtxptGPUScene()
+        public RtxptGPUScene()
         {
             _accelStructure = new RayTracingAccelerationStructure();
         }
@@ -276,7 +276,7 @@ namespace PathTracing
                 if (mesh.GetVertexAttributeStream(VertexAttribute.Position) != 0 ||
                     mesh.GetVertexAttributeFormat(VertexAttribute.Position) != VertexAttributeFormat.Float32)
                 {
-                    Debug.LogError($"[NativeRtxptGPUScene] Skinned mesh '{mesh.name}': position is not a float32 stream-0 attribute — skinned repack skipped (geometry will stay in rest pose).");
+                    Debug.LogError($"[RtxptGPUScene] Skinned mesh '{mesh.name}': position is not a float32 stream-0 attribute — skinned repack skipped (geometry will stay in rest pose).");
                     continue;
                 }
 
@@ -458,7 +458,7 @@ namespace PathTracing
                     {
                         slots = (bufPtrs.Count, bufPtrs.Count + 1);
                         if (bufPtrs.Count > 0xFFFF)
-                            Debug.LogError($"[NativeRtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
+                            Debug.LogError($"[RtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
                         bufPtrs.Add(rec.SkinnedVb.GetNativeBufferPtr());
                         bufPtrs.Add(rec.SkinnedIb.GetNativeBufferPtr());
                         _skinnedBufferSlots[rec.RendererId] = slots;
@@ -471,14 +471,14 @@ namespace PathTracing
                     slots = (bufPtrs.Count, bufPtrs.Count + 1);
                     // SubInstanceData.IndexBufferIndex_VertexBufferIndex packs both as 16-bit.
                     if (bufPtrs.Count > 0xFFFF)
-                        Debug.LogError($"[NativeRtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
+                        Debug.LogError($"[RtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
                     bufPtrs.Add(donutVb.GetNativeBufferPtr());
                     bufPtrs.Add(donutIb.GetNativeBufferPtr());
                     _meshBufferSlots[meshId] = slots;
 
                     // if (!mesh.HasVertexAttribute(VertexAttribute.Normal) ||
                     //     !mesh.HasVertexAttribute(VertexAttribute.Tangent))
-                    //     Debug.LogWarning($"[NativeRtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
+                    //     Debug.LogWarning($"[RtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
                 }
 
                 var streams = new RtxptMeshStreamOffsets(mesh, withPrevPosition: rec.IsSkinned);
@@ -626,9 +626,9 @@ namespace PathTracing
 
             // SubInstanceData.GlobalGeometryIndex_PTMaterialDataIndex packs both fields as 16-bit.
             if (globalGeomIdx > 0xFFFF)
-                Debug.LogError($"[NativeRtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
+                Debug.LogError($"[RtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
             if (matIdx > 0xFFFF)
-                Debug.LogError($"[NativeRtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
+                Debug.LogError($"[RtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
 
             geomList.Add(new DonutGeometryData
             {
@@ -671,7 +671,7 @@ namespace PathTracing
                 Light targetLight = ResolveProxyTargetLight(rec.TargetRenderer);
                 _proxySubInstances.Add((subInstList.Count, targetLight != null ? targetLight.GetInstanceID() : 0));
                 if (targetLight == null)
-                    Debug.LogWarning($"[NativeRtxptGPUScene] Renderer '{rec.TargetRenderer.name}' submesh {s} is flagged " +
+                    Debug.LogWarning($"[RtxptGPUScene] Renderer '{rec.TargetRenderer.name}' submesh {s} is flagged " +
                                      "EnableAsAnalyticLightProxy but has no Spot/Point target light " +
                                      "(add an RtxptAnalyticLightProxy component or parent it under a light).");
             }
@@ -947,7 +947,7 @@ namespace PathTracing
             {
                 if (taskIdx >= MaxEmissiveProcTasks)
                 {
-                    Debug.LogWarning("[NativeRtxptGPUScene] EmissiveTrianglesProcTask overflow — some emissive geometry ignored.");
+                    Debug.LogWarning("[RtxptGPUScene] EmissiveTrianglesProcTask overflow — some emissive geometry ignored.");
                     break;
                 }
 
@@ -955,9 +955,9 @@ namespace PathTracing
                 uint destBase = lightOffset + accumTriangles;
 
                 // Overflow guard
-                if (destBase + triCount > NativeRtxptBufferResources.MaxLights)
+                if (destBase + triCount > RtxptBufferResources.MaxLights)
                 {
-                    Debug.LogWarning($"[NativeRtxptGPUScene] MaxLights overflow at emissive geometry (inst={e.InstanceIndex}, geom={e.GeometrySubIndex}) — skipping.");
+                    Debug.LogWarning($"[RtxptGPUScene] MaxLights overflow at emissive geometry (inst={e.InstanceIndex}, geom={e.GeometrySubIndex}) — skipping.");
                     break;
                 }
 
@@ -1021,7 +1021,7 @@ namespace PathTracing
     /// One skinned-repack compute dispatch: converts a SkinnedMeshRenderer's GPU-skinned vertex
     /// buffer (interleaved, root-bone space) into the instance's donut SoA buffer each frame,
     /// maintaining the PrevPosition stream (donut skinning_cs.hlsl model). Built per topology
-    /// change by <see cref="NativeRtxptGPUScene"/>; recorded each frame by NativeRtxptBuildTlasPass
+    /// change by <see cref="RtxptGPUScene"/>; recorded each frame by RtxptBuildTlasPass
     /// before the TLAS/BLAS build.
     /// </summary>
     internal sealed class RtxptSkinnedDispatch

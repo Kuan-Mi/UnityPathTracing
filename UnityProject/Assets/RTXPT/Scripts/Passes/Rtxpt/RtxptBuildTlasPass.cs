@@ -8,7 +8,7 @@ using UnityEngine.Rendering.Universal;
 namespace PathTracing
 {
     /// <summary>
-    /// Builds/updates the <see cref="NativeRtxptGPUScene"/> TLAS once per frame,
+    /// Builds/updates the <see cref="RtxptGPUScene"/> TLAS once per frame,
     /// before any RTXPT pass that needs the acceleration structure.
     ///
     /// Also records, ahead of the TLAS/BLAS build in the same CommandBuffer:
@@ -24,7 +24,7 @@ namespace PathTracing
     /// buffer are Unity GraphicsBuffers, so they bind directly via SetComputeBufferParam —
     /// the former native-compute path required a per-frame GetNativeBufferPtr() on each.
     /// </summary>
-    public class NativeRtxptBuildTlasPass : ScriptableRenderPass, IDisposable
+    public class RtxptBuildTlasPass : ScriptableRenderPass, IDisposable
     {
         // Shader property IDs for the SkinnedRepack.compute uniforms/resources.
         private static readonly int _idVertexCount     = Shader.PropertyToID("g_VertexCount");
@@ -40,7 +40,7 @@ namespace PathTracing
         private static readonly int _idSrcVertexBuffer = Shader.PropertyToID("t_SrcVertexBuffer");
         private static readonly int _idDstVertexBuffer = Shader.PropertyToID("u_DstVertexBuffer");
 
-        private NativeRtxptGPUScene _gpuScene;
+        private RtxptGPUScene _gpuScene;
         private RayTracePipeline    _buildPipeline;
         private RayTracePipeline    _fillPipeline;
         private RayTracePipeline    _refPipeline;
@@ -48,7 +48,7 @@ namespace PathTracing
         private readonly ComputeShader _repackCs; // null when no shader assigned
         private readonly int           _repackKernel;
 
-        public NativeRtxptBuildTlasPass(ComputeShader skinnedRepackShader = null)
+        public RtxptBuildTlasPass(ComputeShader skinnedRepackShader = null)
         {
             _repackCs = skinnedRepackShader;
             if (_repackCs != null)
@@ -59,7 +59,7 @@ namespace PathTracing
         {
         }
 
-        public void Setup(NativeRtxptGPUScene gpuScene,
+        public void Setup(RtxptGPUScene gpuScene,
                           RayTracePipeline buildPipeline = null,
                           RayTracePipeline fillPipeline  = null,
                           RayTracePipeline refPipeline   = null)
@@ -72,7 +72,7 @@ namespace PathTracing
 
         private class PassData
         {
-            internal NativeRtxptGPUScene GpuScene;
+            internal RtxptGPUScene GpuScene;
             internal RayTracePipeline    BuildPipeline;
             internal RayTracePipeline    FillPipeline;
             internal RayTracePipeline    RefPipeline;
@@ -125,7 +125,7 @@ namespace PathTracing
             if (dispatches.Count == 0) return;
             if (data.RepackCs == null)
             {
-                Debug.LogWarning("[NativeRtxptBuildTlasPass] Scene has skinned renderers but no SkinnedRepack compute shader is assigned — skinned geometry stays in rest pose.");
+                Debug.LogWarning("[RtxptBuildTlasPass] Scene has skinned renderers but no SkinnedRepack compute shader is assigned — skinned geometry stays in rest pose.");
                 return;
             }
 

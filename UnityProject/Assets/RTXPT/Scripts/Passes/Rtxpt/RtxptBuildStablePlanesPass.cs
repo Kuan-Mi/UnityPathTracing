@@ -18,22 +18,22 @@ namespace PathTracing
     /// Must run BEFORE ExportVisibilityBuffer and LightingUpdateEnd.
     /// FillStablePlanes (Phase 2b) runs after LightingUpdateEnd.
     /// </summary>
-    public class NativeRtxptBuildStablePlanesPass : ScriptableRenderPass, IDisposable
+    public class RtxptBuildStablePlanesPass : ScriptableRenderPass, IDisposable
     {
         private readonly RayTracePipeline            _buildSP;
         private readonly NativeRayTraceDescriptorSet _buildDs;
 
-        private NativeRtxptPassContext _ctx;
+        private RtxptPassContext _ctx;
 
         private static readonly RootConstantsHint[] MiniConstRootConstantsHints =
         {
             new RootConstantsHint { Name = "g_MiniConst", Count = 16 }
         };
 
-        /// <summary>Pipeline handle exposed for NativeRtxptBuildTlasPass hit-table rebuilds.</summary>
+        /// <summary>Pipeline handle exposed for RtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline BuildPipeline => _buildSP;
 
-        public NativeRtxptBuildStablePlanesPass(
+        public RtxptBuildStablePlanesPass(
             RayTraceShader buildStablePlanes,
             HitGroupShader[] buildHitGroups = null)
         {
@@ -49,7 +49,7 @@ namespace PathTracing
             _buildSP?.Dispose();
         }
 
-        public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
+        public void Setup(RtxptPassContext ctx) => _ctx = ctx;
 
         // ── Pass data ──────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ namespace PathTracing
         {
             internal RayTracePipeline            BuildSP;
             internal NativeRayTraceDescriptorSet BuildDs;
-            internal NativeRtxptPassContext      Ctx;
+            internal RtxptPassContext      Ctx;
             internal int2                        RenderRes;
         }
 
@@ -120,7 +120,7 @@ namespace PathTracing
 
         private static unsafe void BindCommonRT(
             NativeRayTraceDescriptorSet ds,
-            NativeRtxptPassContext ctx,
+            RtxptPassContext ctx,
             SampleMiniConstants* miniConst,
             RayTracingAccelerationStructure tlas)
         {
@@ -144,7 +144,7 @@ namespace PathTracing
                 ds.SetRWBuffer("u_ShaderDebugBuffer", ctx.Buffers.ShaderDebugBufferPtr);
             if (ctx.Buffers.DebugLinesBufferPtr != IntPtr.Zero)
                 ds.SetRWStructuredBuffer("u_DebugLinesBuffer", ctx.Buffers.DebugLinesBufferPtr,
-                    NativeRtxptBufferResources.MaxDebugLines, NativeRtxptBufferResources.DebugLineStructSize);
+                    RtxptBufferResources.MaxDebugLines, RtxptBufferResources.DebugLineStructSize);
         }
     }
 }

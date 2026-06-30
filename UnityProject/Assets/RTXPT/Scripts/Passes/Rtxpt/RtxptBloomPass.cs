@@ -29,7 +29,7 @@ namespace PathTracing
     /// Gaussian weights and constants are taken verbatim from donut bloom_ps.hlsl / BloomPass.cpp.
     /// Runs after DLSS-RR and before tone mapping, operating on the display-resolution HDR image.
     /// </summary>
-    public class NativeRtxptBloomPass : ScriptableRenderPass, IDisposable
+    public class RtxptBloomPass : ScriptableRenderPass, IDisposable
     {
         private const uint kRGBA16F = (uint)DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
 
@@ -60,10 +60,10 @@ namespace PathTracing
         // Single-RT format array shared by every draw (all bloom targets are RGBA16F).
         private readonly uint[] _colorFmt = { kRGBA16F };
 
-        private NativeRtxptPassContext _ctx;
+        private RtxptPassContext _ctx;
         private IntPtr                 _hdrPtr;
 
-        public NativeRtxptBloomPass(NativeRasterShader downsampleShader,
+        public RtxptBloomPass(NativeRasterShader downsampleShader,
                                     NativeRasterShader blurShader,
                                     NativeRasterShader compositeShader)
         {
@@ -103,7 +103,7 @@ namespace PathTracing
         }
 
         /// <summary>HDR image that is downsampled, blurred and composited back in place (e.g. DlssRrOutput).</summary>
-        public void Setup(NativeRtxptPassContext ctx, NriTextureResource hdr)
+        public void Setup(RtxptPassContext ctx, NriTextureResource hdr)
         {
             _ctx    = ctx;
             _hdrPtr = hdr.NativePtr;

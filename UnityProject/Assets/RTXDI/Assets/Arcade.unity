@@ -500,7 +500,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e198bd8f1fa7c2340822fa968f5c1be3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptMaterialOverride
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxptMaterialOverride
   Slots:
   - {fileID: 0}
 --- !u!1001 &308568790
@@ -3124,7 +3124,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e198bd8f1fa7c2340822fa968f5c1be3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptMaterialOverride
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxptMaterialOverride
   Slots:
   - {fileID: 0}
 --- !u!23 &1693006192 stripped

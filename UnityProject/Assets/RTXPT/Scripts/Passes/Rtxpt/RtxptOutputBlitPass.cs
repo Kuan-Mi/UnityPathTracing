@@ -6,27 +6,27 @@ using UnityEngine.Rendering.Universal;
 namespace PathTracing
 {
     /// <summary>
-    /// Debug / display blit pass for <see cref="NativeRtxptFeature"/>.
+    /// Debug / display blit pass for <see cref="RtxptFeature"/>.
     /// Blits one of the RTXPT render targets onto the active camera texture.
-    /// The target is selected via <see cref="NativeRtxptShowMode"/> in <see cref="NativeRtxptSetting"/>.
+    /// The target is selected via <see cref="RtxptShowMode"/> in <see cref="RtxptSetting"/>.
     ///
     /// Uses the same <c>KM_Final</c> material and <see cref="ShowPass"/> shader variants
     /// as the rest of the pipeline (analogous to <see cref="NativeNrdOutputBlitPass"/>).
     /// </summary>
-    public class NativeRtxptOutputBlitPass : ScriptableRenderPass
+    public class RtxptOutputBlitPass : ScriptableRenderPass
     {
         private readonly Material                    _blitMaterial;
-        private          NativeRtxptTextureResources _resources;
-        private          NativeRtxptShowMode         _showMode;
+        private          RtxptTextureResources _resources;
+        private          RtxptShowMode         _showMode;
         private          float                       _renderScale; // renderRes / displayRes
         private          RtxptDebugViewType          _debugViewType;
 
-        public NativeRtxptOutputBlitPass(Material blitMaterial)
+        public RtxptOutputBlitPass(Material blitMaterial)
         {
             _blitMaterial = blitMaterial;
         }
 
-        public void Setup(NativeRtxptTextureResources resources, NativeRtxptShowMode showMode, float renderScale,
+        public void Setup(RtxptTextureResources resources, RtxptShowMode showMode, float renderScale,
             RtxptDebugViewType debugViewType = RtxptDebugViewType.Disabled)
         {
             _resources     = resources;
@@ -42,8 +42,8 @@ namespace PathTracing
         class PassData
         {
             internal Material                    BlitMaterial;
-            internal NativeRtxptTextureResources Resources;
-            internal NativeRtxptShowMode         ShowMode;
+            internal RtxptTextureResources Resources;
+            internal RtxptShowMode         ShowMode;
             internal float                       RenderScale;
             internal TextureHandle               CameraTexture;
             internal RtxptDebugViewType          DebugViewType;
@@ -74,77 +74,77 @@ namespace PathTracing
             switch (mode)
             {
                 // ── Final outputs ──────────────────────────────────────────
-                case NativeRtxptShowMode.DlssRrOutput:
+                case RtxptShowMode.DlssRrOutput:
                     Blitter.BlitTexture(cmd, res.DlssRrOutput.Handle, fullScaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.ProcessedOutput:
+                case RtxptShowMode.ProcessedOutput:
                     Blitter.BlitTexture(cmd, res.ProcessedOutputColor.Handle, fullScaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.OutputColor:
+                case RtxptShowMode.OutputColor:
                     Blitter.BlitTexture(cmd, res.OutputColor.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
                 // ── GBuffer ────────────────────────────────────────────────
-                case NativeRtxptShowMode.BaseColor:
+                case RtxptShowMode.BaseColor:
                     Blitter.BlitTexture(cmd, res.BaseColor.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.RoughnessMetal:
+                case RtxptShowMode.RoughnessMetal:
                     Blitter.BlitTexture(cmd, res.RoughnessMetal.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.SpecNormal:
+                case RtxptShowMode.SpecNormal:
                     Blitter.BlitTexture(cmd, res.SpecNormal.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
                 // ── Depth / motion ─────────────────────────────────────────
-                case NativeRtxptShowMode.Depth:
+                case RtxptShowMode.Depth:
                     Blitter.BlitTexture(cmd, res.Depth.Handle, scaleOffset, mat, (int)ShowPass.ViewZ);
                     break;
 
-                case NativeRtxptShowMode.MotionVectors:
+                case RtxptShowMode.MotionVectors:
                     Blitter.BlitTexture(cmd, res.ScreenMotionVectors.Handle, scaleOffset, mat, (int)ShowPass.Mv);
                     break;
 
                 // ── Stable planes ──────────────────────────────────────────
-                case NativeRtxptShowMode.SpecularHitT:
+                case RtxptShowMode.SpecularHitT:
                     Blitter.BlitTexture(cmd, res.SpecularHitT.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.StableRadiance:
+                case RtxptShowMode.StableRadiance:
                     Blitter.BlitTexture(cmd, res.StableRadiance.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
                 // ── DLSS-RR guide buffers ──────────────────────────────────
-                case NativeRtxptShowMode.DlssDiffuseAlbedo:
+                case RtxptShowMode.DlssDiffuseAlbedo:
                     Blitter.BlitTexture(cmd, res.DlssRrDiffAlbedo.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.DlssSpecularAlbedo:
+                case RtxptShowMode.DlssSpecularAlbedo:
                     Blitter.BlitTexture(cmd, res.DlssRrSpecAlbedo.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.DlssNormal:
+                case RtxptShowMode.DlssNormal:
                     Blitter.BlitTexture(cmd, res.DlssRrNormalRoughness.Handle, scaleOffset, mat, (int)ShowPass.Normal);
                     break;
 
-                case NativeRtxptShowMode.DlssRoughness:
+                case RtxptShowMode.DlssRoughness:
                     Blitter.BlitTexture(cmd, res.DlssRrNormalRoughness.Handle, scaleOffset, mat, (int)ShowPass.Roughness);
                     break;
 
-                case NativeRtxptShowMode.DlssSpecMotionVectors:
+                case RtxptShowMode.DlssSpecMotionVectors:
                     Blitter.BlitTexture(cmd, res.DlssRrSpecMotionVectors.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
                 // ── Debug ──────────────────────────────────────────────────
-                case NativeRtxptShowMode.ShaderDebugViz:
-                case NativeRtxptShowMode.NEELightColor:
+                case RtxptShowMode.ShaderDebugViz:
+                case RtxptShowMode.NEELightColor:
                     Blitter.BlitTexture(cmd, res.ShaderDebugViz.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.DebugOutputColor:
+                case RtxptShowMode.DebugOutputColor:
                     Blitter.BlitTexture(cmd, res.DebugOutputColor.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
             }
@@ -156,7 +156,7 @@ namespace PathTracing
         {
             var resourceData = frameData.Get<UniversalResourceData>();
 
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt Output Blit", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Rtxpt Output Blit", out var passData);
 
             passData.BlitMaterial  = _blitMaterial;
             passData.Resources     = _resources;

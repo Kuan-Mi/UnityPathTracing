@@ -30,7 +30,7 @@ namespace PathTracing
     /// PIX markers mirror ToneMappingPasses.cpp: "Luminance" { draw, "MipMapGen::Dispatch" { mip
     /// dispatches }, capture, read-back copy } then "ToneMapping" { apply draw }.
     /// </summary>
-    public class NativeRtxptToneMappingMipChainPass : ScriptableRenderPass, IDisposable
+    public class RtxptToneMappingMipChainPass : ScriptableRenderPass, IDisposable
     {
         private const uint kR16F    = (uint)DXGI_FORMAT.DXGI_FORMAT_R16_FLOAT;
         private const uint kR32F    = (uint)DXGI_FORMAT.DXGI_FORMAT_R32_FLOAT;
@@ -89,11 +89,11 @@ namespace PathTracing
         private NriTextureResource _lumTex;
         private int  _lumW, _lumH, _mipCount;
 
-        private NativeRtxptPassContext _ctx;
+        private RtxptPassContext _ctx;
         private IntPtr                 _sourcePtr;
         private IntPtr                 _outputPtr;
 
-        public NativeRtxptToneMappingMipChainPass(
+        public RtxptToneMappingMipChainPass(
             NativeRasterShader  luminanceRasterShader,
             NativeComputeShader mipMapGenCs,
             NativeComputeShader captureCs,
@@ -127,7 +127,7 @@ namespace PathTracing
             _lumTex?.Release();
         }
 
-        public void Setup(NativeRtxptPassContext ctx, NriTextureResource source, NriTextureResource output)
+        public void Setup(RtxptPassContext ctx, NriTextureResource source, NriTextureResource output)
         {
             _ctx       = ctx;
             _sourcePtr = source.NativePtr;
@@ -174,7 +174,7 @@ namespace PathTracing
 
         // Scalar of m_ColorTransform (ToneMappingPasses.cpp:431-440). White-balance is identity here, so the
         // transform is k·I where k = exposureScale · manualExposureScale.
-        private static float ExposureScale(NativeRtxptSetting s)
+        private static float ExposureScale(RtxptSetting s)
         {
             float exposureScale       = Mathf.Pow(2f, s.exposureCompensation);
             float manualExposureScale = 1f;
@@ -196,7 +196,7 @@ namespace PathTracing
         /// ToneMappingPass::GetPreExposedGray reading avgLuminanceLastCaptured). Returns 1.0 when tone
         /// mapping is disabled — the neutral value the path tracer's firefly/DLSS clamps assume.
         /// </summary>
-        public float GetPreExposedGrayLuminance(NativeRtxptSetting s)
+        public float GetPreExposedGrayLuminance(RtxptSetting s)
         {
             if (!s.enableToneMapping) return 1.0f;
             float gray = 0.18f / ExposureScale(s);
@@ -206,7 +206,7 @@ namespace PathTracing
         }
 
         // Mirrors SetParameters / Update* and the CPU avgLuminance feed (exp2 of the read-back log2 value).
-        private static ToneMappingConstants BuildConstants(NativeRtxptSetting s, float avgLumLog2)
+        private static ToneMappingConstants BuildConstants(RtxptSetting s, float avgLumLog2)
         {
             bool auto = s.autoExposure;
             float k = ExposureScale(s);
@@ -291,7 +291,7 @@ namespace PathTracing
                 data.LumRaster.Draw(cmd, lds, in lumDraw);
 
                 // 2. mip reduction — donut MipMapGenPass::Dispatch replicated exactly (same scheme as
-                //    NativeRtxptEnvMapBakerPass.GenerateDonutMipChain): pass i reads mip i*NUM_LODS via
+                //    RtxptEnvMapBakerPass.GenerateDonutMipChain): pass i reads mip i*NUM_LODS via
                 //    the t_input SRV and writes mips i*NUM_LODS+1.. via the u_output UAV array, with the
                 //    base-mip group count for EVERY pass (donut over-dispatches; out-of-range UAV writes
                 //    are dropped). The native per-subresource barriers make the SRV-read-mip /

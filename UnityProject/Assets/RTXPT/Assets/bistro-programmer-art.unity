@@ -21639,7 +21639,7 @@ GameObject:
   - component: {fileID: 659424827}
   - component: {fileID: 659424826}
   m_Layer: 0
-  m_Name: NativeRtxptSettingGUI
+  m_Name: RtxptSettingGUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -21656,7 +21656,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1b4af3e5e4074f8e8c6e82e30d6c1c74, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: PathTracing.Rtxpt::PathTracing.NativeRtxptSettingGUI
+  m_EditorClassIdentifier: PathTracing.Rtxpt::PathTracing.RtxptSettingGUI
   toggleKey: 94
   mainLight: {fileID: 0}
 --- !u!4 &659424827

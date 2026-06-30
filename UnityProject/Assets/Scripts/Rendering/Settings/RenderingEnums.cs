@@ -185,10 +185,10 @@ namespace PathTracing
     }
 
     /// <summary>
-    /// Debug / display modes for <see cref="NativeRtxptFeature"/>'s
-    /// <see cref="NativeRtxptOutputBlitPass"/>.
+    /// Debug / display modes for <see cref="RtxptFeature"/>'s
+    /// <see cref="RtxptOutputBlitPass"/>.
     /// </summary>
-    public enum NativeRtxptShowMode
+    public enum RtxptShowMode
     {
         // ── Final outputs ──────────────────────────────────────────────────
         /// <summary>DLSS-RR denoised + upscaled output (realtime mode).</summary>
@@ -225,7 +225,7 @@ namespace PathTracing
         NEELightColor,
 
         /// <summary>First-hit surface debug visualisation driven by <see cref="RtxptDebugViewType"/>.
-        /// Displayed when <see cref="NativeRtxptSetting.debugViewType"/> is not Disabled.</summary>
+        /// Displayed when <see cref="RtxptSetting.debugViewType"/> is not Disabled.</summary>
         FirstHitDebugViz,
 
         // ── 环境光调试 ─────────────────────────────────────────────────────

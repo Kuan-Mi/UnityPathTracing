@@ -22,7 +22,7 @@ namespace PathTracing
     ///   5. ClearFeedbackHistory       — zero FeedbackTotalWeight + FeedbackCandidates
     ///                                   ready for the current frame's FillStablePlanes writes
     /// </summary>
-    public class NativeRtxptLightingUpdateEndPass : ScriptableRenderPass, IDisposable
+    public class RtxptLightingUpdateEndPass : ScriptableRenderPass, IDisposable
     {
         // ── 2D tile dispatch size (matches LLB_NUM_COMPUTE_THREADS_2D in NEEATBaker.hlsli) ─
         private const int Threads2D = 8;
@@ -49,11 +49,11 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _debugVizDs;
 
         // ── Per-frame state ────────────────────────────────────────────────────
-        private NativeRtxptPassContext _ctx;
+        private RtxptPassContext _ctx;
 
         // ── Constructor ────────────────────────────────────────────────────────
 
-        public NativeRtxptLightingUpdateEndPass(
+        public RtxptLightingUpdateEndPass(
             NativeComputeShader processFeedbackHistoryP1aCs,
             NativeComputeShader processFeedbackHistoryP1bCs,
             NativeComputeShader processFeedbackHistoryP2Cs,
@@ -98,7 +98,7 @@ namespace PathTracing
 
         // ── Setup ──────────────────────────────────────────────────────────────
 
-        public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
+        public void Setup(RtxptPassContext ctx) => _ctx = ctx;
 
         // ── Pass data ──────────────────────────────────────────────────────────
 
@@ -106,7 +106,7 @@ namespace PathTracing
         {
             internal NativeComputePipeline      P1aCs, P1bCs, P2Cs, P3Cs, ClearCs, DebugVizCs;
             internal NativeComputeDescriptorSet P1aDs, P1bDs, P2Ds, P3Ds, ClearDs, DebugVizDs;
-            internal NativeRtxptPassContext     Ctx;
+            internal RtxptPassContext     Ctx;
         }
 
         // ── RenderGraph ────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ namespace PathTracing
             // (begin pass sets ImportanceSamplingType = useNEE ? neeType : 0).
             var setting = ctx.Setting;
             bool neeAtEnabled = setting != null && setting.useNEE
-                                && setting.neeType == NativeRtxptNeeType.NEEAT;
+                                && setting.neeType == RtxptNeeType.NEEAT;
             if (!neeAtEnabled)
                 return;
 

@@ -7,9 +7,9 @@ using UnityEngine.Rendering;
 namespace PathTracing
 {
     /// <summary>
-    /// Per-frame data carrier shared by all NativeRtxpt compute / RT passes.
+    /// Per-frame data carrier shared by all Rtxpt compute / RT passes.
     ///
-    /// Created by <see cref="NativeRtxptFeature"/> once per camera per frame and
+    /// Created by <see cref="RtxptFeature"/> once per camera per frame and
     /// passed to each pass via <c>Setup(ctx)</c> before enqueueing.
     ///
     /// Binding layout follows <c>ShaderResourceBindings.hlsli</c>:
@@ -17,10 +17,10 @@ namespace PathTracing
     ///   b1  = g_MiniConst    (SampleMiniConstants — not yet used, reserved)
     ///   TLAS via GpuScene.AccelerationStructure
     /// </summary>
-    public class NativeRtxptPassContext
+    public class RtxptPassContext
     {
         // ── Constant buffers ──────────────────────────────────────────────────
-        /// <summary>g_Const (b0) — SampleConstants, built each frame by NativeRtxptConstantsBuilder.</summary>
+        /// <summary>g_Const (b0) — SampleConstants, built each frame by RtxptConstantsBuilder.</summary>
         public VolatileConstantBuffer ConstantBuffer;
 
         // ── Scene acceleration structure ──────────────────────────────────────
@@ -28,13 +28,13 @@ namespace PathTracing
 
         // ── GPU scene (bindless geometry / material arrays) ───────────────────
         /// <summary>Provides BindToShader() for bindless instance/geometry/material arrays.</summary>
-        public NativeRtxptGPUScene GpuScene;
+        public RtxptGPUScene GpuScene;
 
         // ── Texture pool (render-res) ─────────────────────────────────────────
-        public NativeRtxptTextureResources Textures;
+        public RtxptTextureResources Textures;
 
         // ── Buffer pool ───────────────────────────────────────────────────────
-        public NativeRtxptBufferResources Buffers;
+        public RtxptBufferResources Buffers;
 
         // ── Resolution ───────────────────────────────────────────────────────
         public int2 RenderResolution;
@@ -44,14 +44,14 @@ namespace PathTracing
         public RtxptCameraFrameState FrameState;
 
         // ── Inspector settings snapshot ───────────────────────────────────────
-        public NativeRtxptSetting Setting;
+        public RtxptSetting Setting;
 
         private Texture lastEnvironmentMap;
         public  IntPtr  environmentMapPtrPtr;
 
         // ── Shared scene light list ───────────────────────────────────────────
         /// <summary>
-        /// All scene lights, gathered once per frame by <see cref="NativeRtxptFeature"/> and shared
+        /// All scene lights, gathered once per frame by <see cref="RtxptFeature"/> and shared
         /// by the env-map baker (directional lights) and the lighting-update pass (point/spot lights),
         /// so the expensive full-scene query runs once per frame instead of once per pass.
         /// </summary>
@@ -94,7 +94,7 @@ namespace PathTracing
         public IntPtr DlssRrNormalRoughnessPtr;
         public IntPtr DlssRrOutputPtr;
 
-        // ── Baked env map (filled by NativeRtxptEnvMapBakerPass each frame) ─────
+        // ── Baked env map (filled by RtxptEnvMapBakerPass each frame) ─────
         /// <summary>Baked 256×256 cubemap mip0. Bound as t_EnvironmentMap (TextureCube).</summary>
         public IntPtr BakedEnvCubePtr;
 
@@ -136,7 +136,7 @@ namespace PathTracing
 
         /// <summary>
         /// Resolves all native IntPtrs from the texture pool.
-        /// Must be called on the main thread after <see cref="NativeRtxptTextureResources.EnsureResources"/> completes.
+        /// Must be called on the main thread after <see cref="RtxptTextureResources.EnsureResources"/> completes.
         /// </summary>
         public void ResolveNativePtrs()
         {
@@ -166,7 +166,7 @@ namespace PathTracing
             // Path tracer samples the BC6H-compressed cube when compression is enabled (mirrors the
             // original GetEnvMapCube() returning m_cubemapBC6H once m_outputIsCompressed). The
             // importance/radiance baker still reads the uncompressed RGBA16F cube directly.
-            BakedEnvCubePtr = (NativeRtxptEnvMapBakerPass.EnableBC6UCompression && Textures.EnvCubemapBC6H != IntPtr.Zero)
+            BakedEnvCubePtr = (RtxptEnvMapBakerPass.EnableBC6UCompression && Textures.EnvCubemapBC6H != IntPtr.Zero)
                 ? Textures.EnvCubemapBC6H
                 : Textures.EnvCubemap.NativePtr;
             EnvImportanceMapPtr            = Textures.EnvImportanceMap.NativePtr;

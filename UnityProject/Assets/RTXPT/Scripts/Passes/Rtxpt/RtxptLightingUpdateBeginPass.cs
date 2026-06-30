@@ -36,7 +36,7 @@ namespace PathTracing
     ///     16. CreateProxyJobs
     ///     17. ExecuteProxyJobs
     /// </summary>
-    public class NativeRtxptLightingUpdateBeginPass : ScriptableRenderPass, IDisposable
+    public class RtxptLightingUpdateBeginPass : ScriptableRenderPass, IDisposable
     {
         // ====================================================================
         // Constants
@@ -70,8 +70,8 @@ namespace PathTracing
         private const uint LLB_MAX_PROXIES_PER_TASK        = 32;
 
         private static readonly uint LLB_MAX_PROXY_PROC_TASKS =
-            (uint)NativeRtxptBufferResources.MaxLights +
-            ((uint)NativeRtxptBufferResources.ProxySamplingCount + LLB_MAX_PROXIES_PER_TASK - 1) / LLB_MAX_PROXIES_PER_TASK;
+            (uint)RtxptBufferResources.MaxLights +
+            ((uint)RtxptBufferResources.ProxySamplingCount + LLB_MAX_PROXIES_PER_TASK - 1) / LLB_MAX_PROXIES_PER_TASK;
 
         private const uint WeightsCountHalf = LightingConfig.RTXPT_LIGHTING_WEIGHTS_COUNT_HALF;
 
@@ -148,15 +148,15 @@ namespace PathTracing
         // ====================================================================
 
         private static readonly RtxptLightingControlData[]    s_controlStaging  = new RtxptLightingControlData[1];
-        private static          RtxptPolymorphicLightInfo[]   s_lightsStaging   = new RtxptPolymorphicLightInfo[NativeRtxptBufferResources.MaxLights];
-        private static          RtxptPolymorphicLightInfoEx[] s_lightsExStaging = new RtxptPolymorphicLightInfoEx[NativeRtxptBufferResources.MaxLights];
+        private static          RtxptPolymorphicLightInfo[]   s_lightsStaging   = new RtxptPolymorphicLightInfo[RtxptBufferResources.MaxLights];
+        private static          RtxptPolymorphicLightInfoEx[] s_lightsExStaging = new RtxptPolymorphicLightInfoEx[RtxptBufferResources.MaxLights];
 
         // Analytic-light history remap staging (mirrors LightsBaker.cpp scratch buffers).
         // Indexed by analytic-local index i; the corresponding global light slot is EnvQtTotalNodeCount+i.
         //   s_currentToPastStaging[i]      = previous-frame global index of light i (or INVALID).
         //   s_pastToCurrentStaging[j]      = current global index that maps onto current analytic slot j.
-        private static          uint[] s_currentToPastStaging = new uint[NativeRtxptBufferResources.MaxLights];
-        private static          uint[] s_pastToCurrentStaging = new uint[NativeRtxptBufferResources.MaxLights];
+        private static          uint[] s_currentToPastStaging = new uint[RtxptBufferResources.MaxLights];
+        private static          uint[] s_pastToCurrentStaging = new uint[RtxptBufferResources.MaxLights];
 
         // Env-quad-node placeholders for the [0..EnvQt) range, uploaded unconditionally every frame to
         // mirror LightsBaker::CollectEnvmapLightPlaceholders. The light/lightsEx structs are zeroed (the
@@ -188,7 +188,7 @@ namespace PathTracing
         // Per-frame state
         // ====================================================================
 
-        private NativeRtxptPassContext _ctx;
+        private RtxptPassContext _ctx;
         private int                    _analyticLightCount;
 
         // Cross-frame analytic-light history matching (mirrors C++ m_historyRemapAnalyticLightIndices +
@@ -232,7 +232,7 @@ namespace PathTracing
         // Constructor
         // ====================================================================
 
-        public NativeRtxptLightingUpdateBeginPass(
+        public RtxptLightingUpdateBeginPass(
             // EnvLightsBaker
             NativeComputeShader envLightsBackupPastCs,
             NativeComputeShader envLightsSubdivideBaseCs,
@@ -346,7 +346,7 @@ namespace PathTracing
         // Setup — main thread, called once per frame before RecordRenderGraph
         // ====================================================================
 
-        public void Setup(NativeRtxptPassContext ctx)
+        public void Setup(RtxptPassContext ctx)
         {
             _dbgFrameCounter++;
             _ctx = ctx;
@@ -433,7 +433,7 @@ namespace PathTracing
             internal bool                       RequestControlReadback;
 
             // --- Shared ---
-            internal NativeRtxptPassContext Ctx;
+            internal RtxptPassContext Ctx;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -442,7 +442,7 @@ namespace PathTracing
                 _computeProxyCountsCs == null || _computeProxyBaselineOffsetsCs == null ||
                 _createProxyJobsCs == null || _executeProxyJobsCs == null)
             {
-                Debug.LogWarning("[NativeRtxptLightingUpdateBeginPass] Required proxy-build shaders missing — pass skipped.");
+                Debug.LogWarning("[RtxptLightingUpdateBeginPass] Required proxy-build shaders missing — pass skipped.");
                 return;
             }
 
@@ -912,9 +912,9 @@ namespace PathTracing
                 foreach (var light in sceneLights)
                 {
                     if (light == null || !light.enabled) continue;
-                    if (count >= NativeRtxptBufferResources.MaxLights)
+                    if (count >= RtxptBufferResources.MaxLights)
                     {
-                        Debug.LogWarning("[NativeRtxptLightingUpdateBeginPass] MaxLights exceeded; some lights ignored.");
+                        Debug.LogWarning("[RtxptLightingUpdateBeginPass] MaxLights exceeded; some lights ignored.");
                         break;
                     }
 
@@ -1020,7 +1020,7 @@ namespace PathTracing
             var setting = _ctx.Setting;
             // Original (LightsBaker.cpp:1022): TemporalFeedbackRequired depends only on
             // ImportanceSamplingType == NEEAT, not on the global UseNEE toggle.
-            bool neeAtSelected      = setting != null && setting.neeType == NativeRtxptNeeType.NEEAT;
+            bool neeAtSelected      = setting != null && setting.neeType == RtxptNeeType.NEEAT;
             bool neeAtEnabled       = setting != null && setting.useNEE && neeAtSelected;
             if (!neeAtSelected)
                 _feedbackBufferFilled = false;
@@ -1038,7 +1038,7 @@ namespace PathTracing
             uint blendedH           = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
             // +1 border tile on each axis for the jitter offset (LightsBaker.cpp:340-341).
             // This is the LocalSamplingResolution used as the addressing stride — must match the
-            // LocalSamplingBuffer allocation (NativeRtxptBufferResources) and the P2/P3 dispatch dims.
+            // LocalSamplingBuffer allocation (RtxptBufferResources) and the P2/P3 dispatch dims.
             uint localW             = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE) + 1;
             uint localH             = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE) + 1;
             uint p0ThreadCount      = ((feedbackW + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
@@ -1129,10 +1129,10 @@ namespace PathTracing
                 InvTransformRow2 = new Vector4(0, 0, 1, 0),
                 // Original (Sample.cpp:1912): ColorMultiplier = TintColor * (Intensity / c_envMapRadianceScale).
                 // The divide cancels the constant compression scale baked into the cube
-                // (NativeRtxptEnvMapBakerPass.EnvMapRadianceScale), so net radiance = source * tint * intensity.
-                ColorMultiplierR = envTint.r * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
-                ColorMultiplierG = envTint.g * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
-                ColorMultiplierB = envTint.b * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
+                // (RtxptEnvMapBakerPass.EnvMapRadianceScale), so net radiance = source * tint * intensity.
+                ColorMultiplierR = envTint.r * envIntensity / RtxptEnvMapBakerPass.EnvMapRadianceScale,
+                ColorMultiplierG = envTint.g * envIntensity / RtxptEnvMapBakerPass.EnvMapRadianceScale,
+                ColorMultiplierB = envTint.b * envIntensity / RtxptEnvMapBakerPass.EnvMapRadianceScale,
                 Enabled          = envEnabled ? 1.0f : 0.0f,
             };
 

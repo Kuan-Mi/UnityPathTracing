@@ -11,7 +11,7 @@ using Object = UnityEngine.Object;
 
 namespace PathTracing
 {
-    public class NativeRtxptEnvMapBakerPass : ScriptableRenderPass, IDisposable
+    public class RtxptEnvMapBakerPass : ScriptableRenderPass, IDisposable
     {
         // Baked radiance cube resolution. Matches the original EnvMapBaker target for an
         // image/HDR background: 2048 (EnvMapBaker.cpp:375, non-procedural). The importance &
@@ -128,7 +128,7 @@ namespace PathTracing
         private static EnvMapBakerCB     s_envBakerCb;
         private static ImportanceBakerCB s_importanceCb;
 
-        private NativeRtxptPassContext _ctx;
+        private RtxptPassContext _ctx;
 
         // When true the env contents are identical to what is already baked into this camera's
         // cube/importance maps, so the whole bake (base layer + importance map + mip chains) is
@@ -139,7 +139,7 @@ namespace PathTracing
         // EnvMapBaker.cpp:429,712): when true the cache is bypassed and the bake runs every frame.
         public static bool DebugForceDynamic = false;
 
-        public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader mipReduceCs, NativeComputeShader importanceBakerCs, NativeComputeShader mipMapGenCs, NativeComputeShader bc6uCompressCs = null)
+        public RtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader mipReduceCs, NativeComputeShader importanceBakerCs, NativeComputeShader mipMapGenCs, NativeComputeShader bc6uCompressCs = null)
         {
             _baseLayerCs       = new NativeComputePipeline(baseLayerCs);
             _baseLayerDs       = new NativeComputeDescriptorSet(_baseLayerCs);
@@ -209,7 +209,7 @@ namespace PathTracing
         /// (<c>if (m_envMapBaker->Update(...)) m_ui.ResetAccumulation = true;</c>).
         /// Returns true when a bake will be recorded this frame.
         /// </summary>
-        public bool PrepareBake(NativeRtxptSetting setting, Light[] sceneLights, NativeRtxptTextureResources tex)
+        public bool PrepareBake(RtxptSetting setting, Light[] sceneLights, RtxptTextureResources tex)
         {
             FillEnvBakerConstants(setting, sceneLights);
 
@@ -235,7 +235,7 @@ namespace PathTracing
             return !_skipBake;
         }
 
-        public void Setup(NativeRtxptPassContext ctx)
+        public void Setup(RtxptPassContext ctx)
         {
             _ctx = ctx;
             FillImportanceBakerConstants();
@@ -502,7 +502,7 @@ namespace PathTracing
             }
         }
 
-        private static unsafe void FillEnvBakerConstants(NativeRtxptSetting setting, Light[] sceneLights)
+        private static unsafe void FillEnvBakerConstants(RtxptSetting setting, Light[] sceneLights)
         {
             s_envBakerCb = default;
             ref var cb = ref s_envBakerCb;
@@ -536,7 +536,7 @@ namespace PathTracing
 
             // Original (EnvMapBaker.cpp:480): ScaleColor is the constant radiance-compression
             // factor only. Tint/intensity are applied at sample time via ColorMultiplier
-            // (NativeRtxptLightingUpdateBeginPass), NOT baked in here. The fork baked tint*intensity
+            // (RtxptLightingUpdateBeginPass), NOT baked in here. The fork baked tint*intensity
             // here AND multiplied again at sample time, double-applying it (and dropping the BC6U
             // compression scale), so any non-1 intensity diverged from the original.
             cb.ScaleColorR           = EnvMapRadianceScale;
