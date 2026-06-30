@@ -1,6 +1,6 @@
 {
-    "name": "PathTracing.NrdSample",
-    "rootNamespace": "",
+    "name": "PathTracing.Runtime",
+    "rootNamespace": "PathTracing",
     "references": [
         "PathTracing.Core",
         "PathTracing.Streamline",
@@ -10,6 +10,7 @@
         "Unity.Mathematics",
         "Unity.Burst",
         "Unity.Collections",
+        "Unity.InputSystem",
         "NativeRayTracing.Runtime"
     ],
     "includePlatforms": [],

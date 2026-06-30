@@ -3,6 +3,8 @@
     "rootNamespace": "",
     "references": [
         "PathTracing.Core",
+        "PathTracing.Streamline",
+        "PathTracing.NriImageProcessing",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
         "Unity.Mathematics",

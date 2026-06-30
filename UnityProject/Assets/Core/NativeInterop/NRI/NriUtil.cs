@@ -1,5 +1,3 @@
-using PathTracing;
-using PathTracing.NativeInterop.NRD;
 using UnityEngine.Experimental.Rendering;
 
 namespace PathTracing.NativeInterop.NRI

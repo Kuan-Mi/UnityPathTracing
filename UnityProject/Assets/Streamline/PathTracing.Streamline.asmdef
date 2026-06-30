@@ -1,15 +1,14 @@
 {
-    "name": "PathTracing.NrdSample",
-    "rootNamespace": "",
+    "name": "PathTracing.Streamline",
+    "rootNamespace": "PathTracing",
     "references": [
         "PathTracing.Core",
-        "PathTracing.Streamline",
-        "PathTracing.NriImageProcessing",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
         "Unity.Mathematics",
         "Unity.Burst",
         "Unity.Collections",
+        "Unity.InputSystem",
         "NativeRayTracing.Runtime"
     ],
     "includePlatforms": [],
