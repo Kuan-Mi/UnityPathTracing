@@ -451,6 +451,10 @@ namespace PathTracing
                     new GUIContent("Temporarily disable DLSS-RR (Unity)", "Debug: skip the DLSS-RR dispatch and show the noisy input."),
                     s.tmpDisableDlssRR);
             }
+
+            s.FG = EditorGUILayout.Toggle(
+                new GUIContent("DLSS-G Frame Generation (SL)", "Enable Streamline DLSS-G frame generation in player builds. The editor present path ignores it."),
+                s.FG);
         }
 
         // ── Stable Planes (denoising layers) (SampleUI.cpp:1207) ──────────────

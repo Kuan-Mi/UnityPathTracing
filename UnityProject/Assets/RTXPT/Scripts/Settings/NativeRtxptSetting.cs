@@ -195,6 +195,9 @@ namespace PathTracing
         public float dlssrrBrightnessClampK  = 4096.0f;
         public float dlssrrMicroJitter       = 0.1f;
         public bool  tmpDisableDlssRR        = false;
+        [Tooltip("Enable DLSS-G Frame Generation through Streamline (SLDenoiser). Player-only " +
+                 "(present-path takeover; the editor ignores it).")]
+        public bool  FG                      = false;
 
         // ── Bloom ─────────────────────────────────────────────────────────────
         public bool  enableBloom     = true;

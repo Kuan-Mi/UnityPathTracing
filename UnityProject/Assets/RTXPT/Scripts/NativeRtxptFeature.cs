@@ -138,6 +138,8 @@ namespace PathTracing
         private NativeRtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
         private NativeRtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
         private SLDlssrrPass                          _dlssRRPass;
+        private SLDlssgInputsPass                     _slDlssgInputsPass;
+        private bool                                  _slFgLastEnabled;
         private NativeRtxptBloomPass                  _bloomPass;
         private NativeRtxptToneMappingMipChainPass    _toneMappingMipChainPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
@@ -227,6 +229,7 @@ namespace PathTracing
             _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs.asset) { renderPassEvent                                                                = renderPassEvent };
             _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs.asset) { renderPassEvent                                                                     = renderPassEvent };
             _dlssRRPass               ??= new SLDlssrrPass { renderPassEvent                                                                                                         = renderPassEvent };
+            _slDlssgInputsPass        ??= new SLDlssgInputsPass { renderPassEvent                                                                                                    = renderPassEvent };
             _bloomPass                ??= new NativeRtxptBloomPass(bloomDownsampleRasterShader.asset, bloomBlurRasterShader.asset, bloomCompositeRasterShader.asset) { renderPassEvent                 = renderPassEvent };
             _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader.asset, mipMapGenCs.asset, captureLuminanceCs.asset, toneMapApplyRasterShader.asset) { renderPassEvent = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs.asset) { renderPassEvent                                                                          = renderPassEvent };
@@ -498,6 +501,8 @@ namespace PathTracing
                 renderer.EnqueuePass(_accumulationPass);
             }
 
+            PushDlssgFrameInputs(renderer, cam, frameState, texPool, displayResolution, renderResolution, texturesChanged, effectiveSetting, eyeIndex);
+
             // ---- Phase Debug: StablePlanesDebugViz (only when a debug view is active) ----
             if (setting.debugViewType != RtxptDebugViewType.Disabled && stablePlanesDebugVizCs.asset != null)
             {
@@ -534,6 +539,94 @@ namespace PathTracing
         }
 
         // ---- Helpers -------------------------------------------------------
+
+        private void PushDlssgFrameInputs(ScriptableRenderer renderer, Camera cam, RtxptCameraFrameState frameState,
+                                          NativeRtxptTextureResources texPool, int2 displayResolution, int2 renderResolution,
+                                          bool texturesChanged, NativeRtxptSetting effectiveSetting, int eyeIndex)
+        {
+            if (eyeIndex != 0)
+                return;
+
+            bool enableFg = effectiveSetting.FG && effectiveSetting.realtimeMode;
+            if (enableFg != _slFgLastEnabled)
+            {
+                SLDlssg.SetFrameGeneration(enableFg);
+                _slFgLastEnabled = enableFg;
+            }
+
+            if (!enableFg)
+                return;
+
+            var fgEventFunc = SLDlssg.GetFrameInputsEventFunc();
+            if (fgEventFunc == IntPtr.Zero)
+                return;
+
+            if (texPool?.Depth == null || texPool.ScreenMotionVectors == null)
+                return;
+
+            var depthPtr = texPool.Depth.NativePtr;
+            var mvPtr    = texPool.ScreenMotionVectors.NativePtr;
+            if (depthPtr == IntPtr.Zero || mvPtr == IntPtr.Zero)
+                return;
+
+            Matrix4x4 viewToWorld        = frameState.worldToView.inverse;
+            Matrix4x4 clipToCameraView   = frameState.viewToClip.inverse;
+            Matrix4x4 worldToClipInv     = frameState.worldToClip.inverse;
+            Matrix4x4 prevWorldToClipInv = frameState.prevWorldToClip.inverse;
+            Matrix4x4 clipToPrevClip     = frameState.prevWorldToClip * worldToClipInv;
+            Matrix4x4 prevClipToClip     = frameState.worldToClip * prevWorldToClipInv;
+
+            var camRight =  new Vector3(viewToWorld.m00, viewToWorld.m10, viewToWorld.m20);
+            var camUp    =  new Vector3(viewToWorld.m01, viewToWorld.m11, viewToWorld.m21);
+            var camFwd   = -new Vector3(viewToWorld.m02, viewToWorld.m12, viewToWorld.m22);
+
+            float renderW = math.max(1, renderResolution.x);
+            float renderH = math.max(1, renderResolution.y);
+
+            var fg = new SLDlssg.FrameInputs
+            {
+                depth         = depthPtr,
+                motionVectors = mvPtr,
+                frameToken    = SLStreamlineFrameLoop.CurrentFrameTokenPtr,
+
+                depthState = SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
+                mvecState  = SLDlssg.D3D12_STATE_UNORDERED_ACCESS,
+
+                mvecDepthW = (uint)renderResolution.x,
+                mvecDepthH = (uint)renderResolution.y,
+                colorW     = (uint)displayResolution.x,
+                colorH     = (uint)displayResolution.y,
+
+                cameraViewToClip = frameState.viewToClip,
+                clipToCameraView = clipToCameraView,
+                clipToPrevClip   = clipToPrevClip,
+                prevClipToClip   = prevClipToClip,
+
+                cameraPos   = new Vector3(frameState.camPos.x, frameState.camPos.y, frameState.camPos.z),
+                cameraUp    = camUp,
+                cameraRight = camRight,
+                cameraFwd   = camFwd,
+
+                jitterX    = frameState.viewportJitter.x,
+                jitterY    = frameState.viewportJitter.y,
+                mvecScaleX = 1.0f / renderW,
+                mvecScaleY = 1.0f / renderH,
+
+                cameraNear   = cam.nearClipPlane,
+                cameraFar    = cam.farClipPlane,
+                cameraFOV    = cam.fieldOfView * Mathf.Deg2Rad,
+                cameraAspect = cam.aspect,
+
+                depthInverted        = 1,
+                cameraMotionIncluded = 1,
+                motionVectors3D      = 0,
+                reset                = (texturesChanged || frameState.frameIndex < 2) ? 1 : 0,
+            };
+
+            var fgPtr = SLDlssg.GetInteropDataPtr(fg, frameState.frameIndex);
+            _slDlssgInputsPass.Setup(fgEventFunc, fgPtr);
+            renderer.EnqueuePass(_slDlssgInputsPass);
+        }
 
         // Resolves a serialized array of lazy hit-group references to the concrete assets the
         // RT passes expect, loading each on demand. Returns null for an unset array.
@@ -600,6 +693,7 @@ namespace PathTracing
             _denoisingGuidesBakePass = null;
             _dlssRrPrepareInputsPass?.Dispose();
             _dlssRrPrepareInputsPass = null;
+            _slDlssgInputsPass = null;
             _bloomPass?.Dispose();
             _bloomPass = null;
             _toneMappingMipChainPass?.Dispose();
