@@ -12,8 +12,13 @@ namespace PathTracing
     /// (<see cref="TextureImporterType.NormalMap"/>). Mismatches are reported and, when fixing, the
     /// importer type is corrected and the texture re-imported.
     ///
-    /// The original RTXPT normal import mode keeps those same normal textures as Default, linear,
-    /// unconverted, uncompressed textures, matching the reference shader's raw normal decode path.
+    /// The original RTXPT normal import mode keeps those same normal (DDNA) textures as Default,
+    /// linear, unconverted textures, matching the reference shader's raw normal decode path, and
+    /// BC7-compressed to match the original RTXPT asset format. (They were previously imported
+    /// Uncompressed — at 2048² RGBA that is 32 bpp vs BC7's 8 bpp, and since the path-tracer
+    /// ClosestHit samples them incoherently, the extra bandwidth/cache footprint measurably slowed
+    /// the divergent PathTrace pass. BC7 keeps all four packed channels, so the raw decode is
+    /// unaffected.)
     ///
     /// A second pair of menu items does the same for the
     /// <see cref="RtxptMaterial.OcclusionRoughnessMetallicTexture"/> slot's colour space: RTXPT loads
@@ -27,7 +32,9 @@ namespace PathTracing
     /// </summary>
     public static class RtxptNormalMapFixer
     {
-        private const TextureImporterCompression OriginalNormalTextureCompression = TextureImporterCompression.Uncompressed;
+        // BC7 (via CompressedHQ on desktop): 4-channel, high-quality, 8 bpp — matches the original
+        // RTXPT BC7_UNORM asset format and keeps the packed DDNA channels intact for the raw decode.
+        private const TextureImporterCompression OriginalNormalTextureCompression = TextureImporterCompression.CompressedHQ;
 
         [MenuItem("RTXPT/Validate Normal Map Texture Types…")]
         private static void Validate() => Run(fix: false);
@@ -176,10 +183,11 @@ namespace PathTracing
 
                     if (fix)
                     {
-                        importer.textureType        = TextureImporterType.Default;
-                        importer.sRGBTexture        = false;
-                        importer.convertToNormalmap = false;
-                        importer.textureCompression = OriginalNormalTextureCompression;
+                        importer.textureType         = TextureImporterType.Default;
+                        importer.sRGBTexture         = false;
+                        importer.convertToNormalmap  = false;
+                        importer.textureCompression  = OriginalNormalTextureCompression;
+                        importer.crunchedCompression = false; // plain BC7, matching RTXPT's BC7_UNORM
                         importer.SaveAndReimport();
                         fixedCount++;
                     }
@@ -218,15 +226,17 @@ namespace PathTracing
             return importer.textureType == TextureImporterType.Default
                    && !importer.sRGBTexture
                    && !importer.convertToNormalmap
+                   && !importer.crunchedCompression
                    && importer.textureCompression == OriginalNormalTextureCompression;
         }
 
         private static string DescribeOriginalNormalImport(TextureImporter importer)
         {
-            return "expected Default/linear/raw; "
+            return "expected Default/linear/BC7; "
                    + $"type {importer.textureType} → {TextureImporterType.Default}, "
                    + $"sRGB {importer.sRGBTexture} → False, "
                    + $"convertToNormalmap {importer.convertToNormalmap} → False, "
+                   + $"crunched {importer.crunchedCompression} → False, "
                    + $"compression {importer.textureCompression} → {OriginalNormalTextureCompression}";
         }
 
