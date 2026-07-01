@@ -22,6 +22,7 @@ namespace NativeRender
         private ulong               _handle;
         private RayTraceShader      _shader;
         private HitGroupShader[]    _hitGroupShaders; // null when not using multi-blob path
+        private bool[]              _hitGroupAnyHit;
         private RootConstantsHint[] _rootConstantsHints;
         private string[]            _rootSRVHints;
         private SamplerHint[]       _samplerHints;
@@ -116,7 +117,8 @@ namespace NativeRender
             RayTraceShader primaryShader,
             HitGroupShader[] hitGroupShaders,
             RootConstantsHint[] rootConstantsHints,
-            string[] rootSRVHints = null)
+            string[] rootSRVHints = null,
+            bool[] hitGroupAnyHit = null)
         {
             if (primaryShader == null)
                 throw new ArgumentNullException(nameof(primaryShader));
@@ -126,6 +128,7 @@ namespace NativeRender
 
             _shader             = primaryShader;
             _hitGroupShaders    = hitGroupShaders;
+            _hitGroupAnyHit     = hitGroupAnyHit;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
             _samplerHints       = primaryShader.ResolveSamplerHints();
@@ -194,7 +197,7 @@ namespace NativeRender
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
-                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
+                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _hitGroupAnyHit);
                 _handle = hintsJson != null
                     ? NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
                         ptrs, sizes, (uint)totalBlobs,
@@ -235,12 +238,13 @@ namespace NativeRender
         }
 
         private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-            SamplerHint[] samplerHints)
+            SamplerHint[] samplerHints, bool[] hitGroupAnyHit = null)
         {
             bool hasRC   = rcHints != null && rcHints.Length > 0;
             bool hasSRV  = srvHints != null && srvHints.Length > 0;
             bool hasSamp = SamplerHintJson.Has(samplerHints);
-            if (!hasRC && !hasSRV && !hasSamp) return null;
+            bool hasHgAH = hitGroupAnyHit != null && hitGroupAnyHit.Length > 0;
+            if (!hasRC && !hasSRV && !hasSamp && !hasHgAH) return null;
 
             var sb = new System.Text.StringBuilder();
             sb.Append('{');
@@ -283,6 +287,19 @@ namespace NativeRender
             {
                 if (any) sb.Append(',');
                 SamplerHintJson.Append(sb, samplerHints);
+                any = true;
+            }
+
+            if (hasHgAH)
+            {
+                if (any) sb.Append(',');
+                sb.Append("\"hitGroupAnyHit\":[");
+                for (int i = 0; i < hitGroupAnyHit.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append(hitGroupAnyHit[i] ? "true" : "false");
+                }
+                sb.Append(']');
             }
 
             sb.Append('}');

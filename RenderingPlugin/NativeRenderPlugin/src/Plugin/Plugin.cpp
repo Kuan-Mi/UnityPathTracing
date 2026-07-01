@@ -12,9 +12,11 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <list>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "IUnityInterface.h"
 #include "IUnityGraphics.h"
@@ -1827,6 +1829,44 @@ static void ApplySamplerHints(ShaderBase* shader, const char* hintsJson)
     }
 }
 
+// Parses "hitGroupAnyHit":[true,false,...] from hints JSON. Entry i applies to
+// hit-group blob i, i.e. native blob[i + 1]. Missing entries keep default true.
+static void ApplyHitGroupAnyHitHints(std::vector<RayTraceShader::BlobDesc>& descs, const char* hintsJson)
+{
+    if (!hintsJson || hintsJson[0] == '\0' || descs.size() <= 1) return;
+    const char* tag = strstr(hintsJson, "\"hitGroupAnyHit\"");
+    if (!tag) return;
+    const char* arrStart = strchr(tag + 16, '[');
+    if (!arrStart) return;
+    const char* arrEnd = strchr(arrStart, ']');
+    if (!arrEnd) return;
+
+    const char* p = arrStart + 1;
+    uint32_t hitGroupIndex = 0;
+    while (p < arrEnd && (hitGroupIndex + 1) < descs.size())
+    {
+        while (p < arrEnd && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' || *p == ',')) ++p;
+        if (p >= arrEnd) break;
+
+        if (_strnicmp(p, "true", 4) == 0)
+        {
+            descs[hitGroupIndex + 1].attachAnyHit = true;
+            p += 4;
+            ++hitGroupIndex;
+        }
+        else if (_strnicmp(p, "false", 5) == 0)
+        {
+            descs[hitGroupIndex + 1].attachAnyHit = false;
+            p += 5;
+            ++hitGroupIndex;
+        }
+        else
+        {
+            ++p;
+        }
+    }
+}
+
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateRayTraceShaderFromBytesEx(
     const uint8_t* dxilBytes,
@@ -1902,6 +1942,7 @@ NR_CreateRayTracePipelineFromBlobsEx(
     std::vector<RayTraceShader::BlobDesc> descs(blobCount);
     for (uint32_t i = 0; i < blobCount; ++i)
         descs[i] = { blobDataPtrs[i], blobSizes[i] };
+    ApplyHitGroupAnyHitHints(descs, hintsJson);
 
     auto* shader = new RayTraceShader();
     if (!shader->Initialize(dev5, s_Log, s_D3D12v8))

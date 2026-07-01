@@ -30,6 +30,10 @@ namespace PathTracing
             new RootConstantsHint { Name = "g_MiniConst", Count = 16 }
         };
 
+        // Static-scene RTXPT parity: HitGroup_0 (Mesh) is opaque and must not wire
+        // AnyHit; HitGroup_1 (black) keeps AnyHit like the original PTPipelineBaker.
+        private static readonly bool[] StaticSceneHitGroupAnyHit = { false, true };
+
         /// <summary>Pipeline handle exposed for RtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline BuildPipeline => _buildSP;
 
@@ -38,7 +42,8 @@ namespace PathTracing
             HitGroupShader[] buildHitGroups = null)
         {
             _buildSP = buildHitGroups is { Length: > 0 }
-                ? new RayTracePipeline(buildStablePlanes, buildHitGroups, MiniConstRootConstantsHints)
+                ? new RayTracePipeline(buildStablePlanes, buildHitGroups, MiniConstRootConstantsHints,
+                    hitGroupAnyHit: StaticSceneHitGroupAnyHit)
                 : new RayTracePipeline(buildStablePlanes, MiniConstRootConstantsHints);
             _buildDs = new NativeRayTraceDescriptorSet(_buildSP);
         }

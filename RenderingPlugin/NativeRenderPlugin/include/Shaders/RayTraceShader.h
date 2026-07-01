@@ -42,7 +42,12 @@ public:
     // blobs[0]        : raygen + miss shaders
     // blobs[1..N-1]   : additional hit-group blobs
     // Each blob is reflected independently; bindings are de-duplicated across blobs.
-    struct BlobDesc { const uint8_t* data; uint32_t size; };
+    struct BlobDesc
+    {
+        const uint8_t* data;
+        uint32_t       size;
+        bool           attachAnyHit = true;
+    };
     bool LoadShaderFromMultipleBlobs(const BlobDesc* blobs, uint32_t blobCount,
                                      const char* name = nullptr,
                                      uint32_t flags = 0,
@@ -104,6 +109,7 @@ public:
     std::unordered_map<std::wstring, size_t> m_hitGroupIndex;  // groupKey → index
 
     bool     m_allowOpacityMicromaps = false;
+    bool     m_attachAnyHitForCurrentBlob = true;
     uint32_t m_maxPayloadSizeInBytes = 4;
     // Actual number of entries in m_hitGroupTable.
     // Initialized to m_hitGroups.size() by BuildShaderTable();

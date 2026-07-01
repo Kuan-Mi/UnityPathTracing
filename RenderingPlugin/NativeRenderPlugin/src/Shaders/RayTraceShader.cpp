@@ -650,6 +650,13 @@ bool RayTraceShader::ReflectBindingsFromBlob(IDxcBlob* shaderLib)
         {
             std::wstring groupKey;
             if (!TryStrip(L"AnyHit", groupKey)) groupKey = nameW;
+            if (!m_attachAnyHitForCurrentBlob)
+            {
+                Logf(kUnityLogTypeLog,
+                     "RayTraceShader (extra blob): skipping AnyHit '%s' by managed hit-group policy",
+                     realName.c_str());
+                continue;
+            }
             std::wstring groupExport = groupKey.empty() ? L"HitGroup" : L"HitGroup_" + groupKey;
             auto it = m_hitGroupIndex.find(groupKey);
             if (it == m_hitGroupIndex.end())
@@ -879,6 +886,7 @@ bool RayTraceShader::LoadShaderFromMultipleBlobs(const BlobDesc* blobs, uint32_t
     }
 
     // Reflect blob[0] fully (resets + populates all state)
+    m_attachAnyHitForCurrentBlob = true;
     if (!ReflectBindings(libs[0].Get())) return false;
 
     // Reflect blobs[1..N] — merges hit groups + bindings without resetting
@@ -886,8 +894,10 @@ bool RayTraceShader::LoadShaderFromMultipleBlobs(const BlobDesc* blobs, uint32_t
     {
         Logf(kUnityLogTypeLog,
              "RayTraceShader::LoadShaderFromMultipleBlobs: reflecting extra blob[%u]", i);
+        m_attachAnyHitForCurrentBlob = blobs[i].attachAnyHit;
         if (!ReflectBindingsFromBlob(libs[i].Get())) return false;
     }
+    m_attachAnyHitForCurrentBlob = true;
 
     // Keep merged hit groups in blob order. The managed RayTracePipeline passes hit-group blobs
     // in the same order as the per-geometry variant indices used by RebuildHitGroupTable(); assign
