@@ -1,0 +1,4 @@
+// Opaque emissive/proxy hit group for Reference.
+// Produces ClosestHit_REF_0_OpaqueEmissive only; no AnyHit.
+
+#include "PathTracerMaterialClosestOnly.hlsl"

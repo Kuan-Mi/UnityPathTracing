@@ -1,0 +1,4 @@
+// Opaque emissive/proxy hit group for FillStablePlanes.
+// Produces ClosestHit_FILL_0_OpaqueEmissive only; no AnyHit.
+
+#include "PathTracerMaterialClosestOnly.hlsl"

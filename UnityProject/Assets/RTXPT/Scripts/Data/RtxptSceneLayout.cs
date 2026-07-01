@@ -39,9 +39,11 @@ namespace PathTracing
         public NativeRenderPlugin.SubmeshDesc[] Descs;
 
         /// <summary>
-        /// Hit-group variant: 0 = emissive (HitEmissive), 1 = non-emissive. Analytic-light-proxy
-        /// materials use variant 0 — the proxy NEE branch is compiled out of the non-emissive
-        /// variant (RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0).
+        /// Hit-group variant in shader-table order:
+        /// 0 = opaque emissive/proxy, 1 = opaque non-emissive,
+        /// 2 = alpha/custom emissive/proxy, 3 = alpha/custom non-emissive.
+        /// Analytic-light-proxy materials use the emissive/proxy branch — the proxy NEE path is
+        /// compiled out of the non-emissive variant (RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0).
         /// </summary>
         public uint HitGroupVariant;
 
@@ -62,6 +64,8 @@ namespace PathTracing
     /// </summary>
     internal static class RtxptSceneLayout
     {
+        private static readonly HashSet<string> s_StaticParityWarnings = new();
+
         public static List<RtxptInstanceRecord> Build(IReadOnlyList<RtxptRenderer> targets)
         {
             var records = new List<RtxptInstanceRecord>(targets.Count);
@@ -146,7 +150,7 @@ namespace PathTracing
                         GroupIndex      = gi,
                         SubmeshIndices  = submeshIdx.ToArray(),
                         Descs           = descArray,
-                        HitGroupVariant = (grp.isEmissive || grp.isAnalyticProxy) ? 0u : 1u,
+                        HitGroupVariant = ComputeHitGroupVariant(t, grp, descArray),
                         ContentHash     = HashRegistration(mesh.GetInstanceID(), descArray, skinned),
                     });
                 }
@@ -158,6 +162,144 @@ namespace PathTracing
         /// <summary>True when the renderer has a pre-baked RtxptMaterial for the given sub-mesh.</summary>
         public static bool SubmeshHasMaterial(RtxptRenderer rr, int subMesh)
             => rr != null && subMesh < rr.Slots.Count && rr.Slots[subMesh] != null;
+
+        private static uint ComputeHitGroupVariant(RtxptRenderer renderer, RtxptSubmeshGroup grp, NativeRenderPlugin.SubmeshDesc[] descs)
+        {
+            if (TryGetHardcodedRtxptMaterialVariant(renderer, grp, out uint materialVariant))
+                return materialVariant;
+
+            return ComputeStaticParityFallbackVariant(renderer, grp, descs);
+        }
+
+        private static bool TryGetHardcodedRtxptMaterialVariant(RtxptRenderer renderer, RtxptSubmeshGroup grp, out uint variant)
+        {
+            // Static-scene RTXPT parity mode. These indices must match the hit-group blob order
+            // supplied by RtxptFeature.AutoFillShaders:
+            //   0 = LMBR0000040black_eae3d639
+            //   1 = LMBR0000002Mesh_b12400a3
+            // The string normalization accepts both RTXPT names (LMBR0000040black...) and Unity
+            // asset names (bistro.LMBR_0000040_black_metal).
+            variant = 0;
+            if (renderer?.Slots == null || grp?.submeshIndices == null) return false;
+
+            bool sawBlack = false;
+            bool sawMesh  = false;
+            foreach (int submesh in grp.submeshIndices)
+            {
+                if (submesh < 0 || submesh >= renderer.Slots.Count) continue;
+                var mat = renderer.Slots[submesh];
+                if (mat == null) continue;
+
+                string name = NormalizeMaterialName(mat.name);
+                if (name.Contains("lmbr0000040black"))
+                    sawBlack = true;
+                if (name.Contains("lmbr0000002mesh"))
+                    sawMesh = true;
+            }
+
+            if (sawBlack && !sawMesh)
+            {
+                variant = 0u;
+                return true;
+            }
+
+            if (sawMesh && !sawBlack)
+            {
+                variant = 1u;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string NormalizeMaterialName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return string.Empty;
+            return name
+                .Replace("_", "")
+                .Replace("-", "")
+                .Replace(".", "")
+                .Replace(" ", "")
+                .ToLowerInvariant();
+        }
+
+        private static uint ComputeFallbackHitGroupVariant(RtxptSubmeshGroup grp, NativeRenderPlugin.SubmeshDesc[] descs)
+        {
+            bool customHit = grp.isAlphaClip;
+            if (!customHit)
+            {
+                foreach (var d in descs)
+                {
+                    if ((d.flags & NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE) == 0)
+                    {
+                        customHit = true;
+                        break;
+                    }
+                }
+            }
+
+            bool emissiveOrProxy = grp.isEmissive || grp.isAnalyticProxy;
+            if (customHit)
+                return emissiveOrProxy ? 2u : 3u;
+            return emissiveOrProxy ? 0u : 1u;
+        }
+
+        private static uint ComputeStaticParityFallbackVariant(RtxptRenderer renderer, RtxptSubmeshGroup grp, NativeRenderPlugin.SubmeshDesc[] descs)
+        {
+            uint legacyVariant = ComputeFallbackHitGroupVariant(grp, descs);
+            // Static parity mode currently bakes exactly two RTXPT material hit groups:
+            //   0 = LMBR0000040black_eae3d639
+            //   1 = LMBR0000002Mesh_b12400a3
+            // Keep any unrecognized/legacy material within that table so packaged builds do
+            // not request the removed legacy variants 2/3.
+            uint fallbackVariant = legacyVariant == 1u ? 1u : 0u;
+            string reason = legacyVariant > 1u
+                ? $"material is not one of the two hard-coded RTXPT parity materials and legacy hit-group variant {legacyVariant} requires a shader not present in the two-entry parity table"
+                : "material is not one of the two hard-coded RTXPT parity materials";
+            LogStaticParityMaterialWarning(renderer, grp, reason, fallbackVariant);
+
+            return fallbackVariant;
+        }
+
+        private static void LogStaticParityMaterialWarning(RtxptRenderer renderer, RtxptSubmeshGroup grp, string reason, uint fallbackVariant)
+        {
+            string rendererName = renderer != null ? renderer.name : "<null renderer>";
+            string groupInfo = FormatGroupInfo(grp);
+            string submeshInfo = FormatSubmeshMaterials(renderer, grp);
+            string key = $"{rendererName}|{groupInfo}|{submeshInfo}|{reason}";
+            if (!s_StaticParityWarnings.Add(key))
+                return;
+
+            Debug.LogError(
+                $"[RtxptSceneLayout] Static RTXPT parity mode only has hit groups 0/1 " +
+                $"(0=LMBR0000040black_eae3d639, 1=LMBR0000002Mesh_b12400a3), but renderer '{rendererName}' {groupInfo} {reason}. " +
+                $"Using fallback variant {fallbackVariant} to avoid an out-of-range shader table. Submeshes/materials: {submeshInfo}");
+        }
+
+        private static string FormatGroupInfo(RtxptSubmeshGroup grp)
+        {
+            if (grp == null)
+                return "group=<null>";
+
+            return $"groupFlags=(alphaClip={grp.isAlphaClip}, emissive={grp.isEmissive}, analyticProxy={grp.isAnalyticProxy})";
+        }
+
+        private static string FormatSubmeshMaterials(RtxptRenderer renderer, RtxptSubmeshGroup grp)
+        {
+            if (renderer?.Slots == null || grp?.submeshIndices == null)
+                return "<unavailable>";
+
+            var parts = new List<string>(grp.submeshIndices.Length);
+            foreach (int submesh in grp.submeshIndices)
+            {
+                string matName = "<missing>";
+                if (submesh >= 0 && submesh < renderer.Slots.Count && renderer.Slots[submesh] != null)
+                    matName = renderer.Slots[submesh].name;
+                parts.Add($"{submesh}:{matName}");
+            }
+
+            return string.Join(", ", parts);
+        }
 
         /// <summary>
         /// World transform for a record's TLAS instance. GPU-skinned vertices are in the root

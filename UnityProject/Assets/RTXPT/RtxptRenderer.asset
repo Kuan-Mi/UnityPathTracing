@@ -134,14 +134,14 @@ MonoBehaviour:
   fillStablePlanesShader: {fileID: -6676421132958364438, guid: fd6d33330a3e97e43ac449908a5fe035, type: 3}
   referenceShader: {fileID: -6676421132958364438, guid: ff675002877a45d4497da9c6e89e523e, type: 3}
   buildHitGroups:
-  - {fileID: 4618623340242925623, guid: f2211fa4e496d5a4a82f6b4a069cdc08, type: 3}
   - {fileID: 4618623340242925623, guid: e551595081865004ab6865917eb81087, type: 3}
+  - {fileID: 4618623340242925623, guid: a0010000000000000000000000000002, type: 3}
   fillHitGroups:
-  - {fileID: 4618623340242925623, guid: 6cc389b3a4b4e18409f4bbfd0ff031cb, type: 3}
-  - {fileID: 4618623340242925623, guid: 16aa14aa3cecec342b1af1dd46e0da99, type: 3}
+  - {fileID: 4618623340242925623, guid: b0010000000000000000000000000001, type: 3}
+  - {fileID: 4618623340242925623, guid: a0010000000000000000000000000004, type: 3}
   referenceHitGroups:
-  - {fileID: 4618623340242925623, guid: 8e4d55a9917144e49992d45946efcf15, type: 3}
   - {fileID: 4618623340242925623, guid: f268b9294a8fe9e4b94e7397da4786b6, type: 3}
+  - {fileID: 4618623340242925623, guid: a0010000000000000000000000000006, type: 3}
   skinnedRepackCs: {fileID: 7200000, guid: 08b45cae9272aad49975cb4b08980396, type: 3}
   exportVisibilityBufferCs: {fileID: -2368575503658470205, guid: 1ff1244216fcd31478566758afd6b1ff, type: 3}
   denoiseSpecHitTCs: {fileID: -2368575503658470205, guid: abb4162c8ba2cd041955d93cefb0143e, type: 3}

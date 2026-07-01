@@ -24,10 +24,10 @@ void RayTraceDescriptorSet::Dispatch(
     BindRootParams(cmdList, slots, slotCount, srvBase, uavBase);
 
     // DispatchRays
-    const UINT stride = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;
+    const UINT stride = 64;
     D3D12_DISPATCH_RAYS_DESC drd = {};
     drd.RayGenerationShaderRecord.StartAddress = m_shader->GetRayGenTable()->GetGPUVirtualAddress();
-    drd.RayGenerationShaderRecord.SizeInBytes  = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    drd.RayGenerationShaderRecord.SizeInBytes  = stride;
     drd.MissShaderTable.StartAddress           = m_shader->GetMissTable()->GetGPUVirtualAddress();
     drd.MissShaderTable.SizeInBytes            = stride * m_shader->GetMissCount();
     drd.MissShaderTable.StrideInBytes          = stride;

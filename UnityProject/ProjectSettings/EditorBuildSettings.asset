@@ -5,7 +5,7 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
+  - enabled: 1
     path: Assets/RTXPT/Assets/bistro.unity
     guid: 282167b52b099884698419ebc09f0555
   - enabled: 0
@@ -14,7 +14,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/RTXPT/Assets/transparent-machines.unity
     guid: b47e9c043d27f844e8f3b92f7f727614
-  - enabled: 1
+  - enabled: 0
     path: Assets/RTXPT/Assets/bistro-programmer-art.unity
     guid: e62505b00b0c9bf46b07ce9268ad9996
   - enabled: 0

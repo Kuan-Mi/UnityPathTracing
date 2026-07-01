@@ -12,6 +12,9 @@ namespace PathTracing
     /// (<see cref="TextureImporterType.NormalMap"/>). Mismatches are reported and, when fixing, the
     /// importer type is corrected and the texture re-imported.
     ///
+    /// The original RTXPT normal import mode keeps those same normal textures as Default, linear,
+    /// unconverted, uncompressed textures, matching the reference shader's raw normal decode path.
+    ///
     /// A second pair of menu items does the same for the
     /// <see cref="RtxptMaterial.OcclusionRoughnessMetallicTexture"/> slot's colour space: RTXPT loads
     /// the metal-rough texture as <b>linear</b> (so the path tracer reads roughness from the raw
@@ -24,11 +27,19 @@ namespace PathTracing
     /// </summary>
     public static class RtxptNormalMapFixer
     {
+        private const TextureImporterCompression OriginalNormalTextureCompression = TextureImporterCompression.Uncompressed;
+
         [MenuItem("RTXPT/Validate Normal Map Texture Types…")]
         private static void Validate() => Run(fix: false);
 
         [MenuItem("RTXPT/Fix Normal Map Texture Types")]
         private static void Fix() => Run(fix: true);
+
+        [MenuItem("RTXPT/Validate Original RTXPT Normal Texture Import…")]
+        private static void ValidateOriginalNormalImport() => RunOriginalNormalImport(fix: false);
+
+        [MenuItem("RTXPT/Fix Original RTXPT Normal Texture Import")]
+        private static void FixOriginalNormalImport() => RunOriginalNormalImport(fix: true);
 
         [MenuItem("RTXPT/Validate Metal-Rough Texture Color Space…")]
         private static void ValidateOrm() => RunOrm(fix: false);
@@ -112,6 +123,105 @@ namespace PathTracing
                     : $"Scanned {checkedPaths.Count} unique normal maps.\n" +
                       $"{wrong.Count} not set to Normal Map, {okCount} correct.\n\nSee Console for details.",
                 "OK");
+        }
+
+        private static void RunOriginalNormalImport(bool fix)
+        {
+            string[] guids = AssetDatabase.FindAssets("t:RtxptMaterial");
+
+            // The original RTXPT shader samples normal textures as raw linear texture data and
+            // performs its own xy/z reconstruction. Unity's NormalMap importer can repack channels,
+            // so this mode intentionally keeps the texture as a plain linear texture.
+            var checkedPaths    = new HashSet<string>();
+            var wrong           = new List<string>(); // "<texPath>  (...)"
+            int fixedCount      = 0;
+            int okCount         = 0;
+            int missingImporter = 0;
+
+            try
+            {
+                for (int i = 0; i < guids.Length; i++)
+                {
+                    string matPath = AssetDatabase.GUIDToAssetPath(guids[i]);
+                    var    mat     = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(matPath);
+                    if (mat == null || mat.NormalTexture == null) continue;
+
+                    string texPath = AssetDatabase.GetAssetPath(mat.NormalTexture);
+                    if (string.IsNullOrEmpty(texPath) || !checkedPaths.Add(texPath)) continue;
+
+                    EditorUtility.DisplayProgressBar(
+                        fix ? "Fixing original RTXPT normal texture import" : "Validating original RTXPT normal texture import",
+                        texPath, (float)i / Mathf.Max(1, guids.Length));
+
+                    var importer = AssetImporter.GetAtPath(texPath) as TextureImporter;
+                    if (importer == null)
+                    {
+                        missingImporter++;
+                        wrong.Add($"{texPath}  (no TextureImporter — used by {mat.name})");
+                        continue;
+                    }
+
+                    if (IsOriginalNormalImport(importer))
+                    {
+                        okCount++;
+                        continue;
+                    }
+
+                    wrong.Add($"{texPath}  ({DescribeOriginalNormalImport(importer)} — used by {mat.name})");
+
+                    if (fix)
+                    {
+                        importer.textureType        = TextureImporterType.Default;
+                        importer.sRGBTexture        = false;
+                        importer.convertToNormalmap = false;
+                        importer.textureCompression = OriginalNormalTextureCompression;
+                        importer.SaveAndReimport();
+                        fixedCount++;
+                    }
+                }
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"[RtxptNormalMapFixer] Original RTXPT normal texture import {(fix ? "fix" : "validation")} complete.");
+            sb.AppendLine($"  Materials scanned : {guids.Length}");
+            sb.AppendLine($"  Unique normal maps: {checkedPaths.Count}");
+            sb.AppendLine($"  Already correct   : {okCount}");
+            sb.AppendLine($"  Wrong import      : {wrong.Count}");
+            if (fix) sb.AppendLine($"  Fixed             : {fixedCount}");
+            if (missingImporter > 0) sb.AppendLine($"  No TextureImporter : {missingImporter}");
+            foreach (string w in wrong) sb.AppendLine($"    - {w}");
+
+            Debug.Log(sb.ToString().TrimEnd());
+
+            EditorUtility.DisplayDialog(
+                fix ? "Fix Original RTXPT Normal Texture Import" : "Validate Original RTXPT Normal Texture Import",
+                fix
+                    ? $"Scanned {checkedPaths.Count} unique normal maps.\n" +
+                      $"Fixed {fixedCount}, already correct {okCount}.\n\nSee Console for details."
+                    : $"Scanned {checkedPaths.Count} unique normal maps.\n" +
+                      $"{wrong.Count} not in original RTXPT import mode, {okCount} correct.\n\nSee Console for details.",
+                "OK");
+        }
+
+        private static bool IsOriginalNormalImport(TextureImporter importer)
+        {
+            return importer.textureType == TextureImporterType.Default
+                   && !importer.sRGBTexture
+                   && !importer.convertToNormalmap
+                   && importer.textureCompression == OriginalNormalTextureCompression;
+        }
+
+        private static string DescribeOriginalNormalImport(TextureImporter importer)
+        {
+            return "expected Default/linear/raw; "
+                   + $"type {importer.textureType} → {TextureImporterType.Default}, "
+                   + $"sRGB {importer.sRGBTexture} → False, "
+                   + $"convertToNormalmap {importer.convertToNormalmap} → False, "
+                   + $"compression {importer.textureCompression} → {OriginalNormalTextureCompression}";
         }
 
         private static void RunOrm(bool fix)

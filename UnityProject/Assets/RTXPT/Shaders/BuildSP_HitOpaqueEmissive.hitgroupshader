@@ -1,0 +1,4 @@
+// Opaque emissive/proxy hit group for BuildStablePlanes.
+// Produces ClosestHit_BUILD_0_OpaqueEmissive only; no AnyHit.
+
+#include "PathTracerMaterialClosestOnly.hlsl"

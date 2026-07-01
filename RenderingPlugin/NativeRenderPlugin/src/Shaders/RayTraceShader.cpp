@@ -37,6 +37,19 @@ namespace
             D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&buf));
         return buf;
     }
+
+    static constexpr UINT kShaderTableStride = 64;
+
+    static void AssignSequentialHitGroupExports(std::vector<RayTraceShader::HitGroupInfo>& hitGroups,
+                                                std::unordered_map<std::wstring, size_t>& hitGroupIndex)
+    {
+        hitGroupIndex.clear();
+        for (size_t i = 0; i < hitGroups.size(); ++i)
+        {
+            hitGroups[i].groupExport = L"HitGroup_" + std::to_wstring(i);
+            hitGroupIndex[std::to_wstring(i)] = i;
+        }
+    }
 } // anonymous namespace
 
 // ---------------------------------------------------------------------------
@@ -268,21 +281,11 @@ bool RayTraceShader::ReflectBindings(IDxcBlob* shaderLib)
 
     AssignHeapOffsets();
 
-    // Sort miss shaders and hit groups for deterministic shader-table ordering.
+    // Sort miss shaders for deterministic shader-table ordering. Hit groups intentionally keep
+    // discovery/blob order: C# supplies the hit-group blobs in shader-table variant order, then
+    // we assign RTXPT-style HitGroup_0/1/... exports without sorting.
     std::sort(m_missShaders.begin(), m_missShaders.end());
-    std::sort(m_hitGroups.begin(), m_hitGroups.end(),
-        [](const HitGroupInfo& a, const HitGroupInfo& b) { return a.groupExport < b.groupExport; });
-    // Rebuild hit-group index after sort.
-    m_hitGroupIndex.clear();
-    for (size_t i = 0; i < m_hitGroups.size(); ++i)
-    {
-        const std::wstring& exp = m_hitGroups[i].groupExport;
-        static const std::wstring kPrefix = L"HitGroup_";
-        std::wstring key = (exp.size() > kPrefix.size() && exp.compare(0, kPrefix.size(), kPrefix) == 0)
-            ? exp.substr(kPrefix.size())
-            : (exp == L"HitGroup" ? L"" : exp);
-        m_hitGroupIndex[key] = i;
-    }
+    AssignSequentialHitGroupExports(m_hitGroups, m_hitGroupIndex);
 
     return true;
 }
@@ -407,7 +410,7 @@ bool RayTraceShader::BuildShaderTable()
         return false;
     }
 
-    const UINT stride = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;
+    const UINT stride = kShaderTableStride;
     const UINT idSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 
     auto MakeTable = [&](const char* label, const std::vector<std::wstring>& names) -> ComPtr<ID3D12Resource>
@@ -505,7 +508,7 @@ bool RayTraceShader::RebuildHitGroupTable(const uint32_t* variantIndices, uint32
         return false;
     }
 
-    const UINT stride    = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;
+    const UINT stride    = kShaderTableStride;
     const UINT idSize    = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
     const UINT totalSize = stride * count;
 
@@ -886,19 +889,10 @@ bool RayTraceShader::LoadShaderFromMultipleBlobs(const BlobDesc* blobs, uint32_t
         if (!ReflectBindingsFromBlob(libs[i].Get())) return false;
     }
 
-    // After merging all hit groups, re-sort for deterministic ordering
-    std::sort(m_hitGroups.begin(), m_hitGroups.end(),
-        [](const HitGroupInfo& a, const HitGroupInfo& b) { return a.groupExport < b.groupExport; });
-    m_hitGroupIndex.clear();
-    for (size_t i = 0; i < m_hitGroups.size(); ++i)
-    {
-        const std::wstring& exp = m_hitGroups[i].groupExport;
-        static const std::wstring kPrefix = L"HitGroup_";
-        std::wstring key = (exp.size() > kPrefix.size() && exp.compare(0, kPrefix.size(), kPrefix) == 0)
-            ? exp.substr(kPrefix.size())
-            : (exp == L"HitGroup" ? L"" : exp);
-        m_hitGroupIndex[key] = i;
-    }
+    // Keep merged hit groups in blob order. The managed RayTracePipeline passes hit-group blobs
+    // in the same order as the per-geometry variant indices used by RebuildHitGroupTable(); assign
+    // RTXPT-style HitGroup_0/1/... exports after every blob has been reflected.
+    AssignSequentialHitGroupExports(m_hitGroups, m_hitGroupIndex);
 
     // Re-assign heap offsets to include bindings from all blobs
     AssignHeapOffsets();

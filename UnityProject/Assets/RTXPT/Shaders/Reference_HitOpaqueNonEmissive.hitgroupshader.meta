@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: f268b9294a8fe9e4b94e7397da4786b6
+guid: a0010000000000000000000000000006
 ScriptedImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -9,21 +9,23 @@ ScriptedImporter:
   assetBundleVariant: 
   script: {fileID: 11500000, guid: 95541f6964d24494cb2e70ab0bbba6e7, type: 3}
   additionalIncludePaths:
-  - ../RenderingPlugin/External/RTXPT/Rtxpt/Lighting
-  - ../RenderingPlugin/External/RTXPT/Rtxpt
-  - ../RenderingPlugin/External/RTXPT/External/Nrd/Shaders/Include
-  - ../RenderingPlugin/External/RTXPT/External/Rtxdi/Include
-  - ../RenderingPlugin/External/RTXPT/External
-  - ../RenderingPlugin/External/donut/include
-  - ../RenderingPlugin/External/RTXPT/Rtxpt/Shaders
+  - F:/RTXPT/Rtxpt/Lighting
+  - F:/RTXPT/Rtxpt
+  - F:/RTXPT/External/Nrd/Shaders/Include
+  - F:/RTXPT/External/Rtxdi/Include
+  - F:/RTXPT/External
+  - F:/RTXPT/External/Donut/include
+  - F:/RTXPT/Rtxpt/Shaders
   extraArgs:
   - -all_resources_bound
   defines:
   - PATH_TRACER_MODE=PATH_TRACER_MODE_REFERENCE
   - RTXPT_PIPELINE_PERMUTATION_NAME=REF
   - RTXPT_MATERIAL_PERMUTATIONS_ENABLED=1
-  - RTXPT_MATERIAL_PERMUTATION_NAME=REF_LMBR0000040black_eae3d639
-  - RTXPT_SHADER_ID=1
+  - RTXPT_MATERIAL_PERMUTATION_NAME=REF_LMBR0000002Mesh_b12400a3
+  - RTXPT_SHADER_ID=0
+  - RTXPT_MATERIAL_IS_EMISSIVE=0
+  - RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0
   - ENABLE_DEBUG_SURFACE_VIZ=0
   - PT_NEE_ENABLED=1
   - TARGET_D3D12

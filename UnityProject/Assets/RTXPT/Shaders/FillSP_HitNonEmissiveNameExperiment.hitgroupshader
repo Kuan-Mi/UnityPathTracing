@@ -1,0 +1,11 @@
+// Name-only experiment for FillStablePlanes non-emissive hit shader.
+//
+// This mirrors RTXPT's per-material black-metal FILL permutation. It is not
+// referenced by RtxptRenderer.asset; compile/import it directly when comparing
+// DXIL hashes.
+//
+// Entry points produced:
+//   ClosestHit_FILL_LMBR0000040black_eae3d639
+//   AnyHit_FILL_LMBR0000040black_eae3d639
+
+#include "PathTracerMaterialSpecializations.hlsl"

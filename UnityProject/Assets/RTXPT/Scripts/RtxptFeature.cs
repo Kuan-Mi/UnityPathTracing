@@ -1155,6 +1155,21 @@ namespace PathTracing
             buildStablePlanesShader              = LoadRs($"{shaderRoot}/BuildStablePlanes");
             fillStablePlanesShader               = LoadRs($"{shaderRoot}/FillStablePlanes");
             referenceShader                      = LoadRs($"{shaderRoot}/Reference");
+            buildHitGroups = new[]
+            {
+                Ref(LoadHg($"{shaderRoot}/BuildSP_HitNonEmissive")),
+                Ref(LoadHg($"{shaderRoot}/BuildSP_HitOpaqueNonEmissive")),
+            };
+            fillHitGroups = new[]
+            {
+                Ref(LoadHg($"{shaderRoot}/FillSP_HitNonEmissiveNameExperiment")),
+                Ref(LoadHg($"{shaderRoot}/FillSP_HitOpaqueNonEmissive")),
+            };
+            referenceHitGroups = new[]
+            {
+                Ref(LoadHg($"{shaderRoot}/Reference_HitNonEmissive")),
+                Ref(LoadHg($"{shaderRoot}/Reference_HitOpaqueNonEmissive")),
+            };
             exportVisibilityBufferCs             = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
             denoiseSpecHitTCs                    = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
             dlssBeforeCs                         = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
@@ -1219,6 +1234,21 @@ namespace PathTracing
                 if (s == null)
                     Debug.LogWarning($"[RtxptFeature] Missing RayTraceShader at: {path}");
                 return s;
+            }
+
+            static HitGroupShader LoadHg(string path)
+            {
+                var s = UnityEditor.AssetDatabase.LoadAssetAtPath<HitGroupShader>(path + ".hitgroupshader");
+                if (s == null)
+                    Debug.LogWarning($"[RtxptFeature] Missing HitGroupShader at: {path}");
+                return s;
+            }
+
+            static LazyLoadReference<T> Ref<T>(T asset) where T : UnityEngine.Object
+            {
+                var r = new LazyLoadReference<T>();
+                r.asset = asset;
+                return r;
             }
 
             static NativeRasterShader LoadRas(string path)
