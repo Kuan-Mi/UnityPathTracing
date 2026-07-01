@@ -175,10 +175,10 @@ namespace PathTracing
         {
             // Static-scene RTXPT parity mode. These indices must match the hit-group blob order
             // supplied by RtxptFeature.AutoFillShaders:
-            //   0 = LMBR0000040black_eae3d639
-            //   1 = LMBR0000002Mesh_b12400a3
-            // The string normalization accepts both RTXPT names (LMBR0000040black...) and Unity
-            // asset names (bistro.LMBR_0000040_black_metal).
+            //   0 = LMBR0000002Mesh_b12400a3
+            //   1 = LMBR0000040black_eae3d639
+            // These are material shader permutations, not literal material names. Mesh is the
+            // representative name for the ordinary non-emissive/non-analytic permutation.
             variant = 0;
             if (renderer?.Slots == null || grp?.submeshIndices == null) return false;
 
@@ -199,15 +199,18 @@ namespace PathTracing
 
             if (sawBlack && !sawMesh)
             {
-                variant = 0u;
+                variant = 1u;
                 return true;
             }
 
             if (sawMesh && !sawBlack)
             {
-                variant = 1u;
+                variant = 0u;
                 return true;
             }
+
+            if (sawMesh && sawBlack)
+                LogStaticParityMaterialWarning(renderer, grp, "contains both hard-coded RTXPT representative material names in one submesh group", 0u);
 
             return false;
         }
@@ -248,16 +251,11 @@ namespace PathTracing
         {
             uint legacyVariant = ComputeFallbackHitGroupVariant(grp, descs);
             // Static parity mode currently bakes exactly two RTXPT material hit groups:
-            //   0 = LMBR0000040black_eae3d639
-            //   1 = LMBR0000002Mesh_b12400a3
-            // Keep any unrecognized/legacy material within that table so packaged builds do
-            // not request the removed legacy variants 2/3.
-            uint fallbackVariant = legacyVariant == 1u ? 1u : 0u;
-            string reason = legacyVariant > 1u
-                ? $"material is not one of the two hard-coded RTXPT parity materials and legacy hit-group variant {legacyVariant} requires a shader not present in the two-entry parity table"
-                : "material is not one of the two hard-coded RTXPT parity materials";
-            LogStaticParityMaterialWarning(renderer, grp, reason, fallbackVariant);
-
+            //   0 = ordinary non-emissive/non-analytic material permutation (Mesh representative)
+            //   1 = material permutation with emissive/analytic paths compiled in (black representative)
+            // Alpha testing affects whether AnyHit is wired, but not the material shader
+            // permutation index in the original RTXPT baker.
+            uint fallbackVariant = (grp != null && (grp.isEmissive || grp.isAnalyticProxy)) ? 1u : 0u;
             return fallbackVariant;
         }
 
@@ -272,7 +270,7 @@ namespace PathTracing
 
             Debug.LogError(
                 $"[RtxptSceneLayout] Static RTXPT parity mode only has hit groups 0/1 " +
-                $"(0=LMBR0000040black_eae3d639, 1=LMBR0000002Mesh_b12400a3), but renderer '{rendererName}' {groupInfo} {reason}. " +
+                $"(0=LMBR0000002Mesh_b12400a3, 1=LMBR0000040black_eae3d639), but renderer '{rendererName}' {groupInfo} {reason}. " +
                 $"Using fallback variant {fallbackVariant} to avoid an out-of-range shader table. Submeshes/materials: {submeshInfo}");
         }
 

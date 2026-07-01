@@ -1157,18 +1157,18 @@ namespace PathTracing
             referenceShader                      = LoadRs($"{shaderRoot}/Reference");
             buildHitGroups = new[]
             {
-                Ref(LoadHg($"{shaderRoot}/BuildSP_HitNonEmissive")),
                 Ref(LoadHg($"{shaderRoot}/BuildSP_HitOpaqueNonEmissive")),
+                Ref(LoadHg($"{shaderRoot}/BuildSP_HitNonEmissive")),
             };
             fillHitGroups = new[]
             {
-                Ref(LoadHg($"{shaderRoot}/FillSP_HitNonEmissiveNameExperiment")),
                 Ref(LoadHg($"{shaderRoot}/FillSP_HitOpaqueNonEmissive")),
+                Ref(LoadHg($"{shaderRoot}/FillSP_HitNonEmissiveNameExperiment")),
             };
             referenceHitGroups = new[]
             {
-                Ref(LoadHg($"{shaderRoot}/Reference_HitNonEmissive")),
                 Ref(LoadHg($"{shaderRoot}/Reference_HitOpaqueNonEmissive")),
+                Ref(LoadHg($"{shaderRoot}/Reference_HitNonEmissive")),
             };
             exportVisibilityBufferCs             = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
             denoiseSpecHitTCs                    = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");

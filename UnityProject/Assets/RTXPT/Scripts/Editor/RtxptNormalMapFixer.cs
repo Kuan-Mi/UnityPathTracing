@@ -60,6 +60,8 @@ namespace PathTracing
 
             try
             {
+                if (fix) AssetDatabase.StartAssetEditing();
+
                 for (int i = 0; i < guids.Length; i++)
                 {
                     string matPath = AssetDatabase.GUIDToAssetPath(guids[i]);
@@ -100,6 +102,7 @@ namespace PathTracing
             }
             finally
             {
+                if (fix) AssetDatabase.StopAssetEditing();
                 EditorUtility.ClearProgressBar();
             }
 
@@ -140,6 +143,8 @@ namespace PathTracing
 
             try
             {
+                if (fix) AssetDatabase.StartAssetEditing();
+
                 for (int i = 0; i < guids.Length; i++)
                 {
                     string matPath = AssetDatabase.GUIDToAssetPath(guids[i]);
@@ -182,6 +187,7 @@ namespace PathTracing
             }
             finally
             {
+                if (fix) AssetDatabase.StopAssetEditing();
                 EditorUtility.ClearProgressBar();
             }
 
@@ -240,6 +246,8 @@ namespace PathTracing
 
             try
             {
+                if (fix) AssetDatabase.StartAssetEditing();
+
                 for (int i = 0; i < guids.Length; i++)
                 {
                     string matPath = AssetDatabase.GUIDToAssetPath(guids[i]);
@@ -293,6 +301,7 @@ namespace PathTracing
             }
             finally
             {
+                if (fix) AssetDatabase.StopAssetEditing();
                 EditorUtility.ClearProgressBar();
             }
 
