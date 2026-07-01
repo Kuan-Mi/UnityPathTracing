@@ -54,15 +54,15 @@ MonoBehaviour:
     m_OverrideState: 1
     m_Value: 1
   environmentMap:
-    m_OverrideState: 0
-    m_Value: {fileID: 0}
+    m_OverrideState: 1
+    m_Value: {fileID: 8900000, guid: e17bc0e66c39bbb47b6780af4e3ff5a7, type: 3}
     dimension: 1
   environmentMapIntensity:
     m_OverrideState: 0
     m_Value: 1
   environmentMapRotationY:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 180
   environmentMapTint:
     m_OverrideState: 0
     m_Value: {r: 1, g: 1, b: 1, a: 1}

@@ -22,6 +22,9 @@ namespace PathTracing
 
         public readonly List<PTMaterialData> Materials   = new();
         public readonly List<IntPtr>         TexturePtrs = new();
+        // Parallel to Materials: reserve emissive triangle-light slots for this material?
+        // Mirrors RTXPT PTMaterial::IsEmissive() = baked-emissive OR UseDonutEmissiveIntensity.
+        public readonly List<bool>           ReserveEmissiveSlots = new();
 
         /// <summary>Returns the material index for the asset, baking it on first sight.</summary>
         public int GetOrAdd(RtxptMaterial asset)
@@ -48,8 +51,14 @@ namespace PathTracing
             };
             RefreshScalars(asset, ref data);
 
+            // RTXPT PTMaterial::IsEmissive() (MaterialsBaker.cpp): the baked emissive term
+            // (EmissiveColor*EmissiveIntensity > 0) OR the UseDonutEmissiveIntensity escape hatch,
+            // which reserves light slots for materials whose emission can animate on at runtime.
+            bool bakedEmissive = data.EmissiveColor.x > 0f || data.EmissiveColor.y > 0f || data.EmissiveColor.z > 0f;
+
             int idx = Materials.Count;
             Materials.Add(data);
+            ReserveEmissiveSlots.Add(bakedEmissive || asset.UseDonutEmissiveIntensity);
             _materialIndexByAssetId[assetId] = idx;
             return idx;
         }

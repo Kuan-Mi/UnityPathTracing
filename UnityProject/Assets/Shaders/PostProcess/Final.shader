@@ -411,7 +411,7 @@
                 i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
                 float3 rgb = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb;
-
+// rgb = 0;
                 // float3 linearRgb = LinearToSRGB(rgb);
                 //
                 // // linearRgb.r = 1 - linearRgb.r;

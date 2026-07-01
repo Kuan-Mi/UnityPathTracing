@@ -69,6 +69,10 @@ namespace PathTracing
         private SubInstanceData[]   _subInstanceCpu;
         private PTMaterialData[]    _ptMaterialCpu;
         private GeometryDebugData[] _geomDebugCpu;
+        // Per-material "reserve emissive triangle-light slots" flag, parallel to _ptMaterialCpu.
+        // Mirrors RTXPT PTMaterial::IsEmissive(): baked-emissive OR UseDonutEmissiveIntensity
+        // (the latter reserves slots for materials whose emission can animate on at runtime).
+        private bool[]              _ptMaterialReserveEmissive;
 
         // True when any _subInstanceCpu field changed since the last upload (emissive mapping
         // offsets / analytic-proxy light indices). Lets the per-frame path skip the full-array
@@ -414,6 +418,7 @@ namespace PathTracing
             _geometryCpu    = null;
             _subInstanceCpu = null;
             _ptMaterialCpu  = null;
+            _ptMaterialReserveEmissive = null;
             _geomDebugCpu   = null;
             _instanceHandles.Clear();
             _rendererEntries.Clear();
@@ -566,6 +571,7 @@ namespace PathTracing
                 geomList.Add(default);
                 subInstList.Add(default);
                 matTable.Materials.Add(default);
+                matTable.ReserveEmissiveSlots.Add(false);
                 geomDbgList.Add(default);
             }
 
@@ -574,6 +580,7 @@ namespace PathTracing
             _subInstanceCpu = subInstList.ToArray();
             _ptMaterialCpu  = matTable.Materials.ToArray();
             _geomDebugCpu   = geomDbgList.ToArray();
+            _ptMaterialReserveEmissive = matTable.ReserveEmissiveSlots.ToArray();
 
             // Whole mode: one CopyBufferRegion spanning the dirty [min,max) element span per
             // flush, matching donut's WriteInstanceBuffer single full-array writeBuffer (one
@@ -721,8 +728,15 @@ namespace PathTracing
                     int matIdx = (int)geom.materialIndex;
                     if (matIdx < 0 || matIdx >= _ptMaterialCpu.Length) continue;
 
-                    var mat = _ptMaterialCpu[matIdx];
-                    if (mat.EmissiveColor.x <= 0f && mat.EmissiveColor.y <= 0f && mat.EmissiveColor.z <= 0f)
+                    // Mirror RTXPT PTMaterial::IsEmissive(): reserve triangle-light slots when the
+                    // material is currently emissive OR is flagged UseDonutEmissiveIntensity (its
+                    // emission can animate on at runtime, so RTXPT reserves slots up-front — see
+                    // LightsBaker.cpp ProcessEmissiveGeometry). Without the second term, a material
+                    // that lights up at runtime would emit no NEE light until a full rebuild.
+                    bool reserve = _ptMaterialReserveEmissive != null && matIdx < _ptMaterialReserveEmissive.Length
+                        ? _ptMaterialReserveEmissive[matIdx]
+                        : (_ptMaterialCpu[matIdx].EmissiveColor.x > 0f || _ptMaterialCpu[matIdx].EmissiveColor.y > 0f || _ptMaterialCpu[matIdx].EmissiveColor.z > 0f);
+                    if (!reserve)
                         continue;
 
                     _emissiveCache.Add(new EmissiveGeometryEntry

@@ -156,7 +156,55 @@ namespace PathTracing
                 }
             }
 
+            SortRecordsForParity(records);
             return records;
+        }
+
+        // ---- TEMPORARY: instance-ordering parity test -----------------------------
+        // Force a deterministic scene order (hierarchy depth-first pre-order) instead of
+        // RtxptRenderer.OnEnable registration order, so the Unity TLAS / sub-instance /
+        // hit-group / material sequence is reproducible and lines up with the original
+        // RTXPT GetMeshInstances() (glTF scene-graph load) order. Everything downstream
+        // (RtxptAccelRegistry.Sync: SetInstanceOrderIndex + runningContribution + the
+        // per-geometry variant array, and RtxptGPUScene: t_InstanceData/t_SubInstanceData/
+        // t_GeometryData) derives from this list, so reordering here reorders them all
+        // consistently. Purpose: remove instance ordering as a variable when diffing PIX
+        // captures. Flip kSortRecordsForParity to false to restore OnEnable order. Remove
+        // once ordering is ruled out as a cause.
+        private const bool kSortRecordsForParity = true;
+
+        private static void SortRecordsForParity(List<RtxptInstanceRecord> records)
+        {
+            if (!kSortRecordsForParity || records.Count < 2) return;
+
+            // Cache each transform's root→node sibling-index path (unique per node), so the
+            // O(n log n) comparisons don't re-walk the hierarchy repeatedly.
+            var pathCache = new Dictionary<Transform, int[]>();
+            int[] PathOf(Transform t)
+            {
+                if (t == null) return System.Array.Empty<int>();
+                if (pathCache.TryGetValue(t, out var cached)) return cached;
+                var chain = new List<int>();
+                for (var c = t; c != null; c = c.parent)
+                    chain.Add(c.GetSiblingIndex());
+                chain.Reverse(); // root → node
+                var arr = chain.ToArray();
+                pathCache[t] = arr;
+                return arr;
+            }
+
+            records.Sort((a, b) =>
+            {
+                int[] pa = PathOf(a.TargetRenderer != null ? a.TargetRenderer.transform : null);
+                int[] pb = PathOf(b.TargetRenderer != null ? b.TargetRenderer.transform : null);
+                int n = Mathf.Min(pa.Length, pb.Length);
+                for (int i = 0; i < n; i++)
+                    if (pa[i] != pb[i]) return pa[i] < pb[i] ? -1 : 1;
+                if (pa.Length != pb.Length) return pa.Length < pb.Length ? -1 : 1;
+                // Same renderer: keep its groups ascending so the per-geometry
+                // (sub-instance / SBT) order stays native-submesh order.
+                return a.GroupIndex.CompareTo(b.GroupIndex);
+            });
         }
 
         /// <summary>True when the renderer has a pre-baked RtxptMaterial for the given sub-mesh.</summary>
