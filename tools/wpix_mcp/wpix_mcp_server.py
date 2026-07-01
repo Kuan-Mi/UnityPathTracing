@@ -31,6 +31,11 @@ def log(*a):
 def t_find_events(wpix_path, name_filter=None, dispatches_only=False):
     return {"events": core.find_shader_events(wpix_path, name_filter, dispatches_only)}
 
+def t_stage_times(wpix_path, name_filter=None, dispatches_only=False, work_only=True,
+                  group_by="marker", duration_counter="TOP to EOP Duration (ns)", top=None):
+    return core.stage_times(wpix_path, name_filter, bool(dispatches_only), bool(work_only),
+                            group_by, duration_counter, top)
+
 def t_describe_dispatch(wpix_path, global_id, used_only=False):
     return core.describe_dispatch(wpix_path, int(global_id), bool(used_only))
 
@@ -74,6 +79,33 @@ TOOLS = [
             "required": ["wpix_path"],
         },
         "handler": t_find_events,
+    },
+    {
+        "name": "wpix_stage_times",
+        "description": "Aggregate GPU duration counters from a .wpix capture by PIX marker/"
+                       "stage. Uses pixtool save-event-list with duration counters, then sums "
+                       "the selected counter over matching events. Default counter is "
+                       "'TOP to EOP Duration (ns)', usually the closest per-event GPU execution "
+                       "duration. By default work_only=true includes compute Dispatch, "
+                       "raytracing DispatchRays/accel builds, raster Draw calls and indirect "
+                       "work, while excluding barriers/waits/present. Set dispatches_only=true "
+                       "for compute-only timing. name_filter narrows to a marker/event "
+                       "substring; group_by is marker, leaf, event, or kind; top returns the "
+                       "slowest N stages.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "wpix_path": {"type": "string", "description": "Path to the .wpix capture."},
+                "name_filter": {"type": "string", "description": "Optional case-insensitive substring of marker path or event name."},
+                "dispatches_only": {"type": "boolean", "default": False, "description": "Keep only Dispatch events for compute-stage timing."},
+                "work_only": {"type": "boolean", "default": True, "description": "Keep shader/dispatch/draw work only: compute, raytracing, raster and indirect events; drop barriers/waits/present."},
+                "group_by": {"type": "string", "enum": ["marker", "leaf", "event", "kind"], "default": "marker", "description": "Aggregation key: full marker path, final marker segment, event name, or work kind."},
+                "duration_counter": {"type": "string", "default": "TOP to EOP Duration (ns)", "description": "Timing counter column to sum, e.g. TOP to EOP Duration (ns) or EOP to EOP Duration (ns)."},
+                "top": {"type": "integer", "description": "Optional: return only the slowest N stages."},
+            },
+            "required": ["wpix_path"],
+        },
+        "handler": t_stage_times,
     },
     {
         "name": "wpix_describe_dispatch",

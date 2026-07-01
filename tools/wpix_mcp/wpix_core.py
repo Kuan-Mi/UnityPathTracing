@@ -140,6 +140,182 @@ def find_shader_events(wpix, name_filter=None, dispatches_only=False):
         res.append({"global_id": e["global_id"], "name": e["name"], "marker": marker_path})
     return res
 
+_GPU_WORK_EVENT_PREFIXES = (
+    "Dispatch",
+    "DispatchRays",
+    "Draw",
+    "ExecuteIndirect",
+    "BuildRaytracingAccelerationStructure",
+)
+
+def _event_kind(name):
+    if name == "Dispatch":
+        return "compute"
+    if name == "DispatchRays":
+        return "raytracing"
+    if name == "BuildRaytracingAccelerationStructure":
+        return "raytracing_build"
+    if name.startswith("Draw"):
+        return "raster"
+    if name == "ExecuteIndirect":
+        return "indirect"
+    return "other"
+
+def _is_gpu_work_event(name):
+    return any(name.startswith(p) for p in _GPU_WORK_EVENT_PREFIXES)
+
+def timed_events(wpix, name_filter=None, dispatches_only=False, work_only=False,
+                 duration_counter="TOP to EOP Duration (ns)",
+                 counter_pattern="*Duration*"):
+    """Return GPU events with PIX timing counters.
+
+    `pixtool save-event-list --counters=*Duration*` adds per-event GPU duration columns
+    to the normal event CSV. This helper mirrors find_shader_events(), but keeps the
+    requested duration counter so callers can aggregate time by marker/stage.
+    """
+    pixtool = find_pixtool()
+    key = hashlib.sha1((os.path.abspath(wpix) + str(os.path.getmtime(wpix)) +
+                        f"|timing|{counter_pattern}").encode()).hexdigest()[:16]
+    csv_path = os.path.join(_cache_root(), f"timing_{key}.csv")
+    if not os.path.isfile(csv_path):
+        # PIX can fail with PIXTOOL99999 if multiple processes export timing counters
+        # from the same capture concurrently. Keep timing exports serial per .wpix.
+        _run([pixtool, "open-capture", wpix, "save-event-list",
+              f"--counters={counter_pattern}", csv_path])
+
+    rows = []
+    with open(csv_path, encoding="utf-8-sig", newline="") as fh:
+        rd = csv.DictReader(fh)
+        for row in rd:
+            row = {(k or "").strip(): (v or "").strip() for k, v in row.items()}
+            gid = (row.get("Global ID") or "").strip()
+            rows.append({
+                "queue": int(row["Queue ID"]) if row.get("Queue ID", "").strip() else None,
+                "parent": int(row["Parent"]) if row.get("Parent", "").strip() else None,
+                "name": (row.get("Name") or "").strip(),
+                "global_id": int(gid) if gid else None,
+                "counters": {k.strip(): _parse_counter_value(v)
+                             for k, v in row.items()
+                             if k and k.strip() not in ("Queue ID", "Parent", "Name", "Global ID")},
+            })
+
+    qmap = {e["queue"]: e for e in rows}
+    out = []
+    for e in rows:
+        if e["global_id"] is None:
+            continue
+        chain = []
+        p = e["parent"]
+        guard = 0
+        while p is not None and p in qmap and guard < 64:
+            par = qmap[p]
+            if par["name"]:
+                chain.append(par["name"])
+            if par["parent"] == p:
+                break
+            p = par["parent"]
+            guard += 1
+        marker_path = "/".join(reversed(chain))
+        if name_filter and name_filter.lower() not in (marker_path + "/" + e["name"]).lower():
+            continue
+        if dispatches_only and e["name"] != "Dispatch":
+            continue
+        if work_only and not _is_gpu_work_event(e["name"]):
+            continue
+        duration_ns = e["counters"].get(duration_counter)
+        out.append({
+            "global_id": e["global_id"],
+            "name": e["name"],
+            "kind": _event_kind(e["name"]),
+            "marker": marker_path,
+            "duration_ns": duration_ns,
+            "duration_ms": (duration_ns / 1_000_000.0) if duration_ns is not None else None,
+            "duration_counter": duration_counter,
+            "counters": e["counters"],
+        })
+    return out
+
+def _parse_counter_value(v):
+    s = (v or "").strip()
+    if not s:
+        return None
+    try:
+        return int(s.replace(",", ""))
+    except ValueError:
+        try:
+            return float(s.replace(",", ""))
+        except ValueError:
+            return s
+
+def stage_times(wpix, name_filter=None, dispatches_only=False, work_only=True,
+                group_by="marker",
+                duration_counter="TOP to EOP Duration (ns)", top=None):
+    """Aggregate PIX GPU timings by stage marker.
+
+    Returns both the contributing timed events and a per-stage table. `group_by` can be:
+      * "marker" — full enclosing marker path (default, precise hierarchy)
+      * "leaf"   — final marker name only
+      * "event"  — event name (Dispatch/Draw/etc)
+      * "kind"   — compute / raytracing / raster / etc
+    Durations are sums of the selected counter over contributing events.
+    """
+    events = timed_events(wpix, name_filter, dispatches_only, work_only, duration_counter)
+
+    def key_for(e):
+        marker = e.get("marker") or "<root>"
+        if group_by == "leaf":
+            return marker.rsplit("/", 1)[-1]
+        if group_by == "event":
+            return e.get("name") or "<unnamed>"
+        if group_by == "kind":
+            return e.get("kind") or "other"
+        return marker
+
+    stages = {}
+    order = {}
+    total_ns = 0
+    for e in events:
+        ns = e.get("duration_ns")
+        if ns is None:
+            continue
+        key = key_for(e)
+        if key not in stages:
+            stages[key] = {
+                "stage": key,
+                "event_count": 0,
+                "duration_ns": 0,
+                "duration_ms": 0.0,
+                "first_global_id": e["global_id"],
+                "last_global_id": e["global_id"],
+            }
+            order[key] = len(order)
+        stages[key]["event_count"] += 1
+        stages[key]["duration_ns"] += ns
+        stages[key]["last_global_id"] = e["global_id"]
+        total_ns += ns
+
+    rows = list(stages.values())
+    for r in rows:
+        r["duration_ms"] = r["duration_ns"] / 1_000_000.0
+    rows.sort(key=lambda r: order[r["stage"]])
+    if top:
+        rows = sorted(rows, key=lambda r: r["duration_ns"], reverse=True)[:int(top)]
+    total_ms = total_ns / 1_000_000.0
+    for r in rows:
+        r["percent"] = (100.0 * r["duration_ns"] / total_ns) if total_ns else 0.0
+    return {
+        "wpix_path": os.path.abspath(wpix),
+        "duration_counter": duration_counter,
+        "group_by": group_by,
+        "dispatches_only": dispatches_only,
+        "work_only": work_only,
+        "name_filter": name_filter,
+        "total_duration_ns": total_ns,
+        "total_duration_ms": total_ms,
+        "stages": rows,
+        "events": events,
+    }
+
 def next_global_id(wpix, gid):
     ids = sorted({e["global_id"] for e in list_events(wpix) if e["global_id"] is not None})
     for i in ids:

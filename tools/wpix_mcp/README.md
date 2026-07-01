@@ -54,6 +54,7 @@ Then restart Claude Code (or `/mcp` to reconnect). Tools appear as `wpix_*`.
 | tool | purpose |
 |---|---|
 | `wpix_find_events` | list Dispatch/Draw events (filter by marker name; `dispatches_only` to drop barriers) |
+| `wpix_stage_times` | aggregate PIX GPU duration counters by marker/stage |
 | `wpix_describe_dispatch` | thread-group counts + CBV/SRV(input)/UAV(output) bindings — **indices match the selectors below** |
 | `wpix_extract` | decode one binding → per-channel stats (+ optional `.npy`) |
 | `wpix_compare` | diff one binding across two captures → max-abs/mse/psnr/#differing texels (+ `max_fp16_ulp` for half formats) |
@@ -74,6 +75,30 @@ wpix_diff_stage { "wpix_a": "...", "wpix_b": "...", "marker": "EnvMapBakerMIPs",
 `mips`: `"base"` (default) compares only mip 0 — correct for a single dispatch, since higher
 mips at that event are stale (written by a later pass). `"all"` compares the full pyramid —
 use only on the final dispatch of a mip-gen chain.
+
+### Quick start: time stages
+
+```jsonc
+wpix_stage_times {
+  "wpix_path": "...\\Unity.wpix",
+  "work_only": true,
+  "group_by": "leaf",
+  "top": 20
+}
+```
+
+This uses `pixtool save-event-list --counters=*Duration*` and sums
+`TOP to EOP Duration (ns)` by default. Use `duration_counter:
+"EOP to EOP Duration (ns)"` if you want the end-to-end event spacing instead.
+With `work_only: true` (the default), compute `Dispatch`, raytracing
+`DispatchRays` / acceleration-structure builds, raster `Draw*`, and indirect work
+are included; barriers, waits and present are excluded. Use `group_by: "kind"` to
+see compute/raytracing/raster totals.
+
+Do not run multiple timing-counter exports against the same `.wpix` in parallel.
+PIX may fail `save-event-list --counters=...` with `PIXTOOL99999` when two
+processes analyze the same capture at the same time. Run `wpix_stage_times`
+serially per capture; subsequent calls reuse the cached CSV.
 
 ### Selectors
 

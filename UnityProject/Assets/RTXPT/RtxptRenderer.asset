@@ -88,7 +88,7 @@ MonoBehaviour:
     dlssrrBrightnessClampK: 4096
     dlssrrMicroJitter: 0.1
     tmpDisableDlssRR: 0
-    FG: 1
+    FG: 0
     enableBloom: 0
     bloomRadius: 8
     bloomIntensity: 0.004
