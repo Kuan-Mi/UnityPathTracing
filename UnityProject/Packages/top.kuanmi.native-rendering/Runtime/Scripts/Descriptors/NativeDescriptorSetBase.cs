@@ -25,7 +25,7 @@ namespace NativeRender
     public abstract class NativeDescriptorSetBase : IDisposable
     {
         // Ring-buffer depth — supports this many in-flight Dispatch calls per frame.
-        protected const int RingSize = 8;
+        protected const int RingSize = 16;
 
         // DX12 hard limit for root-constants: 64 DWORDs = 256 bytes per slot.
         protected const int MaxRootConstantBytes = 256;

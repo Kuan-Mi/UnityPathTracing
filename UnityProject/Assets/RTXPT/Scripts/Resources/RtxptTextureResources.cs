@@ -257,15 +257,15 @@ namespace PathTracing
             EnvDummyCube.AllocateCube(4, enableRandomWrite: false);
             EnvLightLookupMap.Allocate(new int2(1024, 1024), useMipMap: false);
 
-            // if (RtxptEnvMapBakerPass.EnableBC6UCompression)
-            // {
-            //     // Scratch base = cubeDim / BC block size (4); same mip count as the cube so each
-            //     // BC6H subresource has a matching RGBA32_UINT block grid. Mirrors EnvMapBaker.cpp
-            //     // InitBuffers (m_cubemapBC6HScratch / m_cubemapBC6H).
-            //     EnvCubemapBC6HScratch.AllocateCube(cubeDim / 4, useMipMap: true, mipCount: cubeMips);
-            //     if (EnvCubemapBC6H == IntPtr.Zero)
-            //         EnvCubemapBC6H = NativeRender.NativeRenderPlugin.NR_CreateBC6HCube((uint)cubeDim, (uint)cubeMips);
-            // } 
+            if (RtxptEnvMapBakerPass.EnableBC6UCompression)
+            {
+                // Scratch base = cubeDim / BC block size (4); same mip count as the cube so each
+                // BC6H subresource has a matching RGBA32_UINT block grid. Mirrors EnvMapBaker.cpp
+                // InitBuffers (m_cubemapBC6HScratch / m_cubemapBC6H).
+                EnvCubemapBC6HScratch.AllocateCube(cubeDim / 4, useMipMap: true, mipCount: cubeMips);
+                if (EnvCubemapBC6H == IntPtr.Zero)
+                    EnvCubemapBC6H = NativeRender.NativeRenderPlugin.NR_CreateBC6HCube((uint)cubeDim, (uint)cubeMips);
+            }
 
             // Freshly allocated cube/importance maps hold garbage — force the baker to re-run.
             EnvBaked = false;

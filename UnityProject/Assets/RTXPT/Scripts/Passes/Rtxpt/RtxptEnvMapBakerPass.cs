@@ -49,7 +49,7 @@ namespace PathTracing
         // original GetEnvMapCube() returning m_cubemapBC6H when m_outputIsCompressed. The existing
         // BC6UCompress.computeshader asset has no QUALITY macro, so ENCODE_P2 is false ⇒ exactly the
         // "Fast" (m_BC6UCompressLowPSO) variant. Set false to sample the uncompressed cube instead.
-        public const bool EnableBC6UCompression = false;
+        public const bool EnableBC6UCompression = true;
 
         // DXGI_FORMAT_R16G16B16A16_FLOAT — the env cube's format, used to bind it as a typed
         // Texture2DArray SRV for the BC6 compressor (the cube's faces, not a TextureCube view).
