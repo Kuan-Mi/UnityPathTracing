@@ -71,7 +71,7 @@ MonoBehaviour:
     enableRussianRoulette: 1
     nestedDielectricsQuality: 1
     useFp16Types: 1
-    dxHitObjectExtension: 0
+    dxHitObjectExtension: 1
     dxMaybeReorderThreads: 1
     allowPrimarySurfaceReplacement: 1
     stablePlanesSuppressPrimaryIndirectSpecular: 1
