@@ -9,13 +9,13 @@ ScriptedImporter:
   assetBundleVariant: 
   script: {fileID: 11500000, guid: 95541f6964d24494cb2e70ab0bbba6e7, type: 3}
   additionalIncludePaths:
-  - F:/RTXPT/Rtxpt/Lighting
-  - F:/RTXPT/Rtxpt
-  - F:/RTXPT/External/Nrd/Shaders/Include
-  - F:/RTXPT/External/Rtxdi/Include
-  - F:/RTXPT/External
-  - F:/RTXPT/External/Donut/include
-  - F:/RTXPT/Rtxpt/Shaders
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/Lighting
+  - ../RenderingPlugin/External/RTXPT/Rtxpt
+  - ../RenderingPlugin/External/RTXPT/External/Nrd/Shaders/Include
+  - ../RenderingPlugin/External/RTXPT/External/Rtxdi/Include
+  - ../RenderingPlugin/External/RTXPT/External
+  - ../RenderingPlugin/External/donut/include
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/Shaders
   extraArgs:
   - -all_resources_bound
   defines:
