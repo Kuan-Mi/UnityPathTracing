@@ -12,6 +12,18 @@ using UnityEngine.Rendering;
 
 namespace NativeRender
 {
+    public struct RayTracingAccelerationStructureOptions
+    {
+        public bool UseRtxmu;
+        public bool UseCompaction;
+
+        public static RayTracingAccelerationStructureOptions Default => new RayTracingAccelerationStructureOptions
+        {
+            UseRtxmu      = true,
+            UseCompaction = true
+        };
+    }
+
     /// <summary>
     /// Managed wrapper around the native RayTracingAccelerationStructure.
     /// Owns texture/material registration and GPU-instance management keyed by
@@ -116,8 +128,13 @@ namespace NativeRender
         public IntPtr GetTLASNativePtr() => NativeRenderPlugin.NR_AS_GetTLASNativePtr(_handle);
 
         public RayTracingAccelerationStructure()
+            : this(RayTracingAccelerationStructureOptions.Default)
         {
-            _handle = NativeRenderPlugin.NR_CreateAccelerationStructure();
+        }
+
+        public RayTracingAccelerationStructure(RayTracingAccelerationStructureOptions options)
+        {
+            _handle = NativeRenderPlugin.NR_CreateAccelerationStructureEx2(options.UseRtxmu, options.UseCompaction);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     "[NativeRayTracing] NR_CreateAccelerationStructure returned null. " +

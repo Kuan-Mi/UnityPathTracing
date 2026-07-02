@@ -132,6 +132,7 @@ namespace PathTracing
                 }
 
                 desired.Add(handle);
+                accel.SetInstanceMask(handle, 1);
                 accel.SetInstanceOrderIndex(handle, orderIndex++);
 
                 for (int k = 0; k < rec.Descs.Length; k++)

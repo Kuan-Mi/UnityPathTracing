@@ -36,38 +36,40 @@ namespace PathTracing
             uint offset = 0u;
 
             Pos    =  offset;
-            offset += vc * 12u;
+            offset = Align16(offset + vc * 12u);
 
             if (withPrevPosition)
             {
                 PrevPos =  offset;
-                offset  += vc * 12u;
+                offset  = Align16(offset + vc * 12u);
             }
             else PrevPos = Pos;
 
             if (mesh.HasVertexAttribute(VertexAttribute.Normal))
             {
                 Normal =  offset;
-                offset += vc * 4u;
+                offset = Align16(offset + vc * 4u);
             }
             else Normal = Absent;
-
-            if (mesh.HasVertexAttribute(VertexAttribute.TexCoord0))
-            {
-                Uv     =  offset;
-                offset += vc * 8u;
-            }
-            else Uv = Absent;
 
             if (mesh.HasVertexAttribute(VertexAttribute.Tangent))
             {
                 Tangent =  offset;
-                offset  += vc * 4u;
+                offset  = Align16(offset + vc * 4u);
             }
             else Tangent = Absent;
 
+            if (mesh.HasVertexAttribute(VertexAttribute.TexCoord0))
+            {
+                Uv     =  offset;
+                offset = Align16(offset + vc * 8u);
+            }
+            else Uv = Absent;
+
             TotalBytes = offset;
         }
+
+        private static uint Align16(uint value) => (value + 15u) & ~15u;
     }
 
     /// <summary>
@@ -213,6 +215,33 @@ namespace PathTracing
                 totalIndexSlots = Mathf.Max(totalIndexSlots, sub.indexStart + sub.indexCount);
             }
 
+            var ibData = BuildIndexData(src, meshData, totalIndexSlots);
+
+            var ibGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, ibData.Length, 4) { name = "IndexBuffer" };
+            ibGfx.SetData(ibData);
+            ibData.Dispose();
+
+            _ibCache[meshId] = ibGfx;
+            return ibGfx;
+        }
+
+        internal static NativeArray<uint> BuildIndexData(Mesh src)
+        {
+            using var meshDataArray = Mesh.AcquireReadOnlyMeshData(src);
+            var       meshData      = meshDataArray[0];
+
+            int totalIndexSlots = 0;
+            for (int s = 0; s < src.subMeshCount; s++)
+            {
+                var sub = src.GetSubMesh(s);
+                totalIndexSlots = Mathf.Max(totalIndexSlots, sub.indexStart + sub.indexCount);
+            }
+
+            return BuildIndexData(src, meshData, totalIndexSlots);
+        }
+
+        private static NativeArray<uint> BuildIndexData(Mesh src, Mesh.MeshData meshData, int totalIndexSlots)
+        {
             var ibData = new NativeArray<uint>(Mathf.Max(totalIndexSlots, 3), Allocator.Persistent, NativeArrayOptions.ClearMemory);
             for (int s = 0; s < src.subMeshCount; s++)
             {
@@ -224,17 +253,21 @@ namespace PathTracing
                 subIdx.Dispose();
             }
 
-            var ibGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, ibData.Length, 4) { name = "IndexBuffer" };
-            ibGfx.SetData(ibData);
-            ibData.Dispose();
-
-            _ibCache[meshId] = ibGfx;
-            return ibGfx;
+            return ibData;
         }
 
         // Packs the rest-pose SoA vertex buffer for the given stream layout. When the layout
         // has a PrevPosition stream it is initialised to the rest-pose positions.
         private static GraphicsBuffer BuildSoAVertexBuffer(Mesh src, in RtxptMeshStreamOffsets streams)
+        {
+            var vbData = BuildSoAVertexData(src, streams);
+            var vbGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, vbData.Length, 4) { name = "VertexBuffer" };
+            vbGfx.SetData(vbData);
+            vbData.Dispose();
+            return vbGfx;
+        }
+
+        internal static NativeArray<uint> BuildSoAVertexData(Mesh src, in RtxptMeshStreamOffsets streams)
         {
             int vc      = src.vertexCount;
             int vbBytes = (int)streams.TotalBytes;
@@ -242,13 +275,13 @@ namespace PathTracing
             using var meshDataArray = Mesh.AcquireReadOnlyMeshData(src);
             var       meshData      = meshDataArray[0];
 
-            var vbData = new NativeArray<uint>(vbBytes / 4, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-            int w      = 0; // write cursor, in uints (streams are packed in declaration order)
+            var vbData = new NativeArray<uint>(vbBytes / 4, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
             // Position stream (float3, no compression)
             {
                 var positions = new NativeArray<Vector3>(vc, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
                 meshData.GetVertices(positions);
+                int w = (int)(streams.Pos / 4u);
                 for (int i = 0; i < vc; i++)
                 {
                     Vector3 p = positions[i];
@@ -260,6 +293,7 @@ namespace PathTracing
                 // PrevPosition stream (skinned only): rest pose = current pose
                 if (streams.HasPrevPos)
                 {
+                    w = (int)(streams.PrevPos / 4u);
                     for (int i = 0; i < vc; i++)
                     {
                         Vector3 p = positions[i];
@@ -277,6 +311,7 @@ namespace PathTracing
             {
                 var normals = new NativeArray<Vector3>(vc, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
                 meshData.GetNormals(normals);
+                int w = (int)(streams.Normal / 4u);
                 for (int i = 0; i < vc; i++)
                     vbData[w++] = PackRGB8Snorm(normals[i]);
                 normals.Dispose();
@@ -287,6 +322,7 @@ namespace PathTracing
             {
                 var uvs = new NativeArray<Vector2>(vc, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
                 meshData.GetUVs(0, uvs);
+                int w = (int)(streams.Uv / 4u);
                 for (int i = 0; i < vc; i++)
                 {
                     Vector2 uv = uvs[i];
@@ -303,6 +339,7 @@ namespace PathTracing
             {
                 var tangents = new NativeArray<Vector4>(vc, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
                 meshData.GetTangents(tangents);
+                int w = (int)(streams.Tangent / 4u);
                 for (int i = 0; i < vc; i++)
                 {
                     Vector4 t = tangents[i];
@@ -312,10 +349,7 @@ namespace PathTracing
                 tangents.Dispose();
             }
 
-            var vbGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, vbBytes / 4, 4) { name = "VertexBuffer" };
-            vbGfx.SetData(vbData);
-            vbData.Dispose();
-            return vbGfx;
+            return vbData;
         }
 
         // Matches donut's dm::vectorToSnorm8 (vector.cpp) bit-for-bit: scale = 127/length,

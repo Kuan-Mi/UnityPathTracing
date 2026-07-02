@@ -4,6 +4,7 @@
 #include <cstdarg>
 #include <cstring>
 #include <algorithm>
+#include <string>
 
 // Forward declaration of global deferred resource delete function from Plugin.cpp.
 // RetireObject<T> (typed deferred delete) comes from the included PluginInternal.h.
@@ -77,7 +78,7 @@ static ComPtr<ID3D12Resource> CreateBuffer(
 // ---------------------------------------------------------------------------
 static void AccelLogf(IUnityLog *log, UnityLogType type, const char *fmt, ...)
 {
-    char buf[512];
+    char buf[2048];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
@@ -85,16 +86,79 @@ static void AccelLogf(IUnityLog *log, UnityLogType type, const char *fmt, ...)
     log->Log(type, buf, __FILE__, __LINE__);
 }
 
+static const char* BlasBuildFlagsToString(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS flags)
+{
+    static thread_local std::string s;
+    s.clear();
+    auto add = [&](D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS bit, const char* name)
+    {
+        if ((flags & bit) != 0)
+        {
+            if (!s.empty()) s += "|";
+            s += name;
+        }
+    };
+    add(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE, "AllowUpdate");
+    add(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION, "AllowCompaction");
+    add(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE, "PreferFastTrace");
+    add(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD, "PreferFastBuild");
+    add(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_MINIMIZE_MEMORY, "MinimizeMemory");
+    add(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE, "PerformUpdate");
+    add(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_DISABLE_OMMS, "AllowDisableOMMs");
+    if (s.empty()) s = "None";
+    return s.c_str();
+}
+
+static const char* GeometryFlagsToString(D3D12_RAYTRACING_GEOMETRY_FLAGS flags)
+{
+    static thread_local std::string s;
+    s.clear();
+    if ((flags & D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE) != 0)
+        s = "Opaque";
+    if ((flags & D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION) != 0)
+    {
+        if (!s.empty()) s += "|";
+        s += "NoDuplicateAnyHitInvocation";
+    }
+    if (s.empty()) s = "None";
+    return s.c_str();
+}
+
+static const char* GeometryTypeToString(D3D12_RAYTRACING_GEOMETRY_TYPE type)
+{
+    switch (type)
+    {
+    case D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES: return "Triangles";
+    case D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS: return "AABBs";
+    case D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES: return "OMMTriangles";
+    default: return "Unknown";
+    }
+}
+
+static const char* DxgiFormatToString(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+    case DXGI_FORMAT_R16_UINT: return "DXGI_FORMAT_R16_UINT";
+    case DXGI_FORMAT_R32_UINT: return "DXGI_FORMAT_R32_UINT";
+    case DXGI_FORMAT_R32G32B32_FLOAT: return "DXGI_FORMAT_R32G32B32_FLOAT";
+    default: return "DXGI_FORMAT_OTHER";
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
-AccelerationStructure::AccelerationStructure(ID3D12Device5 *device, IUnityLog *log)
-    : m_device(device), m_log(log)
+AccelerationStructure::AccelerationStructure(ID3D12Device5 *device, IUnityLog *log, bool useRtxmu, bool useCompaction)
+    : m_device(device), m_log(log), m_useRtxmu(useRtxmu), m_useCompaction(useCompaction)
 {
-    // RTXMU owns all BLAS result/scratch/compaction memory from here on
-    // (suballocated 8MB blocks, same Initialize size nvrhi uses).
-    m_rtxmu = std::make_shared<rtxmu::DxAccelStructManager>(device);
-    m_rtxmu->Initialize(kRtxmuBlockSize);
+    if (m_useRtxmu)
+    {
+        // RTXMU owns all BLAS result/scratch/compaction memory from here on
+        // (suballocated 8MB blocks, same Initialize size nvrhi uses).
+        m_rtxmu = std::make_shared<rtxmu::DxAccelStructManager>(device);
+        m_rtxmu->Initialize(kRtxmuBlockSize);
+    }
 }
 
 AccelerationStructure::~AccelerationStructure()
@@ -254,7 +318,10 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         if (it != m_blasCache.end())
         {
             it->second.refCount++;
-            slot.blasRtxmuId = it->second.rtxmuId;
+            if (m_useRtxmu)
+                slot.blasRtxmuId = it->second.rtxmuId;
+            else
+                slot.blasVA = it->second.blas ? it->second.blas->GetGPUVirtualAddress() : 0;
             // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] AddRef  vb=%p refCount=%d", (void *)slot.meshInfo.vertexBuffer, it->second.refCount);
             return true;
         }
@@ -292,7 +359,9 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     // fixed topology (only vertex positions change), but if the submesh count ever
     // changes the cached BLAS/scratch sizes no longer apply — fall through to a full
     // rebuild below (the stale BLAS is deferred-released before being replaced).
-    if (isDynamic && slot.dynamicBlas && slot.dynamicBlas->rtxmuId != kInvalidRtxmuId &&
+    if (isDynamic && slot.dynamicBlas &&
+        ((m_useRtxmu && slot.dynamicBlas->rtxmuId != kInvalidRtxmuId) ||
+         (!m_useRtxmu && slot.dynamicBlas->blas)) &&
         slot.dynamicBlas->ommArrays.size() == subCount)
     {
         BLASEntry &existing = *slot.dynamicBlas;
@@ -373,13 +442,39 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         upInputs.DescsLayout  = D3D12_ELEMENTS_LAYOUT_ARRAY;
         upInputs.pGeometryDescs = upGeomDescs.data();
 
-        // RTXMU records the in-place refit: PERFORM_UPDATE|ALLOW_UPDATE routes to
-        // its update path, which reuses the persistent update scratch suballocated
-        // at the initial build — no per-frame prebuild query or scratch allocation.
-        const std::vector<uint64_t> updateIds(1, existing.rtxmuId);
-        m_rtxmu->PopulateUpdateCommandList(cmdList, &upInputs, 1, updateIds);
+        if (m_useRtxmu)
+        {
+            // RTXMU records the in-place refit and reuses its persistent update scratch.
+            const std::vector<uint64_t> updateIds(1, existing.rtxmuId);
+            m_rtxmu->PopulateUpdateCommandList(cmdList, &upInputs, 1, updateIds);
+            slot.blasRtxmuId = existing.rtxmuId;
+        }
+        else
+        {
+            UINT64 updateScratchSize = existing.updateScratchSize;
+            if (updateScratchSize == 0)
+            {
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO upPrebuild = {};
+                m_device->GetRaytracingAccelerationStructurePrebuildInfo(&upInputs, &upPrebuild);
+                updateScratchSize          = upPrebuild.UpdateScratchDataSizeInBytes;
+                existing.updateScratchSize = updateScratchSize;
+            }
+            SharedUploadPool::Allocation upScratch = g_scratchPool.Allocate(
+                updateScratchSize, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
+            if (!upScratch.IsValid())
+            {
+                AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: dynamic update scratch suballoc failed");
+                return false;
+            }
 
-        slot.blasRtxmuId = existing.rtxmuId;
+            D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC upDesc = {};
+            upDesc.SourceAccelerationStructureData = existing.blas->GetGPUVirtualAddress();
+            upDesc.DestAccelerationStructureData   = existing.blas->GetGPUVirtualAddress();
+            upDesc.Inputs                          = upInputs;
+            upDesc.ScratchAccelerationStructureData = upScratch.gpu;
+            cmdList->BuildRaytracingAccelerationStructure(&upDesc, 0, nullptr);
+            slot.blasVA = existing.blas->GetGPUVirtualAddress();
+        }
         return true;
     }
 
@@ -482,8 +577,10 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     if (instanceHasOMM)
         blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_DISABLE_OMMS;
 
-    // Note: ALLOW_COMPACTION is incompatible with ALLOW_UPDATE, so only add it for static BLAS
-    if (!isDynamic)
+    // Note: ALLOW_COMPACTION is incompatible with ALLOW_UPDATE, so only add it for static BLAS.
+    // In the non-RTXMU path, keep the flag even when actual compaction is disabled: current
+    // RTXPT also builds static BLASes with ALLOW_COMPACTION but never performs the copy-compact.
+    if (!isDynamic && (m_useCompaction || !m_useRtxmu))
         blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
@@ -493,28 +590,154 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     inputs.pGeometryDescs = geomDescs.data();
 
-    // RTXMU performs the prebuild query, suballocates result + scratch (+ the
-    // persistent update scratch when ALLOW_UPDATE is set, + the compaction-size
-    // slots when ALLOW_COMPACTION is set) and records the build with the inline
-    // compacted-size emit.
-    std::vector<uint64_t> newIds;
-    m_rtxmu->PopulateBuildCommandList(cmdList, &inputs, 1, newIds);
-    if (newIds.empty())
+    if (!m_useRtxmu)
     {
-        AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: RTXMU build allocation failed");
-        return false;
-    }
-    blas.rtxmuId = newIds[0];
-    m_rtxmuBuildsThisFrame.push_back(newIds[0]);
+        UINT64 totalIndices = 0;
+        UINT64 totalVertices = 0;
+        AccelLogf(m_log, kUnityLogTypeLog,
+                  "[UNITY][BLAS] build begin vb=%p ib=%p submeshHash=%llu dynamic=%d numGeometries=%zu flags=%s useCompaction=%d hasOMM=%d",
+                  (void*)key.vbPtr,
+                  (void*)key.ibPtr,
+                  (unsigned long long)key.submeshHash,
+                  isDynamic ? 1 : 0,
+                  subCount,
+                  BlasBuildFlagsToString(blasFlags),
+                  m_useCompaction ? 1 : 0,
+                  instanceHasOMM ? 1 : 0);
 
-    slot.blasRtxmuId = blas.rtxmuId;
+        for (size_t j = 0; j < subCount; ++j)
+        {
+            const SubMeshData& sub = def.submeshes[j];
+            const D3D12_RAYTRACING_GEOMETRY_DESC& gd = geomDescs[j];
+            const D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC* tri = nullptr;
+            if (gd.Type == D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES)
+                tri = &gd.Triangles;
+            else if (gd.Type == D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES)
+                tri = gd.OmmTriangles.pTriangles;
+
+            if (tri)
+            {
+                totalIndices += tri->IndexCount;
+                totalVertices += tri->VertexCount;
+                AccelLogf(m_log, kUnityLogTypeLog,
+                          "[UNITY][BLAS]   geom[%zu] type=%s flags=%s flagsRaw=%u useTransform=%d indexCount=%u indexOffset=%u indexGpuOffset=%llu indexFormat=%s(%d) vertexCount=%u vertexOffset=%llu baseVertex=%u vertexStride=%llu vertexFormat=%s(%d) hasOMM=%d",
+                          j,
+                          GeometryTypeToString(gd.Type),
+                          GeometryFlagsToString(gd.Flags),
+                          (unsigned)gd.Flags,
+                          tri->Transform3x4 ? 1 : 0,
+                          tri->IndexCount,
+                          sub.indexByteOffset,
+                          (unsigned long long)(tri->IndexBuffer - def.indexBuffer->GetGPUVirtualAddress()),
+                          DxgiFormatToString(tri->IndexFormat),
+                          (int)tri->IndexFormat,
+                          tri->VertexCount,
+                          (unsigned long long)(static_cast<UINT64>(sub.baseVertex) * def.vertexStride),
+                          sub.baseVertex,
+                          (unsigned long long)tri->VertexBuffer.StrideInBytes,
+                          DxgiFormatToString(tri->VertexFormat),
+                          (int)tri->VertexFormat,
+                          gd.Type == D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES ? 1 : 0);
+            }
+            else
+            {
+                AccelLogf(m_log, kUnityLogTypeLog,
+                          "[UNITY][BLAS]   geom[%zu] type=%s flags=%s flagsRaw=%u",
+                          j,
+                          GeometryTypeToString(gd.Type),
+                          GeometryFlagsToString(gd.Flags),
+                          (unsigned)gd.Flags);
+            }
+        }
+        AccelLogf(m_log, kUnityLogTypeLog,
+                  "[UNITY][BLAS] build input totals vb=%p ib=%p submeshHash=%llu totalIndices=%llu totalVertices=%llu",
+                  (void*)key.vbPtr,
+                  (void*)key.ibPtr,
+                  (unsigned long long)key.submeshHash,
+                  (unsigned long long)totalIndices,
+                  (unsigned long long)totalVertices);
+    }
+
+    if (m_useRtxmu)
+    {
+        // RTXMU performs the prebuild query, suballocates result + scratch (+ the
+        // persistent update scratch when ALLOW_UPDATE is set, + the compaction-size
+        // slots when ALLOW_COMPACTION is set) and records the build with the inline
+        // compacted-size emit.
+        std::vector<uint64_t> newIds;
+        m_rtxmu->PopulateBuildCommandList(cmdList, &inputs, 1, newIds);
+        if (newIds.empty())
+        {
+            AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: RTXMU build allocation failed");
+            return false;
+        }
+        blas.rtxmuId = newIds[0];
+        if (m_useCompaction)
+            m_rtxmuBuildsThisFrame.push_back(newIds[0]);
+        slot.blasRtxmuId = blas.rtxmuId;
+    }
+    else
+    {
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
+        m_device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
+        if (isDynamic)
+            blas.updateScratchSize = prebuildInfo.UpdateScratchDataSizeInBytes;
+
+        AccelLogf(m_log, kUnityLogTypeLog,
+                  "[UNITY][BLAS] D3D12 prebuild vb=%p ib=%p submeshHash=%llu result=%llu scratch=%llu updateScratch=%llu",
+                  (void*)key.vbPtr,
+                  (void*)key.ibPtr,
+                  (unsigned long long)key.submeshHash,
+                  (unsigned long long)prebuildInfo.ResultDataMaxSizeInBytes,
+                  (unsigned long long)prebuildInfo.ScratchDataSizeInBytes,
+                  (unsigned long long)prebuildInfo.UpdateScratchDataSizeInBytes);
+
+        D3D12_HEAP_PROPERTIES defaultHeap = {};
+        defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+        wchar_t blasName[64];
+        swprintf(blasName, 64, isDynamic ? L"BLAS_Dynamic_VB_%p" : L"BLAS_Static_VB_%p", (void *)key.vbPtr);
+
+        SharedUploadPool::Allocation blasScratch = g_scratchPool.Allocate(
+            prebuildInfo.ScratchDataSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
+        blas.blas = CreateBuffer(m_device.Get(),
+                                 prebuildInfo.ResultDataMaxSizeInBytes,
+                                 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+                                 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                                 defaultHeap, blasName);
+        if (!blasScratch.IsValid() || !blas.blas)
+        {
+            AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: buffer allocation failed");
+            return false;
+        }
+
+        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
+        buildDesc.DestAccelerationStructureData = blas.blas->GetGPUVirtualAddress();
+        buildDesc.Inputs = inputs;
+        buildDesc.ScratchAccelerationStructureData = blasScratch.gpu;
+        AccelLogf(m_log, kUnityLogTypeLog,
+                  "[UNITY][BLAS] D3D12 build sizes vb=%p ib=%p submeshHash=%llu result=%llu scratchUsed=%llu allocated=%llu destGpuVA=0x%llx sourceGpuVA=0x0",
+                  (void*)key.vbPtr,
+                  (void*)key.ibPtr,
+                  (unsigned long long)key.submeshHash,
+                  (unsigned long long)prebuildInfo.ResultDataMaxSizeInBytes,
+                  (unsigned long long)prebuildInfo.ScratchDataSizeInBytes,
+                  (unsigned long long)prebuildInfo.ResultDataMaxSizeInBytes,
+                  (unsigned long long)blas.blas->GetGPUVirtualAddress());
+        cmdList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
+        slot.blasVA = blas.blas->GetGPUVirtualAddress();
+    }
+
     if(isDynamic){
         // If a stale dynamic BLAS is being replaced (e.g. submesh count changed, so
         // the update fast-path was skipped above), release its RTXMU memory and OMM
         // buffers — both go through GPU-safe deferred frees inside the helper.
         if (slot.dynamicBlas)
         {
-            ReleaseBLASEntryResources(*slot.dynamicBlas);
+            if (m_useRtxmu)
+                ReleaseBLASEntryResources(*slot.dynamicBlas);
+            else
+                RetireObject(slot.dynamicBlas.release());
             slot.dynamicBlas.reset();
         }
         // Store the BLASEntry in the slot so it can be reused (via PERFORM_UPDATE) next frame.
@@ -526,6 +749,8 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Add     vb=%p refCount=1 (new, anyOMM=%d)",
         //           (void*)key.vbPtr, (int)blas.anyOMM);
         m_blasCache.emplace(key, std::move(blas));
+        if (m_useCompaction && !m_useRtxmu)
+            m_compactionQueue.push_back(key);
     }
 
     return true;
@@ -569,6 +794,8 @@ void AccelerationStructure::ReleaseBLASEntryResources(BLASEntry &e)
         ScheduleRtxmuRemove(e.rtxmuId);
         e.rtxmuId = kInvalidRtxmuId;
     }
+    if (e.blas)
+        SafeReleaseResource(std::move(e.blas));
     // OMM-array build scratch and array/desc input blobs are pool-owned;
     // only the built OMM Array AS and its index buffer remain to release here.
     for (auto &r : e.ommArrays)
@@ -584,6 +811,8 @@ void AccelerationStructure::ReleaseBLASEntryResources(BLASEntry &e)
 // ---------------------------------------------------------------------------
 void AccelerationStructure::ScheduleRtxmuRemove(uint64_t id)
 {
+    if (!m_rtxmu)
+        return;
     // The lambda holds a shared_ptr so the manager outlives this object if the
     // AccelerationStructure itself is retired before the cleanup drains.
     EnqueueCleanup([mgr = m_rtxmu, id]()
@@ -609,7 +838,7 @@ void AccelerationStructure::ScrubPendingRtxmuId(uint64_t id)
 
 D3D12_GPU_VIRTUAL_ADDRESS AccelerationStructure::ResolveBlasVA(uint64_t id) const
 {
-    return (id != kInvalidRtxmuId && m_rtxmu->IsValid(id))
+    return (m_rtxmu && id != kInvalidRtxmuId && m_rtxmu->IsValid(id))
         ? m_rtxmu->GetAccelStructGPUVA(id)
         : 0;
 }
@@ -685,13 +914,139 @@ void AccelerationStructure::ProcessRtxmuCompaction(ID3D12GraphicsCommandList4 *c
     }
 }
 
+void AccelerationStructure::QueueCompactionSizeQueries(ID3D12GraphicsCommandList4 *cmdList)
+{
+    if (m_compactionQueue.empty())
+        return;
+
+    PendingCompactionBatch batch;
+    batch.keys.reserve(m_compactionQueue.size());
+    std::vector<D3D12_GPU_VIRTUAL_ADDRESS> vas;
+    vas.reserve(m_compactionQueue.size());
+    for (const MeshKey &key : m_compactionQueue)
+    {
+        auto it = m_blasCache.find(key);
+        if (it == m_blasCache.end() || !it->second.blas)
+            continue;
+        batch.keys.push_back(key);
+        vas.push_back(it->second.blas->GetGPUVirtualAddress());
+    }
+    m_compactionQueue.clear();
+    if (batch.keys.empty())
+        return;
+
+    const UINT64 bytes = batch.keys.size() * sizeof(uint64_t);
+
+    D3D12_HEAP_PROPERTIES defaultHeap = {};
+    defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_HEAP_PROPERTIES readbackHeap = {};
+    readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+    batch.buildFrame = m_frameCounter;
+    batch.sizeBuffer = CreateBuffer(m_device.Get(), bytes,
+        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        defaultHeap, L"BLAS_CompactSizeUAV");
+    batch.readbackBuffer = CreateBuffer(m_device.Get(), bytes,
+        D3D12_RESOURCE_FLAG_NONE,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        readbackHeap, L"BLAS_CompactSizeReadback");
+    if (!batch.sizeBuffer || !batch.readbackBuffer)
+        return;
+    batch.readbackBuffer->Map(0, nullptr, &batch.mappedReadback);
+
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC postbuildDesc = {};
+    postbuildDesc.DestBuffer = batch.sizeBuffer->GetGPUVirtualAddress();
+    postbuildDesc.InfoType   = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE;
+    cmdList->EmitRaytracingAccelerationStructurePostbuildInfo(
+        &postbuildDesc, static_cast<UINT>(vas.size()), vas.data());
+
+    D3D12_RESOURCE_BARRIER transBarrier = {};
+    transBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    transBarrier.Transition.pResource   = batch.sizeBuffer.Get();
+    transBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    transBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    transBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &transBarrier);
+
+    cmdList->CopyBufferRegion(batch.readbackBuffer.Get(), 0, batch.sizeBuffer.Get(), 0, bytes);
+
+    m_pendingCompactionBatches.push_back(std::move(batch));
+}
+
+void AccelerationStructure::ProcessPendingCompactions(ID3D12GraphicsCommandList4 *cmdList)
+{
+    if (m_pendingCompactionBatches.empty())
+        return;
+
+    auto batchIt = m_pendingCompactionBatches.begin();
+    while (batchIt != m_pendingCompactionBatches.end())
+    {
+        if (m_frameCounter - batchIt->buildFrame < 3)
+        {
+            ++batchIt;
+            continue;
+        }
+
+        const uint64_t* sizes = static_cast<const uint64_t *>(batchIt->mappedReadback);
+
+        for (size_t e = 0; e < batchIt->keys.size(); ++e)
+        {
+            const MeshKey &key           = batchIt->keys[e];
+            const uint64_t compactedSize = sizes ? sizes[e] : 0;
+
+            auto cacheIt = m_blasCache.find(key);
+            if (cacheIt == m_blasCache.end() || compactedSize == 0 || !cacheIt->second.blas)
+                continue;
+
+            BLASEntry &entry = cacheIt->second;
+
+            D3D12_HEAP_PROPERTIES defaultHeap = {};
+            defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+            wchar_t name[64];
+            swprintf(name, 64, L"BLAS_Compacted_VB_%p", (void *)key.vbPtr);
+            auto compactedBlas = CreateBuffer(m_device.Get(), compactedSize,
+                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+                D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                defaultHeap, name);
+            if (!compactedBlas)
+                continue;
+
+            cmdList->CopyRaytracingAccelerationStructure(
+                compactedBlas->GetGPUVirtualAddress(),
+                entry.blas->GetGPUVirtualAddress(),
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_COMPACT);
+
+            D3D12_GPU_VIRTUAL_ADDRESS oldVA = entry.blas->GetGPUVirtualAddress();
+            D3D12_GPU_VIRTUAL_ADDRESS newVA = compactedBlas->GetGPUVirtualAddress();
+            SafeReleaseResource(std::move(entry.blas));
+            entry.blas = std::move(compactedBlas);
+
+            for (auto &slot : m_slots)
+            {
+                if (slot.active && slot.blasVA == oldVA)
+                    slot.blasVA = newVA;
+            }
+        }
+
+        if (batchIt->mappedReadback)
+            batchIt->readbackBuffer->Unmap(0, nullptr);
+        batchIt = m_pendingCompactionBatches.erase(batchIt);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // GetBLASVA / HasAnyOMM
 // ---------------------------------------------------------------------------
 D3D12_GPU_VIRTUAL_ADDRESS AccelerationStructure::GetBLASVA(const MeshKey &key) const
 {
     auto it = m_blasCache.find(key);
-    return (it != m_blasCache.end()) ? ResolveBlasVA(it->second.rtxmuId) : 0;
+    if (it == m_blasCache.end())
+        return 0;
+    return m_useRtxmu
+        ? ResolveBlasVA(it->second.rtxmuId)
+        : (it->second.blas ? it->second.blas->GetGPUVirtualAddress() : 0);
 }
 
 ID3D12Resource* AccelerationStructure::GetTLAS() const
@@ -984,6 +1339,11 @@ void AccelerationStructure::Clear()
     m_rtxmuBuildsThisFrame.clear();
     m_rtxmuPendingCompaction.clear();
     m_rtxmuPendingGC.clear();
+    m_compactionQueue.clear();
+    for (auto &batch : m_pendingCompactionBatches)
+        if (batch.mappedReadback && batch.readbackBuffer)
+            batch.readbackBuffer->Unmap(0, nullptr);
+    m_pendingCompactionBatches.clear();
 
     // NOTE: We no longer defer deletion of vertex/index buffers from slots because we don't own them.
     // Unity manages these resources, and we only store raw pointers without AddRef.
@@ -1287,7 +1647,13 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
     // Step 0: Advance frame counter and compact any ready pending BLASes
     // -------------------------------------------------------------------
     ++m_frameCounter;
-    ProcessRtxmuCompaction(cmdList);
+    if (m_useCompaction)
+    {
+        if (m_useRtxmu)
+            ProcessRtxmuCompaction(cmdList);
+        else
+            ProcessPendingCompactions(cmdList);
+    }
 
     // -------------------------------------------------------------------
     // Step A: Build any pending new BLASes.
@@ -1329,9 +1695,19 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
         cmdList->ResourceBarrier(1, &blasBarrier);
     }
 
-    // Record the compaction-size readback copies for this frame's RTXMU builds
-    // (must follow the global UAV barrier above so the builds are complete).
-    FlushRtxmuBuilds(cmdList);
+    if (m_useCompaction)
+    {
+        if (m_useRtxmu)
+        {
+            // Record the compaction-size readback copies for this frame's RTXMU builds
+            // (must follow the global UAV barrier above so the builds are complete).
+            FlushRtxmuBuilds(cmdList);
+        }
+        else
+        {
+            QueueCompactionSizeQueries(cmdList);
+        }
+    }
 
     // Emit TLAS instances in caller-specified order (SetInstanceOrderIndex), not raw slot
     // order: freed slots are reused, so slot order diverges from registration order after
@@ -1351,9 +1727,9 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
     {
         const InstanceSlot &slot = m_slots[s];
         TLASInstanceEntry e;
-        // Resolve the BLAS VA per frame — RTXMU moves the BLAS to its compacted
-        // location once compaction is recorded, and the id tracks that.
-        e.blasVA = ResolveBlasVA(slot.blasRtxmuId);
+        // RTXMU BLASes can move after compaction; legacy committed BLASes keep a
+        // patched VA in the slot when compacted.
+        e.blasVA = m_useRtxmu ? ResolveBlasVA(slot.blasRtxmuId) : slot.blasVA;
         e.instanceID = slot.customInstanceID;
         e.mask = slot.mask;
         memcpy(e.transform, slot.transform, 48);

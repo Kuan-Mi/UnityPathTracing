@@ -26,6 +26,14 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern ulong NR_CreateAccelerationStructure();
 
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateAccelerationStructureEx([MarshalAs(UnmanagedType.I1)] bool useRtxmu);
+
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateAccelerationStructureEx2(
+            [MarshalAs(UnmanagedType.I1)] bool useRtxmu,
+            [MarshalAs(UnmanagedType.I1)] bool useCompaction);
+
         /// <summary>Destroys an acceleration structure created by NR_CreateAccelerationStructure.</summary>
         [DllImport(DllName)]
         public static extern void NR_DestroyAccelerationStructure(ulong handle);

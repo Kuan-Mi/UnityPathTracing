@@ -46,6 +46,11 @@
 
 using Microsoft::WRL::ComPtr;
 
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateAccelerationStructureEx(bool useRtxmu);
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateAccelerationStructureEx2(bool useRtxmu, bool useCompaction);
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -338,6 +343,18 @@ UnityPluginUnload()
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateAccelerationStructure()
 {
+    return NR_CreateAccelerationStructureEx2(true, true);
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateAccelerationStructureEx(bool useRtxmu)
+{
+    return NR_CreateAccelerationStructureEx2(useRtxmu, true);
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateAccelerationStructureEx2(bool useRtxmu, bool useCompaction)
+{
     if (!s_RendererReady)
     {
         NR_WARN("NR_CreateAccelerationStructure called before renderer is ready");
@@ -351,7 +368,7 @@ NR_CreateAccelerationStructure()
         NR_ERROR("NR_CreateAccelerationStructure: failed to obtain ID3D12Device5");
         return 0;
     }
-    auto* as = new AccelerationStructure(dev, s_Log);
+    auto* as = new AccelerationStructure(dev, s_Log, useRtxmu, useCompaction);
     dev->Release(); // QueryInterface added a ref, release it now
     if (s_D3D12v8)
         as->SetUnityGraphics(s_D3D12v8);

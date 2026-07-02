@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NativeRender;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using RayTracingAccelerationStructure = NativeRender.RayTracingAccelerationStructure;
@@ -62,6 +63,8 @@ namespace PathTracing
         // Bindless
         private BindlessBuffer  _sceneBuffers;
         private BindlessTexture _sceneTextures;
+        private GraphicsBuffer  _mergedStaticVertexBuffer;
+        private GraphicsBuffer  _mergedStaticIndexBuffer;
 
         // CPU-side mirrors
         private DonutInstanceData[] _instanceCpu;
@@ -99,12 +102,33 @@ namespace PathTracing
         }
 
         private readonly Dictionary<int, RendererEntry>    _rendererEntries = new();
-        private readonly Dictionary<int, (int vb, int ib)> _meshBufferSlots = new();
+        private readonly Dictionary<int, MergedMeshOffsets> _mergedMeshOffsets = new();
 
         // Skinned instances: bindless slot pair per renderer (own SoA VB + shared donut IB),
         // and the set of mesh ids referenced this rebuild (for geometry-cache eviction).
         private readonly Dictionary<int, (int vb, int ib)> _skinnedBufferSlots = new();
         private readonly HashSet<int>                      _usedMeshIds        = new();
+
+        private readonly struct MergedMeshOffsets
+        {
+            public readonly uint IndexBaseBytes;
+            public readonly uint PositionOffset;
+            public readonly uint PrevPositionOffset;
+            public readonly uint NormalOffset;
+            public readonly uint TexCoord1Offset;
+            public readonly uint TangentOffset;
+
+            public MergedMeshOffsets(uint indexBaseBytes, uint positionOffset, uint prevPositionOffset,
+                uint normalOffset, uint texCoord1Offset, uint tangentOffset)
+            {
+                IndexBaseBytes      = indexBaseBytes;
+                PositionOffset      = positionOffset;
+                PrevPositionOffset  = prevPositionOffset;
+                NormalOffset        = normalOffset;
+                TexCoord1Offset     = texCoord1Offset;
+                TangentOffset       = tangentOffset;
+            }
+        }
 
         // One repack dispatch per skinned renderer, rebuilt on topology change and consumed by
         // RtxptBuildTlasPass every frame before the TLAS/BLAS build.
@@ -206,7 +230,11 @@ namespace PathTracing
 
         public RtxptGPUScene()
         {
-            _accelStructure = new RayTracingAccelerationStructure();
+            _accelStructure = new RayTracingAccelerationStructure(new RayTracingAccelerationStructureOptions
+            {
+                UseRtxmu      = false,
+                UseCompaction = false
+            });
         }
 
         public void MarkRebuildDirty() => _forceRebuild = true;
@@ -410,6 +438,10 @@ namespace PathTracing
             _geomDebugGpuBuf?.Release();
             _geomDebugGpuBuf    = null;
             _geomDebugGpuBufPtr = IntPtr.Zero;
+            _mergedStaticVertexBuffer?.Release();
+            _mergedStaticVertexBuffer = null;
+            _mergedStaticIndexBuffer?.Release();
+            _mergedStaticIndexBuffer = null;
             _sceneBuffers?.Dispose();
             _sceneBuffers = null;
             _sceneTextures?.Dispose();
@@ -422,7 +454,7 @@ namespace PathTracing
             _geomDebugCpu   = null;
             _instanceHandles.Clear();
             _rendererEntries.Clear();
-            _meshBufferSlots.Clear();
+            _mergedMeshOffsets.Clear();
             _skinnedBufferSlots.Clear();
             _usedMeshIds.Clear();
             _overrideMaterialIndices.Clear();
@@ -452,6 +484,16 @@ namespace PathTracing
             var geomDbgList = new List<GeometryDebugData>();
             var bufPtrs     = new List<IntPtr>();
 
+            BuildMergedStaticGeometryBuffers();
+            (int vb, int ib) staticSlots = (-1, -1);
+            if (_mergedStaticIndexBuffer != null && _mergedStaticVertexBuffer != null)
+            {
+                // Donut creates the index descriptor before the vertex descriptor.
+                staticSlots = (vb: 1, ib: 0);
+                bufPtrs.Add(_mergedStaticIndexBuffer.GetNativeBufferPtr());
+                bufPtrs.Add(_mergedStaticVertexBuffer.GetNativeBufferPtr());
+            }
+
             foreach (var rec in _layout)
             {
                 Mesh mesh   = rec.Mesh;
@@ -459,38 +501,40 @@ namespace PathTracing
                 _usedMeshIds.Add(meshId);
 
                 (int vb, int ib) slots;
+                MergedMeshOffsets merged = default;
                 if (rec.IsSkinned)
                 {
                     // Per-instance SoA VB (rewritten each frame by the repack compute) + shared
                     // per-mesh donut IB, registered as their own bindless slot pair per renderer.
                     if (!_skinnedBufferSlots.TryGetValue(rec.RendererId, out slots))
                     {
-                        slots = (bufPtrs.Count, bufPtrs.Count + 1);
-                        if (bufPtrs.Count > 0xFFFF)
-                            Debug.LogError($"[RtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
-                        bufPtrs.Add(rec.SkinnedVb.GetNativeBufferPtr());
+                        slots = (vb: bufPtrs.Count + 1, ib: bufPtrs.Count);
+                        if (slots.vb > 0xFFFF)
+                            Debug.LogError($"[RtxptGPUScene] Bindless buffer slot overflow: VB slot index {slots.vb} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
                         bufPtrs.Add(rec.SkinnedIb.GetNativeBufferPtr());
+                        bufPtrs.Add(rec.SkinnedVb.GetNativeBufferPtr());
                         _skinnedBufferSlots[rec.RendererId] = slots;
                     }
                 }
-                else if (!_meshBufferSlots.TryGetValue(meshId, out slots))
+                else
                 {
-                    var (donutVb, donutIb) = _geometryCache.GetOrCreate(mesh);
-
-                    slots = (bufPtrs.Count, bufPtrs.Count + 1);
-                    // SubInstanceData.IndexBufferIndex_VertexBufferIndex packs both as 16-bit.
-                    if (bufPtrs.Count > 0xFFFF)
-                        Debug.LogError($"[RtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
-                    bufPtrs.Add(donutVb.GetNativeBufferPtr());
-                    bufPtrs.Add(donutIb.GetNativeBufferPtr());
-                    _meshBufferSlots[meshId] = slots;
+                    slots = staticSlots;
+                    if (!_mergedMeshOffsets.TryGetValue(meshId, out merged))
+                    {
+                        Debug.LogError($"[RtxptGPUScene] Missing merged static geometry offsets for mesh '{mesh.name}'.");
+                        merged = new MergedMeshOffsets(0u, 0u, 0u,
+                            RtxptMeshStreamOffsets.Absent, RtxptMeshStreamOffsets.Absent, RtxptMeshStreamOffsets.Absent);
+                    }
 
                     // if (!mesh.HasVertexAttribute(VertexAttribute.Normal) ||
                     //     !mesh.HasVertexAttribute(VertexAttribute.Tangent))
                     //     Debug.LogWarning($"[RtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
                 }
 
-                var streams = new RtxptMeshStreamOffsets(mesh, withPrevPosition: rec.IsSkinned);
+                var streams = rec.IsSkinned ? new RtxptMeshStreamOffsets(mesh, withPrevPosition: true) : default;
+                var offsets = rec.IsSkinned
+                    ? new MergedMeshOffsets(0u, streams.Pos, streams.PrevPos, streams.Normal, streams.Uv, streams.Tangent)
+                    : merged;
 
                 // Per-renderer material-index array for the lightweight material-edit path.
                 // A renderer's records are consecutive in the layout; the array spans all of
@@ -504,7 +548,7 @@ namespace PathTracing
 
                 int firstGeom = geomList.Count;
                 foreach (int s in rec.SubmeshIndices)
-                    AddSubmeshGeometry(rec, s, slots, streams, matTable, geomList, subInstList, geomDbgList, overrideMatIndices);
+                    AddSubmeshGeometry(rec, s, slots, offsets, matTable, geomList, subInstList, geomDbgList, overrideMatIndices);
 
                 // TLAS InstanceID must be the SubInstanceData base offset (firstGeometryInstanceIndex),
                 // NOT the instance index: the any-hit alpha test indexes t_SubInstanceData[InstanceID()
@@ -617,11 +661,145 @@ namespace PathTracing
             _sceneGpuDirty = false;
         }
 
+        private void BuildMergedStaticGeometryBuffers()
+        {
+            var meshes     = new List<(Mesh mesh, int meshId, RtxptMeshStreamOffsets streams, NativeArray<uint> vb, uint vertexBase, uint indexBaseBytes)>();
+            var indexWords = new List<uint>();
+            var seenMeshes = new HashSet<int>();
+
+            uint totalVertices = 0u;
+            bool hasNormal     = false;
+            bool hasUv         = false;
+            bool hasTangent    = false;
+
+            foreach (var rec in _layout)
+            {
+                if (rec.IsSkinned) continue;
+
+                Mesh mesh = rec.Mesh;
+                if (mesh == null) continue;
+
+                int meshId = mesh.GetInstanceID();
+                if (!seenMeshes.Add(meshId)) continue;
+
+                var streams = new RtxptMeshStreamOffsets(mesh);
+                using NativeArray<uint> vb = RtxptGeometryCache.BuildSoAVertexData(mesh, streams);
+                using NativeArray<uint> ib = RtxptGeometryCache.BuildIndexData(mesh);
+
+                uint vertexBase    = totalVertices;
+                uint indexBaseBytes = (uint)indexWords.Count * 4u;
+
+                hasNormal  |= streams.HasNormal;
+                hasUv      |= streams.HasUv;
+                hasTangent |= streams.HasTangent;
+
+                for (int i = 0; i < ib.Length; i++)
+                    indexWords.Add(ib[i]);
+
+                var vbCopy = new NativeArray<uint>(vb.Length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+                NativeArray<uint>.Copy(vb, vbCopy);
+                meshes.Add((mesh, meshId, streams, vbCopy, vertexBase, indexBaseBytes));
+                totalVertices += (uint)mesh.vertexCount;
+            }
+
+            if (seenMeshes.Count == 0)
+                return;
+
+            uint posBase     = 0u;
+            uint writeCursor = Align16(totalVertices * 12u);
+            uint normalBase  = RtxptMeshStreamOffsets.Absent;
+            uint tangentBase = RtxptMeshStreamOffsets.Absent;
+            uint uvBase      = RtxptMeshStreamOffsets.Absent;
+
+            if (hasNormal)
+            {
+                normalBase  = writeCursor;
+                writeCursor = Align16(writeCursor + totalVertices * 4u);
+            }
+
+            if (hasTangent)
+            {
+                tangentBase = writeCursor;
+                writeCursor = Align16(writeCursor + totalVertices * 4u);
+            }
+
+            if (hasUv)
+            {
+                uvBase      = writeCursor;
+                writeCursor = Align16(writeCursor + totalVertices * 8u);
+            }
+
+            var vertexWords = new uint[Mathf.Max((int)(writeCursor / 4u), 1)];
+
+            foreach (var entry in meshes)
+            {
+                int  vc                 = entry.mesh.vertexCount;
+                uint meshPositionOffset = posBase + entry.vertexBase * 12u;
+                uint meshNormalOffset   = normalBase != RtxptMeshStreamOffsets.Absent
+                    ? normalBase + entry.vertexBase * 4u
+                    : RtxptMeshStreamOffsets.Absent;
+                uint meshTangentOffset = tangentBase != RtxptMeshStreamOffsets.Absent
+                    ? tangentBase + entry.vertexBase * 4u
+                    : RtxptMeshStreamOffsets.Absent;
+                uint meshUvOffset = uvBase != RtxptMeshStreamOffsets.Absent
+                    ? uvBase + entry.vertexBase * 8u
+                    : RtxptMeshStreamOffsets.Absent;
+
+                CopyWords(entry.vb, entry.streams.Pos, vertexWords, meshPositionOffset, (uint)vc * 12u);
+                if (entry.streams.HasNormal && meshNormalOffset != RtxptMeshStreamOffsets.Absent)
+                    CopyWords(entry.vb, entry.streams.Normal, vertexWords, meshNormalOffset, (uint)vc * 4u);
+                if (entry.streams.HasTangent && meshTangentOffset != RtxptMeshStreamOffsets.Absent)
+                    CopyWords(entry.vb, entry.streams.Tangent, vertexWords, meshTangentOffset, (uint)vc * 4u);
+                if (entry.streams.HasUv && meshUvOffset != RtxptMeshStreamOffsets.Absent)
+                    CopyWords(entry.vb, entry.streams.Uv, vertexWords, meshUvOffset, (uint)vc * 8u);
+
+                _mergedMeshOffsets[entry.meshId] = new MergedMeshOffsets(
+                    indexBaseBytes: 0u, // overwritten below
+                    positionOffset: meshPositionOffset,
+                    prevPositionOffset: meshPositionOffset,
+                    normalOffset: meshNormalOffset,
+                    texCoord1Offset: meshUvOffset,
+                    tangentOffset: meshTangentOffset);
+            }
+
+            foreach (var entry in meshes)
+            {
+                var existing = _mergedMeshOffsets[entry.meshId];
+                _mergedMeshOffsets[entry.meshId] = new MergedMeshOffsets(entry.indexBaseBytes,
+                    existing.PositionOffset, existing.PrevPositionOffset, existing.NormalOffset,
+                    existing.TexCoord1Offset, existing.TangentOffset);
+                entry.vb.Dispose();
+            }
+
+            _mergedStaticIndexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Raw, Mathf.Max(indexWords.Count, 1), 4)
+            {
+                name = "IndexBuffer"
+            };
+            _mergedStaticIndexBuffer.SetData(indexWords.ToArray());
+
+            _mergedStaticVertexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Raw, Mathf.Max(vertexWords.Length, 1), 4)
+            {
+                name = "VertexBuffer"
+            };
+            _mergedStaticVertexBuffer.SetData(vertexWords);
+        }
+
+        private static uint Align16(uint value) => (value + 15u) & ~15u;
+
+        private static void CopyWords(NativeArray<uint> src, uint srcByteOffset, uint[] dst, uint dstByteOffset, uint byteCount)
+        {
+            int srcWord = (int)(srcByteOffset / 4u);
+            int dstWord = (int)(dstByteOffset / 4u);
+            int words   = (int)(byteCount / 4u);
+            for (int i = 0; i < words; i++)
+                dst[dstWord + i] = src[srcWord + i];
+        }
+
         // Appends geometry + sub-instance + debug data for one assigned sub-mesh of a record.
         // Only called for sub-meshes the layout has already confirmed assigned, so
         // rec.Renderer.Slots[s] is non-null here.
         private void AddSubmeshGeometry(RtxptInstanceRecord rec, int s, (int vb, int ib) slots,
-            in RtxptMeshStreamOffsets streams, RtxptMaterialTable matTable,
+            in MergedMeshOffsets offsets, RtxptMaterialTable matTable,
             List<DonutGeometryData> geomList, List<SubInstanceData> subInstList,
             List<GeometryDebugData> geomDbgList, int[] overrideMatIndices)
         {
@@ -646,16 +824,16 @@ namespace PathTracing
                 numIndices        = (uint)sub.indexCount,
                 numVertices       = (uint)mesh.vertexCount,
                 indexBufferIndex  = slots.ib,
-                indexOffset       = (uint)sub.indexStart * 4u, // donut IB is always uint32
+                indexOffset       = offsets.IndexBaseBytes + (uint)sub.indexStart * 4u, // donut IB is always uint32
                 vertexBufferIndex = slots.vb,
-                positionOffset    = streams.Pos,
+                positionOffset    = offsets.PositionOffset,
                 // Skinned buffers carry a real PrevPosition stream (repack copies last frame's
                 // positions there, donut SkinningPass model); static buffers alias positions.
-                prevPositionOffset = streams.PrevPos,
-                texCoord1Offset    = streams.Uv,
+                prevPositionOffset = offsets.PrevPositionOffset,
+                texCoord1Offset    = offsets.TexCoord1Offset,
                 texCoord2Offset    = 0xFFFFFFFFu,
-                normalOffset       = streams.Normal,
-                tangentOffset      = streams.Tangent,
+                normalOffset       = offsets.NormalOffset,
+                tangentOffset      = offsets.TangentOffset,
                 curveRadiusOffset  = 0xFFFFFFFFu,
                 materialIndex      = (uint)matIdx,
             });
@@ -698,8 +876,8 @@ namespace PathTracing
                 // ResolveAnalyticProxyLights once the analytic light global indices are known.
                 AnalyticProxyLightIndex            = 0xFFFFFFFFu,
                 IndexBufferIndex_VertexBufferIndex = ((uint)slots.ib << 16) | ((uint)slots.vb & 0xFFFFu),
-                IndexOffset                        = (uint)sub.indexStart * 4u,
-                TexCoord1Offset                    = streams.Uv,
+                IndexOffset                        = offsets.IndexBaseBytes + (uint)sub.indexStart * 4u,
+                TexCoord1Offset                    = offsets.TexCoord1Offset,
                 padding0                           = 0u,
             });
 

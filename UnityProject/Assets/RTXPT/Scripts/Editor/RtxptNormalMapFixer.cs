@@ -36,6 +36,10 @@ namespace PathTracing
         // RTXPT BC7_UNORM asset format and keeps the packed DDNA channels intact for the raw decode.
         private const TextureImporterCompression OriginalNormalTextureCompression = TextureImporterCompression.CompressedHQ;
 
+        // The normal, base color, and metal-rough source assets were re-exported at 4K; match that
+        // resolution on import instead of Unity's default 2048 cap.
+        private const int OriginalMaxTextureSize = 4096;
+
         [MenuItem("RTXPT/Validate Normal Map Texture Types…")]
         private static void Validate() => Run(fix: false);
 
@@ -53,6 +57,12 @@ namespace PathTracing
 
         [MenuItem("RTXPT/Fix Metal-Rough Texture Color Space")]
         private static void FixOrm() => RunOrm(fix: true);
+
+        [MenuItem("RTXPT/Validate Base Color & Metal-Rough Texture Compression…")]
+        private static void ValidateAlbedoOrmCompression() => RunAlbedoOrmCompression(fix: false);
+
+        [MenuItem("RTXPT/Fix Base Color & Metal-Rough Texture Compression")]
+        private static void FixAlbedoOrmCompression() => RunAlbedoOrmCompression(fix: true);
 
         private static void Run(bool fix)
         {
@@ -188,6 +198,7 @@ namespace PathTracing
                         importer.convertToNormalmap  = false;
                         importer.textureCompression  = OriginalNormalTextureCompression;
                         importer.crunchedCompression = false; // plain BC7, matching RTXPT's BC7_UNORM
+                        importer.maxTextureSize      = OriginalMaxTextureSize;
                         importer.SaveAndReimport();
                         fixedCount++;
                     }
@@ -227,17 +238,19 @@ namespace PathTracing
                    && !importer.sRGBTexture
                    && !importer.convertToNormalmap
                    && !importer.crunchedCompression
-                   && importer.textureCompression == OriginalNormalTextureCompression;
+                   && importer.textureCompression == OriginalNormalTextureCompression
+                   && importer.maxTextureSize == OriginalMaxTextureSize;
         }
 
         private static string DescribeOriginalNormalImport(TextureImporter importer)
         {
-            return "expected Default/linear/BC7; "
+            return "expected Default/linear/BC7/4K; "
                    + $"type {importer.textureType} → {TextureImporterType.Default}, "
                    + $"sRGB {importer.sRGBTexture} → False, "
                    + $"convertToNormalmap {importer.convertToNormalmap} → False, "
                    + $"crunched {importer.crunchedCompression} → False, "
-                   + $"compression {importer.textureCompression} → {OriginalNormalTextureCompression}";
+                   + $"compression {importer.textureCompression} → {OriginalNormalTextureCompression}, "
+                   + $"maxSize {importer.maxTextureSize} → {OriginalMaxTextureSize}";
         }
 
         private static void RunOrm(bool fix)
@@ -337,6 +350,108 @@ namespace PathTracing
                     : $"Scanned {desiredByPath.Count} unique metal-rough maps.\n" +
                       $"{wrong.Count} wrong color space, {okCount} correct.\n\nSee Console for details.",
                 "OK");
+        }
+
+        // The original RTXPT base color, metallic, and roughness maps are all BC7_UNORM. Metalness and
+        // roughness are packed into the same OcclusionRoughnessMetallicTexture, so fixing that one
+        // texture's compression covers both channels; base color is BaseOrDiffuseTexture. Colour space
+        // (sRGB/linear) is handled separately by RunOrm — this only touches compression format.
+        private static void RunAlbedoOrmCompression(bool fix)
+        {
+            string[] guids = AssetDatabase.FindAssets("t:RtxptMaterial");
+
+            var checkedPaths    = new HashSet<string>();
+            var wrong           = new List<string>(); // "<texPath>  (...)"
+            int fixedCount      = 0;
+            int okCount         = 0;
+            int missingImporter = 0;
+
+            try
+            {
+                if (fix) AssetDatabase.StartAssetEditing();
+
+                for (int i = 0; i < guids.Length; i++)
+                {
+                    string matPath = AssetDatabase.GUIDToAssetPath(guids[i]);
+                    var    mat     = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(matPath);
+                    if (mat == null) continue;
+
+                    EditorUtility.DisplayProgressBar(
+                        fix ? "Fixing base color / metal-rough compression" : "Validating base color / metal-rough compression",
+                        matPath, (float)i / Mathf.Max(1, guids.Length));
+
+                    CheckOrFixBc7Compression(mat.BaseOrDiffuseTexture, mat.name, fix,
+                        checkedPaths, wrong, ref fixedCount, ref okCount, ref missingImporter);
+                    CheckOrFixBc7Compression(mat.OcclusionRoughnessMetallicTexture, mat.name, fix,
+                        checkedPaths, wrong, ref fixedCount, ref okCount, ref missingImporter);
+                }
+            }
+            finally
+            {
+                if (fix) AssetDatabase.StopAssetEditing();
+                EditorUtility.ClearProgressBar();
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"[RtxptNormalMapFixer] Base color / metal-rough BC7 compression {(fix ? "fix" : "validation")} complete.");
+            sb.AppendLine($"  Materials scanned : {guids.Length}");
+            sb.AppendLine($"  Unique textures   : {checkedPaths.Count}");
+            sb.AppendLine($"  Already correct   : {okCount}");
+            sb.AppendLine($"  Wrong compression : {wrong.Count}");
+            if (fix) sb.AppendLine($"  Fixed             : {fixedCount}");
+            if (missingImporter > 0) sb.AppendLine($"  No TextureImporter : {missingImporter}");
+            foreach (string w in wrong) sb.AppendLine($"    - {w}");
+
+            Debug.Log(sb.ToString().TrimEnd());
+
+            EditorUtility.DisplayDialog(
+                fix ? "Fix Base Color & Metal-Rough Texture Compression" : "Validate Base Color & Metal-Rough Texture Compression",
+                fix
+                    ? $"Scanned {checkedPaths.Count} unique textures.\n" +
+                      $"Fixed {fixedCount}, already correct {okCount}.\n\nSee Console for details."
+                    : $"Scanned {checkedPaths.Count} unique textures.\n" +
+                      $"{wrong.Count} not BC7 compressed, {okCount} correct.\n\nSee Console for details.",
+                "OK");
+        }
+
+        private static void CheckOrFixBc7Compression(
+            Texture texture, string materialName, bool fix,
+            HashSet<string> checkedPaths, List<string> wrong,
+            ref int fixedCount, ref int okCount, ref int missingImporter)
+        {
+            if (texture == null) return;
+
+            string texPath = AssetDatabase.GetAssetPath(texture);
+            if (string.IsNullOrEmpty(texPath) || !checkedPaths.Add(texPath)) return;
+
+            var importer = AssetImporter.GetAtPath(texPath) as TextureImporter;
+            if (importer == null)
+            {
+                missingImporter++;
+                wrong.Add($"{texPath}  (no TextureImporter — used by {materialName})");
+                return;
+            }
+
+            if (importer.textureCompression == OriginalNormalTextureCompression
+                && !importer.crunchedCompression
+                && importer.maxTextureSize == OriginalMaxTextureSize)
+            {
+                okCount++;
+                return;
+            }
+
+            wrong.Add($"{texPath}  (compression {importer.textureCompression} → {OriginalNormalTextureCompression}, " +
+                      $"crunched {importer.crunchedCompression} → False, " +
+                      $"maxSize {importer.maxTextureSize} → {OriginalMaxTextureSize} — used by {materialName})");
+
+            if (fix)
+            {
+                importer.textureCompression  = OriginalNormalTextureCompression;
+                importer.crunchedCompression = false;
+                importer.maxTextureSize      = OriginalMaxTextureSize;
+                importer.SaveAndReimport();
+                fixedCount++;
+            }
         }
     }
 }

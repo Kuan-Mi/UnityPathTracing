@@ -161,11 +161,12 @@ struct MeshKeyHash
 
 struct BLASEntry
 {
-    // The BLAS itself lives inside RTXMU (NVIDIA RTX Memory Utility): result /
-    // scratch / update-scratch / compacted memory are all suballocated from
-    // RTXMU's pooled blocks and identified by this id. Resolve the current GPU
-    // VA via DxAccelStructManager::GetAccelStructGPUVA — it switches to the
-    // compacted location automatically once compaction has been recorded.
+    // Legacy path: committed BLAS result buffer, optionally replaced by a
+    // compacted committed buffer after the batched readback completes.
+    ComPtr<ID3D12Resource> blas;
+
+    // RTXMU path: result / scratch / update-scratch / compacted memory are
+    // suballocated from RTXMU's pooled blocks and identified by this id.
     uint64_t rtxmuId = kInvalidRtxmuId;
 
     // Built OMM Array AS (consumed by the BLAS build and at trace time) — must
@@ -180,6 +181,9 @@ struct BLASEntry
 
     bool anyOMM   = false;
     int  refCount = 0;
+
+    // Legacy dynamic BLAS path: cached update scratch size for PERFORM_UPDATE.
+    UINT64 updateScratchSize = 0;
 };
 // ---------------------------------------------------------------------------
 // AccelerationStructure
@@ -199,7 +203,7 @@ struct BLASEntry
 class AccelerationStructure
 {
 public:
-    AccelerationStructure(ID3D12Device5* device, IUnityLog* log);
+    AccelerationStructure(ID3D12Device5* device, IUnityLog* log, bool useRtxmu = true, bool useCompaction = true);
     ~AccelerationStructure();
 
     // Optional: supply v8 interface so the AS can notify Unity of resource state changes
@@ -285,6 +289,15 @@ private:
         uint32_t              frame = 0;   // m_frameCounter when this stage was recorded
     };
 
+    struct PendingCompactionBatch
+    {
+        std::vector<MeshKey>   keys;
+        ComPtr<ID3D12Resource> sizeBuffer;
+        ComPtr<ID3D12Resource> readbackBuffer;
+        void*                  mappedReadback = nullptr;
+        uint32_t               buildFrame     = 0;
+    };
+
     struct TLASInstanceEntry
     {
         D3D12_GPU_VIRTUAL_ADDRESS blasVA;
@@ -317,8 +330,10 @@ private:
         // TLAS emission order (SetInstanceOrderIndex). 0xFFFFFFFF = unordered: emitted after
         // all ordered instances, in slot order (stable sort), preserving legacy behavior.
         uint32_t tlasOrder = 0xFFFFFFFFu;
+        // Legacy committed-buffer BLAS VA, used when RTXMU is disabled.
+        D3D12_GPU_VIRTUAL_ADDRESS blasVA = 0;
         // RTXMU id of this instance's BLAS. The GPU VA is resolved per frame at
-        // TLAS emission (it moves when RTXMU compacts the BLAS).
+        // TLAS emission when RTXMU is enabled.
         uint64_t blasRtxmuId = kInvalidRtxmuId;
         // Persistent BLAS for dynamic (skinned) instances – reused every frame with PERFORM_UPDATE
         std::unique_ptr<BLASEntry> dynamicBlas;
@@ -341,6 +356,8 @@ private:
     // queues them for the deferred stages. Must run after the frame's global
     // post-build UAV barrier.
     void FlushRtxmuBuilds(ID3D12GraphicsCommandList4* cmdList);
+    void QueueCompactionSizeQueries(ID3D12GraphicsCommandList4* cmdList);
+    void ProcessPendingCompactions(ID3D12GraphicsCommandList4* cmdList);
     // Defers RemoveAccelerationStructures(id) until the GPU has finished any
     // frame that may still reference it (shares the deferred-delete fence).
     void ScheduleRtxmuRemove(uint64_t id);
@@ -361,6 +378,9 @@ private:
     IUnityLog*               m_log;
     IUnityGraphicsD3D12v8*   m_d3d12v8 = nullptr;
     ComPtr<ID3D12Device5> m_device;
+    bool m_useRtxmu = true;
+    // Controls whether static BLASes are actually copy-compacted after build.
+    bool m_useCompaction = true;
 
     // BLAS cache
     std::unordered_map<MeshKey, BLASEntry, MeshKeyHash> m_blasCache;
@@ -379,6 +399,9 @@ private:
     static constexpr uint32_t kRtxmuStageLatency = 3;
     // Suballocator block size; matches nvrhi's rtxMemUtil->Initialize(8388608).
     static constexpr uint32_t kRtxmuBlockSize = 8u * 1024u * 1024u;
+
+    std::vector<MeshKey>                m_compactionQueue;
+    std::vector<PendingCompactionBatch> m_pendingCompactionBatches;
 
     uint32_t m_frameCounter = 0;
 

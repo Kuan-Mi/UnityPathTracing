@@ -161,7 +161,7 @@ namespace PathTracing
                 // Original (Sample.cpp:1521): hardcoded 0 — this is the legacy stable-planes / NRD
                 // guide flag and is unused by DLSS-RR (the entire RTXPT codebase never sets it non-zero).
                 // The fork's `realtimeAA==DLSS-RR ? 1 : 0` diverged from the DLSS-RR reference, which captures 0.
-                denoisingEnabled = 0u,
+                denoisingEnabled = 1u,
                 frameIndex       = fs.frameIndex,
                 useReSTIRDI      = 0u,
                 useReSTIRGI      = 0u,
