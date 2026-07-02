@@ -93,6 +93,77 @@ def bindless_textures(wpix):
     return out, n_events
 
 
+def expected_mips(w, h):
+    """Mip count for a full chain down to 1x1 (D3D12 default): floor(log2(max(w,h)))+1.
+    For power-of-two square textures (all of these are) that's just max(w,h).bit_length()."""
+    if not w or not h:
+        return None
+    return max(w, h).bit_length()
+
+
+def shape_key(item):
+    return (item["res_format"], item["width"], item["height"])
+
+
+def shape_report(A, B):
+    """Since RTXPT keeps the full source-asset name and Unity only has generic
+    'image_N' debug names (see main()'s name-based diff -> 0 shared names), the only
+    way to cross-check mips/dims between engines is by grouping on (format, width,
+    height) shape and comparing per-shape mip counts + population counts instead of
+    per-texture identity."""
+    from collections import Counter
+    count_a = Counter(shape_key(it) for it in A)
+    count_b = Counter(shape_key(it) for it in B)
+    mips_a = {shape_key(it): it["mips"] for it in A}
+    mips_b = {shape_key(it): it["mips"] for it in B}
+
+    print("\n== Shape-based comparison (format+dims, since debug names don't overlap) ==")
+    keys = sorted(set(count_a) | set(count_b), key=lambda k: (k[0] or "", k[1] or 0, k[2] or 0))
+    formula_bad, mip_mismatch, count_mismatch = [], [], []
+    for k in keys:
+        fmt, wd, ht = k
+        exp = expected_mips(wd, ht)
+        ca, cb = count_a.get(k, 0), count_b.get(k, 0)
+        ma, mb = mips_a.get(k), mips_b.get(k)
+        if ca and ma != exp:
+            formula_bad.append(("RTXPT", k, ma, exp))
+        if cb and mb != exp:
+            formula_bad.append(("UNITY", k, mb, exp))
+        if ca and cb and ma != mb:
+            mip_mismatch.append((k, ma, mb))
+        if ca != cb:
+            count_mismatch.append((k, ca, cb))
+
+    print(f"   unique (format,dims) shapes: RTXPT={len(count_a)}  UNITY={len(count_b)}")
+
+    if formula_bad:
+        print(f"\n   {len(formula_bad)} entries violate the full-mip-chain formula "
+              "(mips != floor(log2(max(w,h)))+1):")
+        for eng, k, actual, exp in formula_bad:
+            print(f"      {eng} {k[0]} {k[1]}x{k[2]}: mips={actual} expected={exp}")
+    else:
+        print("   PASS: every texture in both engines has a full mip chain "
+              "(mips == floor(log2(max(w,h)))+1).")
+
+    if mip_mismatch:
+        print(f"\n   {len(mip_mismatch)} shared (format,dims) shape(s) have differing mip counts:")
+        for k, ma, mb in mip_mismatch:
+            print(f"      {k[0]} {k[1]}x{k[2]}: RTXPT mips={ma}  UNITY mips={mb}")
+    else:
+        print("   PASS: mip counts agree for every shared (format,dims) shape.")
+
+    if count_mismatch:
+        print(f"\n   {len(count_mismatch)} shape(s) (i.e. dims) have a different "
+              "population between engines:")
+        for k, ca, cb in count_mismatch:
+            print(f"      {k[0]} {k[1]}x{k[2]}: RTXPT count={ca}  UNITY count={cb}")
+    else:
+        print("   PASS: dims are distributed identically -- same number of textures "
+              "per (format,dims) shape in both engines.")
+
+    return not (formula_bad or mip_mismatch or count_mismatch)
+
+
 def _row(item):
     dims = f'{item["width"]}x{item["height"]}' if item["width"] else "-"
     return [item["slot"], item["resource_name"] or f'<resource {item["resource_id"]}>',
@@ -160,12 +231,16 @@ def main(rtxpt=DEF_RTXPT, unity=DEF_UNITY):
         for name in only_b:
             print(f"      {name}")
 
+    shape_ok = shape_report(A, B)
+
     print()
     if only_a or only_b or mismatched:
-        print("VERDICT: bindless texture sets differ between the two engines (see lists above).")
+        print("VERDICT (by name): bindless texture sets differ between the two engines (see lists above).")
     else:
-        print("VERDICT: identical set of bindless textures (by name/format/dims) in both engines; "
+        print("VERDICT (by name): identical set of bindless textures (by name/format/dims) in both engines; "
               "heap slot order differs (engine-specific bindless indices).")
+    print(f"VERDICT (by shape): mips/dims are {'CONSISTENT' if shape_ok else 'INCONSISTENT'} "
+          "between engines (see shape-based comparison above).")
     return 0
 
 

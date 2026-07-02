@@ -28,15 +28,15 @@ capture, not documented anywhere):
     known FINITE size we instead iterate the declared [start, start+size) range
     directly and just skip unpopulated slots, never mistaking a null slot for the end.
 
-KNOWN LIMITATION: this only sees resources bound through the *global* root signature
-(SetComputeRootDescriptorTable on the command list). RTXPT puts its G-buffer/denoiser/
-output render targets there, so they show up; Unity's PathTrace global table only binds
-~5 textures plus scene buffers -- its equivalent render targets are apparently supplied
-via DXR *local* root signatures / shader-binding-table records (per-hit-group/raygen
-resources), which wpix_core does not parse. So a large "-- only in RTXPT --" list here
-is an expected artifact of that architecture difference, not necessarily a real gap; it
-does NOT mean Unity's PathTrace lacks those resources, just that this script can't see
-where they're bound.
+EXPECTED ASYMMETRY: a large "-- only in RTXPT --" list is an artifact of binding
+philosophy, not a real gap. Neither engine uses DXR local root signatures (verified:
+both state objects contain a single GLOBAL_ROOT_SIGNATURE subobject and their SBT
+records are bare 32-byte shader identifiers with no local root arguments). RTXPT sets
+one big shared root signature for many passes, so at PathTrace it carries dozens of
+bound-but-unused textures (denoiser guides, RR/G-buffer/output targets, dummy black/
+white textures) that no FILL shader's RDAT resource list references; Unity binds
+per-pass and only binds the registers the FILL shaders actually use. What matters is
+that every texture in the shaders' used set appears in BOTH lists and matches.
 
 Run from tools/wpix_mcp:  python compare_pathtrace_textures.py [rtxpt.wpix] [unity.wpix]
 """
@@ -148,7 +148,7 @@ def main(rtxpt=DEF_RTXPT, unity=DEF_UNITY):
 
     if only_a:
         print(f"\n   -- only in RTXPT ({len(only_a)}) --  "
-              f"(likely bound via a DXR local root sig on the UNITY side -- see module docstring)")
+              f"(bound-but-unused via RTXPT's shared root signature -- see module docstring)")
         for name in only_a:
             it = by_name_a[name]
             print(f"      {it['resource_name']}  ({it['res_format']}, {it['width']}x{it['height']}, {it['usage']})")
