@@ -55,20 +55,18 @@ copy /Y "%OUT_DIR%\D3D12HeapHook.dll"         "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\D3D12HeapHook.pdb"         "%UNITY_PLUGINS%\" >nul
 
 
-:: Streamline runtime (development build)
-:: so SL can init and locate its DLSS-G plugin.
-set SL_BIN=Other\streamline-sdk-v2.11.1\bin\x64\development
+:: Streamline runtime (RELEASE / production build) so SL can init and locate its DLSS-G plugin.
+:: NOTE: switched from bin\x64\development to bin\x64 (release). The release set ships NO
+:: sl.imgui.dll (SL's in-engine debug overlay) and NO WinPixEventRuntime.dll — the C++ overlay is
+:: intentionally disabled (see SLCore.cpp kFeatures). To restore the dev overlay, point SL_BIN back
+:: at ...\bin\x64\development and re-add the sl.imgui.dll / WinPixEventRuntime.dll copies.
+set SL_BIN=Other\streamline-sdk-v2.11.1\bin\x64
 copy /Y "%SL_BIN%\sl.interposer.dll"      "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\sl.common.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\sl.dlss_g.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\sl.reflex.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\sl.pcl.dll"             "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssg.dll"        "%UNITY_PLUGINS%\" >nul
-copy /Y "%SL_BIN%\WinPixEventRuntime.dll" "%UNITY_PLUGINS%\" >nul
-:: sl.imgui = Streamline's in-engine debug overlay (Reflex/DLSS-G/common HUD, toggle Ctrl+Shift+Home).
-:: Loads only with the development SL binaries (above); silently absent in production. The driver's
-:: ReflexTestEnable HUD does NOT draw through the SL proxy swapchain, so this is the in-build HUD.
-copy /Y "%SL_BIN%\sl.imgui.dll"           "%UNITY_PLUGINS%\" >nul
 
 copy /Y "%OUT_DIR%\StreamlinePlugin.dll"        "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\StreamlinePlugin.pdb"        "%UNITY_PLUGINS%\" >nul
@@ -82,7 +80,6 @@ copy /Y "%SL_BIN%\nvngx_dlssd.dll"        "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\sl.dlss_g.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\sl.reflex.dll"          "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssg.dll"        "%UNITY_PLUGINS%\" >nul
-copy /Y "%SL_BIN%\WinPixEventRuntime.dll" "%UNITY_PLUGINS%\" >nul
 
 :: DXC (dxcompiler / dxil)
 copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
@@ -105,9 +102,13 @@ copy /Y "%NRD_DIR%\NRD.pdb" "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "%NRI_DIR%\NRI.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "%NRI_DIR%\NRI.pdb" "%UNITY_ASSETS_PLUGINS%\" >nul
 
-:: DLSS / DLSS-D -> Assets\Plugins\x86_64
-copy /Y "%NRI_DIR%\nvngx_dlss.dll"  "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "%NRI_DIR%\nvngx_dlssd.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
+:: DLSS-SR / DLSS-RR NGX models -> Assets\Plugins\x86_64
+:: Sourced from the RELEASE Streamline runtime (%SL_BIN%), NOT %NRI_DIR% (which ships the dev-profile
+:: models). These share a filename with the Packages\Plugins copies; in the player build the Assets
+:: copy wins the duplicate-name collision, so this is the version that actually ships. Kept in lockstep
+:: with %SL_BIN% so both plugin folders carry identical release models.
+copy /Y "%SL_BIN%\nvngx_dlss.dll"  "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\nvngx_dlssd.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
 
 echo.
 echo ============================================================
@@ -118,8 +119,7 @@ echo    OMMBakerPlugin.dll
 echo    omm-lib.dll
 echo    ShaderCompilerPlugin.dll
 echo    D3D12HeapHook.dll
-echo    sl.*.dll + nvngx_dlss/dlssd/dlssg.dll ^(Streamline 2.11.1 runtime: DLSS-SR/RR/G^)
-echo    sl.imgui.dll ^(SL debug overlay, toggle Ctrl+Shift+Home^)
+echo    sl.*.dll + nvngx_dlss/dlssd/dlssg.dll ^(Streamline 2.11.1 RELEASE runtime: DLSS-SR/RR/G^)
 echo    dxcompiler.dll
 echo    dxil.dll
 echo  Assets Plugins:  %UNITY_ASSETS_PLUGINS%\

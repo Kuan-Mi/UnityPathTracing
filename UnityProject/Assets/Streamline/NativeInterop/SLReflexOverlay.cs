@@ -57,8 +57,15 @@ namespace PathTracing.NativeInterop.Streamline
                 visible = !visible;
         }
 
+        // TEMPORARILY DISABLED: the on-screen Reflex/PCL overlay (button + window) is suppressed.
+        // Reflex/PCL themselves keep running (SLReflexRuntime is untouched); only the GUI is hidden.
+        // Remove this early-return to bring the overlay back.
+        private const bool GuiDisabled = true;
+
         private void OnGUI()
         {
+            if (GuiDisabled) return;
+
             InitStyles();
 
             float buttonW = 170f;

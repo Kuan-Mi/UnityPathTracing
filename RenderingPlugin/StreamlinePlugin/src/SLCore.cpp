@@ -138,13 +138,15 @@ namespace SLCore
 
         // Feature set for the whole plugin. ADD NEW FEATURES HERE (e.g. sl::kFeatureNIS,
         // sl::kFeatureDLSS for super-resolution) — this is the single extension point.
-        // kFeatureImGUI = SL's in-engine debug overlay (Reflex/DLSS-G/common HUD, toggle
-        // Ctrl+Shift+Home). It MUST be requested here or sl.imgui is "Ignoring plugin ...
-        // not requested by the host"; it only loads with development SL binaries (no-op in
-        // production) and renders through presentCommon, so it needs the SL proxy present path.
+        // NOTE: kFeatureImGUI (SL's in-engine debug overlay — Reflex/DLSS-G/common HUD, toggle
+        // Ctrl+Shift+Home) is TEMPORARILY DISABLED. It only loads with development SL binaries
+        // and renders through presentCommon; we ship the release/production SL runtime, which has
+        // no sl.imgui.dll, so requesting it here would only emit "Ignoring plugin ... not
+        // requested"/"missing plugin" noise. Re-add sl::kFeatureImGUI (and the development SL
+        // binaries + sl.imgui.dll copy in build_and_copy.bat) to bring the C++ overlay back.
         static const sl::Feature kFeatures[] = {
             sl::kFeatureDLSS, sl::kFeatureDLSS_RR, sl::kFeatureDLSS_G, sl::kFeatureReflex,
-            sl::kFeaturePCL, sl::kFeatureImGUI,
+            sl::kFeaturePCL,
         };
         sl::Preferences pref{};
         pref.showConsole        = false;
