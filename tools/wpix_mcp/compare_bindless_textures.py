@@ -55,23 +55,35 @@ def pathtrace_dispatch(wpix):
     return ed, d, len(events)
 
 
-def bindless_textures(wpix):
-    """[{slot, name, format, width, height, mips}], sorted by heap slot, for every
-    Texture-shaped SRV in an unbounded bindless descriptor table bound at the
-    PathTrace DispatchRays (buffers in the same/sibling table are excluded by shape)."""
-    ed, d, n_events = pathtrace_dispatch(wpix)
+def bindless_slots(ed, d):
+    """Set of descriptor-heap slots covered by any unbounded SRV root table bound at
+    dispatch `d` (both the texture and buffer arrays -- shape, not space, tells them
+    apart; see module docstring). Shared with compare_pathtrace_textures.py, which
+    needs this set to EXCLUDE the bindless heap from the "regular" bound textures."""
     sig = ed.root_sigs.get(d["root_signature"], {})
     table_starts = d["root_tables"]
     other_starts = set(table_starts.values())
-    rows = {}
+    slots = set()
     for param, start in table_starts.items():
         ranges = sig.get(param, {}).get("ranges") or []
         if not any(rg["range_type"] == "SRV" and rg["num"] >= UNBOUNDED_THRESHOLD for rg in ranges):
             continue
         for desc in ed.table_slots(start, other_starts - {start}, max_count=16384):
-            if desc["shape"] not in TEXTURE_SHAPES:
-                continue
-            rows[desc["slot"]] = desc
+            slots.add(desc["slot"])
+    return slots
+
+
+def bindless_textures(wpix):
+    """[{slot, name, format, width, height, mips}], sorted by heap slot, for every
+    Texture-shaped SRV in an unbounded bindless descriptor table bound at the
+    PathTrace DispatchRays (buffers in the same/sibling table are excluded by shape)."""
+    ed, d, n_events = pathtrace_dispatch(wpix)
+    rows = {}
+    for slot in bindless_slots(ed, d):
+        desc = ed.descriptors.get(slot, {})
+        if desc.get("shape") not in TEXTURE_SHAPES:
+            continue
+        rows[slot] = desc
     out = []
     for slot, desc in sorted(rows.items()):
         r = ed.resources.get(desc["resource"], {})

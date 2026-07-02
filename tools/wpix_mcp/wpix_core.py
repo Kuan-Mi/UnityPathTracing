@@ -166,16 +166,21 @@ def _is_gpu_work_event(name):
 
 def timed_events(wpix, name_filter=None, dispatches_only=False, work_only=False,
                  duration_counter="TOP to EOP Duration (ns)",
-                 counter_pattern="*Duration*"):
+                 counter_pattern="*Duration*", cache_bust=None):
     """Return GPU events with PIX timing counters.
 
-    `pixtool save-event-list --counters=*Duration*` adds per-event GPU duration columns
-    to the normal event CSV. This helper mirrors find_shader_events(), but keeps the
-    requested duration counter so callers can aggregate time by marker/stage.
+    `pixtool save-event-list --counters=*Duration*` replays the capture on the GPU and
+    reports its actual, real-hardware duration counters -- these are live measurements,
+    not values frozen at capture time, so repeated replays of the same .wpix can (and do)
+    vary run to run. Results are cached by default (keyed on file path + mtime) since the
+    replay is slow; pass a distinct `cache_bust` (e.g. a run index) to force a fresh replay
+    instead of reusing the cached CSV, when collecting multiple independent samples from
+    one capture.
     """
     pixtool = find_pixtool()
     key = hashlib.sha1((os.path.abspath(wpix) + str(os.path.getmtime(wpix)) +
-                        f"|timing|{counter_pattern}").encode()).hexdigest()[:16]
+                        f"|timing|{counter_pattern}" +
+                        (f"|{cache_bust}" if cache_bust is not None else "")).encode()).hexdigest()[:16]
     csv_path = os.path.join(_cache_root(), f"timing_{key}.csv")
     if not os.path.isfile(csv_path):
         # PIX can fail with PIXTOOL99999 if multiple processes export timing counters
@@ -249,7 +254,7 @@ def _parse_counter_value(v):
 
 def stage_times(wpix, name_filter=None, dispatches_only=False, work_only=True,
                 group_by="marker",
-                duration_counter="TOP to EOP Duration (ns)", top=None):
+                duration_counter="TOP to EOP Duration (ns)", top=None, cache_bust=None):
     """Aggregate PIX GPU timings by stage marker.
 
     Returns both the contributing timed events and a per-stage table. `group_by` can be:
@@ -258,8 +263,11 @@ def stage_times(wpix, name_filter=None, dispatches_only=False, work_only=True,
       * "event"  — event name (Dispatch/Draw/etc)
       * "kind"   — compute / raytracing / raster / etc
     Durations are sums of the selected counter over contributing events.
+    `cache_bust` forces a fresh GPU replay instead of reusing a cached timing CSV --
+    see `timed_events`.
     """
-    events = timed_events(wpix, name_filter, dispatches_only, work_only, duration_counter)
+    events = timed_events(wpix, name_filter, dispatches_only, work_only, duration_counter,
+                          cache_bust=cache_bust)
 
     def key_for(e):
         marker = e.get("marker") or "<root>"
