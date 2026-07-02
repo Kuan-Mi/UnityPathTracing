@@ -109,6 +109,85 @@ namespace PathTracing
         private readonly Dictionary<int, (int vb, int ib)> _skinnedBufferSlots = new();
         private readonly HashSet<int>                      _usedMeshIds        = new();
 
+        private readonly struct GeometryRangeKey : IEquatable<GeometryRangeKey>
+        {
+            private readonly int  _meshId;
+            private readonly bool _skinned;
+            private readonly int  _rendererId;
+            private readonly int  _vb;
+            private readonly int  _ib;
+            private readonly uint _indexBaseBytes;
+            private readonly uint _positionOffset;
+            private readonly uint _prevPositionOffset;
+            private readonly uint _normalOffset;
+            private readonly uint _texCoord1Offset;
+            private readonly uint _tangentOffset;
+            private readonly int  _hash;
+
+            public readonly int[] Submeshes;
+            public readonly int[] Materials;
+
+            public GeometryRangeKey(RtxptInstanceRecord rec, (int vb, int ib) slots,
+                in MergedMeshOffsets offsets, int[] submeshes, int[] materials)
+            {
+                _meshId             = rec.Mesh.GetInstanceID();
+                _skinned            = rec.IsSkinned;
+                _rendererId         = rec.IsSkinned ? rec.RendererId : 0;
+                _vb                 = slots.vb;
+                _ib                 = slots.ib;
+                _indexBaseBytes     = offsets.IndexBaseBytes;
+                _positionOffset     = offsets.PositionOffset;
+                _prevPositionOffset = offsets.PrevPositionOffset;
+                _normalOffset       = offsets.NormalOffset;
+                _texCoord1Offset    = offsets.TexCoord1Offset;
+                _tangentOffset      = offsets.TangentOffset;
+                Submeshes           = submeshes;
+                Materials           = materials;
+
+                unchecked
+                {
+                    int h = _meshId;
+                    h = (h * 397) ^ _skinned.GetHashCode();
+                    h = (h * 397) ^ _rendererId;
+                    h = (h * 397) ^ _vb;
+                    h = (h * 397) ^ _ib;
+                    h = (h * 397) ^ (int)_indexBaseBytes;
+                    h = (h * 397) ^ (int)_positionOffset;
+                    h = (h * 397) ^ (int)_prevPositionOffset;
+                    h = (h * 397) ^ (int)_normalOffset;
+                    h = (h * 397) ^ (int)_texCoord1Offset;
+                    h = (h * 397) ^ (int)_tangentOffset;
+                    for (int i = 0; i < Submeshes.Length; i++)
+                    {
+                        h = (h * 397) ^ Submeshes[i];
+                        h = (h * 397) ^ Materials[i];
+                    }
+                    _hash = h;
+                }
+            }
+
+            public bool Equals(GeometryRangeKey other)
+            {
+                if (_meshId != other._meshId || _skinned != other._skinned ||
+                    _rendererId != other._rendererId || _vb != other._vb || _ib != other._ib ||
+                    _indexBaseBytes != other._indexBaseBytes || _positionOffset != other._positionOffset ||
+                    _prevPositionOffset != other._prevPositionOffset || _normalOffset != other._normalOffset ||
+                    _texCoord1Offset != other._texCoord1Offset || _tangentOffset != other._tangentOffset ||
+                    Submeshes.Length != other.Submeshes.Length)
+                    return false;
+
+                for (int i = 0; i < Submeshes.Length; i++)
+                {
+                    if (Submeshes[i] != other.Submeshes[i] || Materials[i] != other.Materials[i])
+                        return false;
+                }
+                return true;
+            }
+
+            public override bool Equals(object obj) => obj is GeometryRangeKey other && Equals(other);
+            public override int GetHashCode() => _hash;
+        }
+
         private readonly struct MergedMeshOffsets
         {
             public readonly uint IndexBaseBytes;
@@ -483,6 +562,7 @@ namespace PathTracing
             var subInstList = new List<SubInstanceData>();
             var geomDbgList = new List<GeometryDebugData>();
             var bufPtrs     = new List<IntPtr>();
+            var geometryRangeCache = new Dictionary<GeometryRangeKey, int>();
 
             BuildMergedStaticGeometryBuffers();
             (int vb, int ib) staticSlots = (-1, -1);
@@ -546,9 +626,20 @@ namespace PathTracing
                     _overrideCache.Add((rec.Renderer, overrideMatIndices));
                 }
 
-                int firstGeom = geomList.Count;
-                foreach (int s in rec.SubmeshIndices)
-                    AddSubmeshGeometry(rec, s, slots, offsets, matTable, geomList, subInstList, geomDbgList, overrideMatIndices);
+                int[] materialIndices = ResolveMaterialIndices(rec, matTable, overrideMatIndices);
+                var   rangeKey        = new GeometryRangeKey(rec, slots, offsets, rec.SubmeshIndices, materialIndices);
+                if (!geometryRangeCache.TryGetValue(rangeKey, out int firstGeometryIndex))
+                {
+                    firstGeometryIndex = geomList.Count;
+                    geometryRangeCache.Add(rangeKey, firstGeometryIndex);
+                    for (int i = 0; i < rec.SubmeshIndices.Length; i++)
+                        AddGeometryData(rec, rec.SubmeshIndices[i], materialIndices[i], slots, offsets, geomList, geomDbgList);
+                }
+
+                int firstSubInstance = subInstList.Count;
+                for (int i = 0; i < rec.SubmeshIndices.Length; i++)
+                    AddSubInstanceData(rec, rec.SubmeshIndices[i], materialIndices[i],
+                        firstGeometryIndex + i, slots, offsets, matTable, subInstList);
 
                 // TLAS InstanceID must be the SubInstanceData base offset (firstGeometryInstanceIndex),
                 // NOT the instance index: the any-hit alpha test indexes t_SubInstanceData[InstanceID()
@@ -556,7 +647,7 @@ namespace PathTracing
                 // instanceDesc.instanceID = instance->GetGeometryInstanceIndex() (Sample.cpp). The
                 // closest-hit path is unaffected — it uses the automatic InstanceIndex() to fetch the
                 // instance, then adds firstGeometryInstanceIndex itself.
-                _accelStructure.SetInstanceID(rec.Handle, (uint)firstGeom);
+                _accelStructure.SetInstanceID(rec.Handle, (uint)firstSubInstance);
 
                 Matrix4x4 m    = RtxptSceneLayout.GetRootTransform(rec);
                 var       row0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
@@ -566,9 +657,9 @@ namespace PathTracing
                 instList.Add(new DonutInstanceData
                 {
                     flags                      = 0u,
-                    firstGeometryInstanceIndex = (uint)firstGeom,
-                    firstGeometryIndex         = (uint)firstGeom,
-                    numGeometries              = (uint)(geomList.Count - firstGeom),
+                    firstGeometryInstanceIndex = (uint)firstSubInstance,
+                    firstGeometryIndex         = (uint)firstGeometryIndex,
+                    numGeometries              = (uint)rec.SubmeshIndices.Length,
                     transformRow0              = row0,
                     transformRow1              = row1,
                     transformRow2              = row2,
@@ -795,29 +886,35 @@ namespace PathTracing
                 dst[dstWord + i] = src[srcWord + i];
         }
 
-        // Appends geometry + sub-instance + debug data for one assigned sub-mesh of a record.
-        // Only called for sub-meshes the layout has already confirmed assigned, so
-        // rec.Renderer.Slots[s] is non-null here.
-        private void AddSubmeshGeometry(RtxptInstanceRecord rec, int s, (int vb, int ib) slots,
-            in MergedMeshOffsets offsets, RtxptMaterialTable matTable,
-            List<DonutGeometryData> geomList, List<SubInstanceData> subInstList,
-            List<GeometryDebugData> geomDbgList, int[] overrideMatIndices)
+        private static int[] ResolveMaterialIndices(RtxptInstanceRecord rec,
+            RtxptMaterialTable matTable, int[] overrideMatIndices)
+        {
+            var materialIndices = new int[rec.SubmeshIndices.Length];
+            for (int i = 0; i < rec.SubmeshIndices.Length; i++)
+            {
+                int           s    = rec.SubmeshIndices[i];
+                RtxptMaterial slot = rec.Renderer.Slots[s];
+                int           idx  = matTable.GetOrAdd(slot);
+                materialIndices[i] = idx;
+                if (s < overrideMatIndices.Length)
+                    overrideMatIndices[s] = idx;
+            }
+            return materialIndices;
+        }
+
+        // Appends shared GeometryData for one assigned sub-mesh. Static mesh instances with the
+        // same mesh/material range reuse this record, mirroring Donut's MeshGeometry table.
+        private static void AddGeometryData(RtxptInstanceRecord rec, int s, int matIdx,
+            (int vb, int ib) slots, in MergedMeshOffsets offsets,
+            List<DonutGeometryData> geomList, List<GeometryDebugData> geomDbgList)
         {
             Mesh              mesh = rec.Mesh;
             SubMeshDescriptor sub  = mesh.GetSubMesh(s);
-            RtxptMaterial     slot = rec.Renderer.Slots[s];
-
-            int matIdx = matTable.GetOrAdd(slot);
-            if (s < overrideMatIndices.Length)
-                overrideMatIndices[s] = matIdx;
 
             int globalGeomIdx = geomList.Count;
 
-            // SubInstanceData.GlobalGeometryIndex_PTMaterialDataIndex packs both fields as 16-bit.
             if (globalGeomIdx > 0xFFFF)
                 Debug.LogError($"[RtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
-            if (matIdx > 0xFFFF)
-                Debug.LogError($"[RtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
 
             geomList.Add(new DonutGeometryData
             {
@@ -837,6 +934,26 @@ namespace PathTracing
                 curveRadiusOffset  = 0xFFFFFFFFu,
                 materialIndex      = (uint)matIdx,
             });
+
+            // --- GeometryDebugData (RTXPT t4, all zero = no OMM) ---
+            geomDbgList.Add(default);
+        }
+
+        // Appends per-instance SubInstanceData for one assigned sub-mesh. Unlike GeometryData,
+        // this is not shared: TLAS InstanceID() indexes this flat per-instance table directly.
+        private void AddSubInstanceData(RtxptInstanceRecord rec, int s, int matIdx, int globalGeomIdx,
+            (int vb, int ib) slots, in MergedMeshOffsets offsets, RtxptMaterialTable matTable,
+            List<SubInstanceData> subInstList)
+        {
+            Mesh              mesh = rec.Mesh;
+            SubMeshDescriptor sub  = mesh.GetSubMesh(s);
+            RtxptMaterial     slot = rec.Renderer.Slots[s];
+
+            // SubInstanceData.GlobalGeometryIndex_PTMaterialDataIndex packs both fields as 16-bit.
+            if (globalGeomIdx > 0xFFFF)
+                Debug.LogError($"[RtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
+            if (matIdx > 0xFFFF)
+                Debug.LogError($"[RtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
 
             // --- SubInstanceData (RTXPT t1) ---
             bool  isAlphaTested = slot.EnableAlphaTesting;
@@ -880,9 +997,6 @@ namespace PathTracing
                 TexCoord1Offset                    = offsets.TexCoord1Offset,
                 padding0                           = 0u,
             });
-
-            // --- GeometryDebugData (RTXPT t4, all zero = no OMM) ---
-            geomDbgList.Add(default);
         }
 
         private void RebuildEmissiveCache()
