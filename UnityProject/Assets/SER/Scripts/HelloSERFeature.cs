@@ -87,6 +87,7 @@ namespace SER
             private Mesh _quadMesh;
 
             private RenderTexture _outputTexture;
+            private IntPtr _outputTexturePtr;
             private RTHandle _outputHandle;
             private int _outputWidth;
             private int _outputHeight;
@@ -136,7 +137,7 @@ namespace SER
                 passData.RayGenConstantBuffer = _rayGenConstantBuffer;
                 passData.Mode = _mode;
                 passData.Output = _outputHandle;
-                passData.OutputTexture = _outputTexture;
+                passData.OutputTexturePtr = _outputTexturePtr;
                 passData.Width = (uint)width;
                 passData.Height = (uint)height;
                 passData.BlitMaterial = _blitMaterial;
@@ -175,7 +176,7 @@ namespace SER
                 }
 
                 data.DescriptorSet.SetAccelerationStructure("Scene", data.Accel);
-                data.DescriptorSet.SetRWTexture("RenderTarget", data.OutputTexture.GetNativeTexturePtr());
+                data.DescriptorSet.SetRWTexture("RenderTarget", data.OutputTexturePtr);
                 data.RayGenConstantBuffer.UploadDirect(context.cmd, RayGenConstants.Fullscreen);
                 data.DescriptorSet.SetConstantBuffer("g_rayGenCB", data.RayGenConstantBuffer);
                 data.Pipeline.Dispatch(cmd, data.DescriptorSet, data.Width, data.Height);
@@ -276,6 +277,7 @@ namespace SER
                     hideFlags = HideFlags.HideAndDontSave
                 };
                 _outputTexture.Create();
+                _outputTexturePtr = _outputTexture.GetNativeTexturePtr();
                 _outputHandle = RTHandles.Alloc(_outputTexture);
                 _outputWidth = width;
                 _outputHeight = height;
@@ -293,6 +295,7 @@ namespace SER
                     _outputTexture = null;
                 }
 
+                _outputTexturePtr = IntPtr.Zero;
                 _outputWidth = 0;
                 _outputHeight = 0;
             }
@@ -342,7 +345,7 @@ namespace SER
                 public VolatileConstantBuffer RayGenConstantBuffer;
                 public ShaderMode Mode;
                 public RTHandle Output;
-                public RenderTexture OutputTexture;
+                public IntPtr OutputTexturePtr;
                 public uint Width;
                 public uint Height;
                 public Material BlitMaterial;
