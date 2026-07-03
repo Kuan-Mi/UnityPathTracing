@@ -179,7 +179,10 @@ namespace NativeRender
             uint flags,
             uint maxPayloadSizeInBytes,
             string rayGenName,
-            string hintsJson);
+            [In] NR_BindingLayoutItem[] layoutItems,
+            uint layoutItemCount,
+            [In] NR_StaticSampler[] staticSamplers,
+            uint staticSamplerCount);
 
         /// <summary>
         /// Builds a DXR pipeline from N pre-compiled DXIL blobs merged into one RTPSO.
@@ -207,7 +210,12 @@ namespace NativeRender
             uint flags,
             uint maxPayloadSizeInBytes,
             string rayGenName,
-            string hintsJson);
+            [In] NR_BindingLayoutItem[] layoutItems,
+            uint layoutItemCount,
+            [In] NR_StaticSampler[] staticSamplers,
+            uint staticSamplerCount,
+            [In] byte[] hitGroupAnyHit,
+            uint hitGroupAnyHitCount);
 
 
         /// <summary>Creates a RayTraceDescriptorSet bound to the given shader handle. Returns 0 on failure.</summary>
@@ -521,9 +529,8 @@ namespace NativeRender
         public static extern ulong NR_CreateComputeShader(byte[] dxilBytes, uint size, string name);
 
         /// <summary>
-        /// Like NR_CreateComputeShader, but accepts a hintsJson string that promotes selected
-        /// CBV bindings to root 32-bit constants (SetComputeRoot32BitConstants).
-        /// hintsJson format: [{"name":"MyConstants","count":4}, ...]
+        /// Like NR_CreateComputeShader, but accepts the explicit binding layout and static samplers
+        /// that shape the native root signature.
         /// Must be called before resource bindings are set up.
         /// Returns an opaque handle on success, 0 on failure.
         /// </summary>
@@ -531,7 +538,10 @@ namespace NativeRender
         public static extern ulong NR_CreateComputeShaderEx(
             byte[] dxilBytes, uint size,
             [MarshalAs(UnmanagedType.LPStr)] string name,
-            [MarshalAs(UnmanagedType.LPStr)] string hintsJson);
+            [In] NR_BindingLayoutItem[] layoutItems,
+            uint layoutItemCount,
+            [In] NR_StaticSampler[] staticSamplers,
+            uint staticSamplerCount);
 
         /// <summary>Destroys a ComputeShader created by NR_CreateComputeShader.</summary>
         [DllImport(DllName)]
@@ -576,6 +586,32 @@ namespace NativeRender
             public uint  stride; // element stride (StructuredBuffer; 0 = raw/typed)
             public uint  objectKind; // 0=None(raw ID3D12Resource*),1=AccelStruct,2=BindlessTex,3=BindlessBuf,4=RootConstants,5=NativeBuffer,6=BindlessUAVTex,7=Sampler
             public uint  format; // DXGI_FORMAT for typed buffer UAV (0 = raw/structured)
+        }
+
+        /// <summary>One explicit binding-layout item sent to the native plugin at pipeline creation.</summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct NR_BindingLayoutItem
+        {
+            public uint kind;
+            public uint slot;
+            public uint space;
+            public uint count;
+            public uint num32;
+            public uint groupWithPrevious;
+        }
+
+        /// <summary>One explicit static-sampler definition sent to the native plugin at pipeline creation.</summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct NR_StaticSampler
+        {
+            public uint reg;
+            public uint space;
+            public uint filter;
+            public uint addressU;
+            public uint addressV;
+            public uint addressW;
+            public uint mips;
+            public uint maxAnisotropy;
         }
 
         /// <summary>
@@ -707,13 +743,16 @@ namespace NativeRender
             ref RasterPipelineStateDesc state,
             [MarshalAs(UnmanagedType.LPStr)] string name);
 
-        /// <summary>Like NR_CreateRasterShader, with a hintsJson string (rootConstants / rootSRV).</summary>
+        /// <summary>Like NR_CreateRasterShader, with an explicit binding layout and static samplers.</summary>
         [DllImport(DllName)]
         public static extern ulong NR_CreateRasterShaderEx(
             byte[] vsDxil, uint vsSize, byte[] psDxil, uint psSize,
             ref RasterPipelineStateDesc state,
             [MarshalAs(UnmanagedType.LPStr)] string name,
-            [MarshalAs(UnmanagedType.LPStr)] string hintsJson);
+            [In] NR_BindingLayoutItem[] layoutItems,
+            uint layoutItemCount,
+            [In] NR_StaticSampler[] staticSamplers,
+            uint staticSamplerCount);
 
         /// <summary>Destroys a RasterShader created by NR_CreateRasterShader(Ex) (deferred).</summary>
         [DllImport(DllName)]

@@ -156,9 +156,12 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeRasterPipeline] Shader compilation failed for: {_shader.GetHlslPath()}");
 
-            string layoutJson = _layout.BuildCreationJson();
+            var layoutItems = _layout.BuildNativeItems();
+            var staticSamplers = _layout.BuildNativeStaticSamplers();
             _handle = NativeRenderPlugin.NR_CreateRasterShaderEx(
-                vs, (uint)vs.Length, ps, (uint)ps.Length, ref _state, _shader.name, layoutJson);
+                vs, (uint)vs.Length, ps, (uint)ps.Length, ref _state, _shader.name,
+                layoutItems, (uint)layoutItems.Length,
+                staticSamplers, (uint)staticSamplers.Length);
 
             if (_handle == 0)
                 throw new InvalidOperationException(

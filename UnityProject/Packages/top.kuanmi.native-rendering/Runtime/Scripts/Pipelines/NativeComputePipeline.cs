@@ -19,7 +19,7 @@ namespace NativeRender
         public uint Count;
     }
 
-    /// <summary>Texture filtering mode for a <see cref="SamplerHint"/>. Order matches the native parser.</summary>
+    /// <summary>Texture filtering mode for a <see cref="SamplerHint"/>. Order matches the native ABI.</summary>
     public enum SamplerFilter
     {
         Point       = 0,
@@ -27,7 +27,7 @@ namespace NativeRender
         Anisotropic = 2
     }
 
-    /// <summary>Texture address (wrap) mode for a <see cref="SamplerHint"/>. Order matches the native parser.</summary>
+    /// <summary>Texture address (wrap) mode for a <see cref="SamplerHint"/>. Order matches the native ABI.</summary>
     public enum SamplerAddress
     {
         Wrap       = 0,
@@ -40,7 +40,7 @@ namespace NativeRender
     /// <summary>
     /// Overrides the static-sampler attributes for one HLSL sampler, replacing the
     /// name-inference convention (sampler_LinearClamp, …) used by the native plugin.
-    /// Authored on the shader importer and serialized into the pipeline hints JSON.
+    /// Authored on the shader importer and passed to native through the explicit binding layout.
     /// </summary>
     [Serializable]
     public struct SamplerHint
@@ -233,8 +233,12 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            string layoutJson = _layout.BuildCreationJson();
-            _handle = NativeRenderPlugin.NR_CreateComputeShaderEx(dxil, (uint)dxil.Length, shader.name, layoutJson);
+            var layoutItems = _layout.BuildNativeItems();
+            var staticSamplers = _layout.BuildNativeStaticSamplers();
+            _handle = NativeRenderPlugin.NR_CreateComputeShaderEx(
+                dxil, (uint)dxil.Length, shader.name,
+                layoutItems, (uint)layoutItems.Length,
+                staticSamplers, (uint)staticSamplers.Length);
 
             if (_handle == 0)
                 throw new InvalidOperationException(

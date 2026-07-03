@@ -198,9 +198,12 @@ namespace NativeRender
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
             string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
-            string hintsJson  = BuildCreationJson(_layout, null);
+            var layoutItems = _layout.BuildNativeItems();
+            var staticSamplers = _layout.BuildNativeStaticSamplers();
             _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(
-                dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName, hintsJson);
+                dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName,
+                layoutItems, (uint)layoutItems.Length,
+                staticSamplers, (uint)staticSamplers.Length);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytesEx returned 0 for: {shader.name}");
@@ -251,10 +254,15 @@ namespace NativeRender
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
-                string hintsJson = BuildCreationJson(_layout, _hitGroupAnyHit);
+                var layoutItems = _layout.BuildNativeItems();
+                var staticSamplers = _layout.BuildNativeStaticSamplers();
+                var hitGroupAnyHit = BuildHitGroupAnyHitBytes(_hitGroupAnyHit);
                 _handle = NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
                     ptrs, sizes, (uint)totalBlobs,
-                    primaryShader.name, flags, maxPayload, rayGenName, hintsJson);
+                    primaryShader.name, flags, maxPayload, rayGenName,
+                    layoutItems, (uint)layoutItems.Length,
+                    staticSamplers, (uint)staticSamplers.Length,
+                    hitGroupAnyHit, (uint)hitGroupAnyHit.Length);
 
                 if (_handle == 0)
                     throw new InvalidOperationException(
@@ -322,22 +330,13 @@ namespace NativeRender
                     string.Join(", ", missing));
         }
 
-        private static string BuildCreationJson(NativeBindingLayout layout, bool[] hitGroupAnyHit)
+        private static byte[] BuildHitGroupAnyHitBytes(bool[] flags)
         {
-            string layoutJson = layout.BuildCreationJson();
-            if (hitGroupAnyHit == null || hitGroupAnyHit.Length == 0) return layoutJson;
-
-            // Splice "hitGroupAnyHit" into the layout's top-level JSON object.
-            var sb = new System.Text.StringBuilder(layoutJson, layoutJson.Length + 64);
-            sb.Length -= 1; // drop trailing '}'
-            sb.Append(",\"hitGroupAnyHit\":[");
-            for (int i = 0; i < hitGroupAnyHit.Length; i++)
-            {
-                if (i > 0) sb.Append(',');
-                sb.Append(hitGroupAnyHit[i] ? "true" : "false");
-            }
-            sb.Append("]}");
-            return sb.ToString();
+            if (flags == null || flags.Length == 0) return Array.Empty<byte>();
+            var bytes = new byte[flags.Length];
+            for (int i = 0; i < flags.Length; i++)
+                bytes[i] = flags[i] ? (byte)1 : (byte)0;
+            return bytes;
         }
 
         private void OnShaderRecompiled(RayTraceShader shader)

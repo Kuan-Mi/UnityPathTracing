@@ -7,6 +7,7 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <wrl/client.h>
+#include <algorithm>
 #include <atomic>
 #include <cstdarg>
 #include <cstdint>
@@ -1708,137 +1709,83 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
     return reinterpret_cast<uint64_t>(cs);
 }
 
-// Parses:
-// "sharedLayout":{"items":[{"kind":0,"slot":1,"space":0,"count":1,"num32":0},...]}
-// Kind values match ShaderBase::SharedLayoutKind.
-static void ApplySharedLayoutHints(ShaderBase* shader, const char* hintsJson)
+#pragma pack(push, 4)
+struct NR_BindingLayoutItem
 {
-    if (!shader || !hintsJson || hintsJson[0] == '\0') return;
-    const char* tag = strstr(hintsJson, "\"sharedLayout\"");
-    if (!tag) return;
-    const char* itemsTag = strstr(tag, "\"items\"");
-    if (!itemsTag) return;
-    const char* arrStart = strchr(itemsTag, '[');
-    if (!arrStart) return;
-    const char* arrEnd = strchr(arrStart, ']');
-    if (!arrEnd) return;
+    uint32_t kind;
+    uint32_t slot;
+    uint32_t space;
+    uint32_t count;
+    uint32_t num32;
+    uint32_t groupWithPrevious;
+};
 
-    auto ReadUInt = [](const char* objBegin, const char* objEnd,
-                       const char* key, uint32_t fallback) -> uint32_t {
-        const char* k = strstr(objBegin, key);
-        if (!k || k >= objEnd) return fallback;
-        const char* colon = strchr(k, ':');
-        if (!colon || colon >= objEnd) return fallback;
-        return static_cast<uint32_t>(strtoul(colon + 1, nullptr, 10));
-    };
+struct NR_StaticSampler
+{
+    uint32_t reg;
+    uint32_t space;
+    uint32_t filter;
+    uint32_t addressU;
+    uint32_t addressV;
+    uint32_t addressW;
+    uint32_t mips;
+    uint32_t maxAnisotropy;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(NR_BindingLayoutItem) == 24, "NR_BindingLayoutItem ABI mismatch");
+static_assert(sizeof(NR_StaticSampler) == 32, "NR_StaticSampler ABI mismatch");
+
+static void ApplyBindingLayout(
+    ShaderBase* shader,
+    const NR_BindingLayoutItem* layoutItems,
+    uint32_t layoutItemCount,
+    const NR_StaticSampler* staticSamplers,
+    uint32_t staticSamplerCount)
+{
+    if (!shader) return;
 
     shader->ClearSharedLayout();
-    const char* p = arrStart + 1;
-    while (p < arrEnd)
+    for (uint32_t i = 0; layoutItems && i < layoutItemCount; ++i)
     {
-        const char* objStart = strchr(p, '{');
-        if (!objStart || objStart >= arrEnd) break;
-        const char* objEnd = strchr(objStart, '}');
-        if (!objEnd || objEnd > arrEnd) break;
-
-        uint32_t kind  = ReadUInt(objStart, objEnd, "\"kind\"", 0);
-        uint32_t slot  = ReadUInt(objStart, objEnd, "\"slot\"", 0);
-        uint32_t space = ReadUInt(objStart, objEnd, "\"space\"", 0);
-        uint32_t count = ReadUInt(objStart, objEnd, "\"count\"", 1);
-        uint32_t num32 = ReadUInt(objStart, objEnd, "\"num32\"", 0);
-        uint32_t grp   = ReadUInt(objStart, objEnd, "\"grp\"",   0);
-
+        const NR_BindingLayoutItem& item = layoutItems[i];
         shader->AddSharedLayoutItem(
-            static_cast<ShaderBase::SharedLayoutKind>(kind),
-            slot, space, count, num32, grp != 0);
-
-        p = objEnd + 1;
+            static_cast<ShaderBase::SharedLayoutKind>(item.kind),
+            item.slot,
+            item.space,
+            item.count,
+            item.num32,
+            item.groupWithPrevious != 0);
     }
-}
 
-// Parses "staticSamplers":[{"reg":N,"space":N,"filter":N,"addressU":N,"addressV":N,
-// "addressW":N,"mips":N,"aniso":N}] from the hints JSON. C# resolves sampler registers
-// (from import-time reflection) and filter/address config (editor hints or naming
-// convention) itself; the plugin just forwards explicit descs into the root signature.
-static void ApplyStaticSamplerHints(ShaderBase* shader, const char* hintsJson)
-{
-    if (!hintsJson || hintsJson[0] == '\0') return;
-    const char* tag = strstr(hintsJson, "\"staticSamplers\"");
-    if (!tag) return;
-    const char* arrStart = strchr(tag + 16, '[');
-    if (!arrStart) return;
-    const char* arrEnd = strchr(arrStart, ']');
-    if (!arrEnd) return;
-
-    // Reads an integer field within [objBegin, objEnd); returns fallback if absent.
-    auto ReadInt = [](const char* objBegin, const char* objEnd,
-                      const char* key, int fallback) -> int {
-        const char* k = strstr(objBegin, key);
-        if (!k || k >= objEnd) return fallback;
-        const char* colon = strchr(k, ':');
-        if (!colon || colon >= objEnd) return fallback;
-        return atoi(colon + 1);
-    };
-
-    const char* p = arrStart + 1;
-    while (p < arrEnd)
+    for (uint32_t i = 0; staticSamplers && i < staticSamplerCount; ++i)
     {
-        const char* objStart = strchr(p, '{');
-        if (!objStart || objStart >= arrEnd) break;
-        const char* objEnd = strchr(objStart, '}');
-        if (!objEnd) break;
-
+        const NR_StaticSampler& sampler = staticSamplers[i];
         ShaderBase::StaticSamplerDef def;
-        def.reg           = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"reg\"",      0));
-        def.space         = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"space\"",    0));
-        def.filter        = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"filter\"",   1));
-        def.addressU      = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"addressU\"", 0));
-        def.addressV      = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"addressV\"", 0));
-        def.addressW      = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"addressW\"", 0));
-        def.mips          = ReadInt(objStart, objEnd, "\"mips\"", 0) != 0;
-        def.maxAnisotropy = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"aniso\"", 16));
+        def.reg           = sampler.reg;
+        def.space         = sampler.space;
+        def.filter        = sampler.filter;
+        def.addressU      = sampler.addressU;
+        def.addressV      = sampler.addressV;
+        def.addressW      = sampler.addressW;
+        def.mips          = sampler.mips != 0;
+        def.maxAnisotropy = sampler.maxAnisotropy;
         shader->AddStaticSampler(def);
-
-        p = objEnd + 1;
     }
 }
 
-// Parses "hitGroupAnyHit":[true,false,...] from hints JSON. Entry i applies to
-// hit-group blob i, i.e. native blob[i + 1]. Missing entries keep default true.
-static void ApplyHitGroupAnyHitHints(std::vector<RayTraceShader::BlobDesc>& descs, const char* hintsJson)
+static void ApplyHitGroupAnyHitHints(
+    std::vector<RayTraceShader::BlobDesc>& descs,
+    const uint8_t* hitGroupAnyHit,
+    uint32_t hitGroupAnyHitCount)
 {
-    if (!hintsJson || hintsJson[0] == '\0' || descs.size() <= 1) return;
-    const char* tag = strstr(hintsJson, "\"hitGroupAnyHit\"");
-    if (!tag) return;
-    const char* arrStart = strchr(tag + 16, '[');
-    if (!arrStart) return;
-    const char* arrEnd = strchr(arrStart, ']');
-    if (!arrEnd) return;
+    if (!hitGroupAnyHit || hitGroupAnyHitCount == 0 || descs.size() <= 1) return;
 
-    const char* p = arrStart + 1;
-    uint32_t hitGroupIndex = 0;
-    while (p < arrEnd && (hitGroupIndex + 1) < descs.size())
-    {
-        while (p < arrEnd && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' || *p == ',')) ++p;
-        if (p >= arrEnd) break;
-
-        if (_strnicmp(p, "true", 4) == 0)
-        {
-            descs[hitGroupIndex + 1].attachAnyHit = true;
-            p += 4;
-            ++hitGroupIndex;
-        }
-        else if (_strnicmp(p, "false", 5) == 0)
-        {
-            descs[hitGroupIndex + 1].attachAnyHit = false;
-            p += 5;
-            ++hitGroupIndex;
-        }
-        else
-        {
-            ++p;
-        }
-    }
+    const uint32_t count = std::min<uint32_t>(
+        hitGroupAnyHitCount,
+        static_cast<uint32_t>(descs.size() - 1));
+    for (uint32_t i = 0; i < count; ++i)
+        descs[i + 1].attachAnyHit = hitGroupAnyHit[i] != 0;
 }
 
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
@@ -1849,7 +1796,10 @@ NR_CreateRayTraceShaderFromBytesEx(
     uint32_t flags,
     uint32_t maxPayloadSizeInBytes,
     const char* rayGenName,
-    const char* hintsJson)
+    const NR_BindingLayoutItem* layoutItems,
+    uint32_t layoutItemCount,
+    const NR_StaticSampler* staticSamplers,
+    uint32_t staticSamplerCount)
 {
     if (!s_RendererReady)
     {
@@ -1870,8 +1820,7 @@ NR_CreateRayTraceShaderFromBytesEx(
         dev5->Release();
         return 0;
     }
-    ApplySharedLayoutHints(shader, hintsJson);
-    ApplyStaticSamplerHints(shader, hintsJson);
+    ApplyBindingLayout(shader, layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
     if (!shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes, rayGenName))
     {
         delete shader;
@@ -1891,7 +1840,12 @@ NR_CreateRayTracePipelineFromBlobsEx(
     uint32_t        flags,
     uint32_t        maxPayloadSizeInBytes,
     const char*     rayGenName,
-    const char*     hintsJson)
+    const NR_BindingLayoutItem* layoutItems,
+    uint32_t        layoutItemCount,
+    const NR_StaticSampler* staticSamplers,
+    uint32_t        staticSamplerCount,
+    const uint8_t*  hitGroupAnyHit,
+    uint32_t        hitGroupAnyHitCount)
 {
     if (!s_RendererReady)
     {
@@ -1915,7 +1869,7 @@ NR_CreateRayTracePipelineFromBlobsEx(
     std::vector<RayTraceShader::BlobDesc> descs(blobCount);
     for (uint32_t i = 0; i < blobCount; ++i)
         descs[i] = { blobDataPtrs[i], blobSizes[i] };
-    ApplyHitGroupAnyHitHints(descs, hintsJson);
+    ApplyHitGroupAnyHitHints(descs, hitGroupAnyHit, hitGroupAnyHitCount);
 
     auto* shader = new RayTraceShader();
     if (!shader->Initialize(dev5, s_Log, s_D3D12v8))
@@ -1924,8 +1878,7 @@ NR_CreateRayTracePipelineFromBlobsEx(
         dev5->Release();
         return 0;
     }
-    ApplySharedLayoutHints(shader, hintsJson);
-    ApplyStaticSamplerHints(shader, hintsJson);
+    ApplyBindingLayout(shader, layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
     if (!shader->LoadShaderFromMultipleBlobs(descs.data(), blobCount, name, flags,
                                              maxPayloadSizeInBytes, rayGenName))
     {
@@ -1938,7 +1891,14 @@ NR_CreateRayTracePipelineFromBlobsEx(
 }
 
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* name, const char* hintsJson)
+NR_CreateComputeShaderEx(
+    const uint8_t* dxilBytes,
+    uint32_t size,
+    const char* name,
+    const NR_BindingLayoutItem* layoutItems,
+    uint32_t layoutItemCount,
+    const NR_StaticSampler* staticSamplers,
+    uint32_t staticSamplerCount)
 {
     if (!s_RendererReady)
     {
@@ -1964,8 +1924,7 @@ NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* na
         dev5->Release();
         return 0;
     }
-    ApplySharedLayoutHints(cs, hintsJson);
-    ApplyStaticSamplerHints(cs, hintsJson);
+    ApplyBindingLayout(cs, layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
     if (!cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;
@@ -2224,14 +2183,17 @@ struct RAS_RenderEventData
 // ---------------------------------------------------------------------------
 // NR_CreateRasterShader / NR_CreateRasterShaderEx
 //   Build a graphics pipeline from pre-compiled VS + PS DXIL blobs and a
-//   RasterPipelineStateDesc.  The Ex form also accepts a hintsJson string
-//   (rootConstants / rootSRV), identical to the compute / ray-tracing Ex forms.
+//   RasterPipelineStateDesc.
 // ---------------------------------------------------------------------------
 static uint64_t CreateRasterShaderImpl(
     const uint8_t* vsDxil, uint32_t vsSize,
     const uint8_t* psDxil, uint32_t psSize,
     const RasterPipelineStateDesc* state,
-    const char* name, const char* hintsJson)
+    const char* name,
+    const NR_BindingLayoutItem* layoutItems,
+    uint32_t layoutItemCount,
+    const NR_StaticSampler* staticSamplers,
+    uint32_t staticSamplerCount)
 {
     if (!s_RendererReady)
     {
@@ -2262,8 +2224,7 @@ static uint64_t CreateRasterShaderImpl(
         dev5->Release();
         return 0;
     }
-    ApplySharedLayoutHints(rs, hintsJson);
-    ApplyStaticSamplerHints(rs, hintsJson);
+    ApplyBindingLayout(rs, layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
     if (!rs->LoadShaderFromBlobs(vsDxil, vsSize, psDxil, psSize, *state, name))
     {
         delete rs;
@@ -2279,16 +2240,21 @@ NR_CreateRasterShader(const uint8_t* vsDxil, uint32_t vsSize,
                       const uint8_t* psDxil, uint32_t psSize,
                       const RasterPipelineStateDesc* state, const char* name)
 {
-    return CreateRasterShaderImpl(vsDxil, vsSize, psDxil, psSize, state, name, nullptr);
+    return CreateRasterShaderImpl(vsDxil, vsSize, psDxil, psSize, state, name,
+                                  nullptr, 0, nullptr, 0);
 }
 
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateRasterShaderEx(const uint8_t* vsDxil, uint32_t vsSize,
                         const uint8_t* psDxil, uint32_t psSize,
                         const RasterPipelineStateDesc* state, const char* name,
-                        const char* hintsJson)
+                        const NR_BindingLayoutItem* layoutItems,
+                        uint32_t layoutItemCount,
+                        const NR_StaticSampler* staticSamplers,
+                        uint32_t staticSamplerCount)
 {
-    return CreateRasterShaderImpl(vsDxil, vsSize, psDxil, psSize, state, name, hintsJson);
+    return CreateRasterShaderImpl(vsDxil, vsSize, psDxil, psSize, state, name,
+                                  layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

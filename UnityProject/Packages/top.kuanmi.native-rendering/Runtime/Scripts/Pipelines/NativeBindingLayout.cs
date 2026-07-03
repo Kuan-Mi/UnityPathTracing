@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace NativeRender
 {
@@ -143,54 +142,46 @@ namespace NativeRender
             return this;
         }
 
-        // -------------------------------------------------------------------
-        // Creation JSON — the single sideband sent to the render plugin
-        // -------------------------------------------------------------------
-
-        internal string BuildCreationJson()
+        internal NativeRenderPlugin.NR_BindingLayoutItem[] BuildNativeItems()
         {
-            var sb = new StringBuilder(256);
-            sb.Append('{');
-            AppendJson(sb);
-            if (_staticSamplers.Count > 0)
-            {
-                sb.Append(",\"staticSamplers\":[");
-                for (int i = 0; i < _staticSamplers.Count; i++)
-                {
-                    if (i > 0) sb.Append(',');
-                    var s = _staticSamplers[i];
-                    sb.Append("{\"reg\":").Append(s.Slot)
-                        .Append(",\"space\":").Append(s.Space)
-                        .Append(",\"filter\":").Append((uint)s.Filter)
-                        .Append(",\"addressU\":").Append((uint)s.AddressU)
-                        .Append(",\"addressV\":").Append((uint)s.AddressV)
-                        .Append(",\"addressW\":").Append((uint)s.AddressW)
-                        .Append(",\"mips\":").Append(s.Mips ? 1 : 0)
-                        .Append(",\"aniso\":").Append(s.MaxAnisotropy)
-                        .Append('}');
-                }
-                sb.Append(']');
-            }
-            sb.Append('}');
-            return sb.ToString();
-        }
-
-        internal void AppendJson(StringBuilder sb)
-        {
-            sb.Append("\"sharedLayout\":{\"items\":[");
+            if (_items.Count == 0) return Array.Empty<NativeRenderPlugin.NR_BindingLayoutItem>();
+            var dst = new NativeRenderPlugin.NR_BindingLayoutItem[_items.Count];
             for (int i = 0; i < _items.Count; i++)
             {
-                if (i > 0) sb.Append(',');
                 var item = _items[i];
-                sb.Append("{\"kind\":").Append((uint)item.Kind)
-                    .Append(",\"slot\":").Append(item.Slot)
-                    .Append(",\"space\":").Append(item.Space)
-                    .Append(",\"count\":").Append(item.Count == 0 ? 1 : item.Count)
-                    .Append(",\"num32\":").Append(item.Num32BitValues)
-                    .Append(",\"grp\":").Append(item.GroupWithPrevious ? 1 : 0)
-                    .Append('}');
+                dst[i] = new NativeRenderPlugin.NR_BindingLayoutItem
+                {
+                    kind = (uint)item.Kind,
+                    slot = item.Slot,
+                    space = item.Space,
+                    count = item.Count == 0 ? 1 : item.Count,
+                    num32 = item.Num32BitValues,
+                    groupWithPrevious = item.GroupWithPrevious ? 1u : 0u,
+                };
             }
-            sb.Append("]}");
+            return dst;
+        }
+
+        internal NativeRenderPlugin.NR_StaticSampler[] BuildNativeStaticSamplers()
+        {
+            if (_staticSamplers.Count == 0) return Array.Empty<NativeRenderPlugin.NR_StaticSampler>();
+            var dst = new NativeRenderPlugin.NR_StaticSampler[_staticSamplers.Count];
+            for (int i = 0; i < _staticSamplers.Count; i++)
+            {
+                var s = _staticSamplers[i];
+                dst[i] = new NativeRenderPlugin.NR_StaticSampler
+                {
+                    reg = s.Slot,
+                    space = s.Space,
+                    filter = (uint)s.Filter,
+                    addressU = (uint)s.AddressU,
+                    addressV = (uint)s.AddressV,
+                    addressW = (uint)s.AddressW,
+                    mips = s.Mips ? 1u : 0u,
+                    maxAnisotropy = s.MaxAnisotropy,
+                };
+            }
+            return dst;
         }
 
         // -------------------------------------------------------------------
