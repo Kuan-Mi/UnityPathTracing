@@ -50,6 +50,40 @@ namespace NativeRender
         }
 
         /// <summary>
+        /// Returns true when every binding object carries the post-migration
+        /// "count" field. Old cached shader assets omitted it, which makes
+        /// bounded arrays parse as one descriptor and can produce a root
+        /// signature that fails PSO creation.
+        /// </summary>
+        public static bool HasBindingCounts(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return false;
+
+            int bindingsIdx = json.IndexOf("\"bindings\"", StringComparison.Ordinal);
+            if (bindingsIdx < 0) return false;
+            int arrayStart = json.IndexOf('[', bindingsIdx);
+            if (arrayStart < 0) return false;
+            int arrayEnd = json.IndexOf(']', arrayStart);
+            if (arrayEnd < 0) arrayEnd = json.Length;
+
+            int pos = arrayStart + 1;
+            while (pos < arrayEnd)
+            {
+                int objStart = json.IndexOf('{', pos);
+                if (objStart < 0 || objStart >= arrayEnd) break;
+                int objEnd = json.IndexOf('}', objStart);
+                if (objEnd < 0) break;
+
+                string obj = json.Substring(objStart + 1, objEnd - objStart - 1);
+                if (obj.IndexOf("\"count\"", StringComparison.Ordinal) < 0)
+                    return false;
+
+                pos = objEnd + 1;
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Appends the bindings of <paramref name="json"/> into <paramref name="dst"/>,
         /// de-duplicating by (name, reg, space) — used to merge the reflection of a
         /// multi-blob RT pipeline (primary + hit-group shaders).

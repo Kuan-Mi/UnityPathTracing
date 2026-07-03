@@ -4,7 +4,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Describes one resource binding discovered via DXC reflection.
+// Describes one resource binding derived from the explicit C# binding layout.
 // ---------------------------------------------------------------------------
 enum class BindingType
 {
@@ -35,7 +35,7 @@ struct Binding
 
 // ---------------------------------------------------------------------------
 // BindingSlot
-//   One slot per reflected binding, passed from C# via IssuePluginEventAndData.
+//   One slot per binding-layout item, passed from C# via IssuePluginEventAndData.
 //   Must match NativeRenderPlugin.CS_BindingSlot exactly (Pack=4, 24 bytes).
 //
 //   A single `objectPtr` holds whatever the binding points at; objectKind tells

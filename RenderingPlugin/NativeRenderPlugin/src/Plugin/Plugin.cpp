@@ -1649,7 +1649,7 @@ NR_NSB_TryReadback(uint64_t handle, void* dst, uint64_t dstBytes)
 
 // ---------------------------------------------------------------------------
 // CS_BindingSlot
-//   One slot per reflected binding. Mirrors ComputeShader.h CS_BindingSlot.
+//   One slot per binding-layout item. Mirrors ComputeShader.h CS_BindingSlot.
 //   (Redeclared here for Plugin.cpp; the authoritative definition is in ComputeShader.h)
 // ---------------------------------------------------------------------------
 // (CS_BindingSlot and CS_BindingObjectKind are included via ComputeShader.h)

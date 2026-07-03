@@ -176,8 +176,10 @@ namespace NativeRender
         }
 
         public static NativeBindingSetItem Sampler(uint slot, NativeSampler sampler, uint space = 0)
-            => Sampler(slot, sampler.Filter, sampler.AddressU, sampler.AddressV, sampler.AddressW,
-                sampler.Mips, sampler.MaxAnisotropy, space);
+            => sampler != null
+                ? Sampler(slot, sampler.Filter, sampler.AddressU, sampler.AddressV, sampler.AddressW,
+                    sampler.Mips, sampler.MaxAnisotropy, space)
+                : Make(BindingRegClass.Sampler, slot, space, 0, KindNone);
 
         public static NativeBindingSetItem BindlessTexture_SRV(uint space, BindlessTexture textures, uint firstSlot = 0)
         {

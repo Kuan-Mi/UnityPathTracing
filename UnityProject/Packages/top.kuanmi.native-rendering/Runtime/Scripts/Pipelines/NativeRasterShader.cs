@@ -94,7 +94,11 @@ namespace NativeRender
 
         internal void EnsureCompiled(string hlslPath = null)
         {
-            if (HasCompiledBytes) return;
+            if (HasCompiledBytes)
+            {
+                EnsureReflectionCurrent();
+                return;
+            }
 
             if (string.IsNullOrEmpty(hlslPath))
                 hlslPath = GetHlslPath();
@@ -122,8 +126,8 @@ namespace NativeRender
                 return;
             }
 
-            // Merge reflected binding names from both stages so the slot layout the
-            // pipeline builds covers VS-only and PS-only resources.
+            // Merge reflection from both stages so the auto-generated binding
+            // layout covers VS-only and PS-only resources.
             _reflectionJson = MergeReflection(_vsDxil, _psDxil);
 
 #if UNITY_EDITOR
@@ -131,6 +135,17 @@ namespace NativeRender
 #endif
             Debug.Log($"[NativeRasterShader] Compiled VS {_vsDxil.Length}B + PS {_psDxil.Length}B: {hlslPath}");
             OnRecompiled?.Invoke(this);
+        }
+
+        private void EnsureReflectionCurrent()
+        {
+            if (!HasCompiledBytes || ShaderReflectionInfo.HasBindingCounts(_reflectionJson))
+                return;
+
+            _reflectionJson = MergeReflection(_vsDxil, _psDxil);
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
         }
 
         private static string AppendDefine(string defines, string extra)
@@ -159,8 +174,9 @@ namespace NativeRender
         {
             string vsJson = ReflectStage(vs);
             string psJson = ReflectStage(ps);
-            // Concatenate the two "bindings" arrays into one document. Duplicate names
-            // are harmless: the pipeline's slot map resolves each via NR_RAS_GetSlotIndex.
+            // Concatenate the two "bindings" arrays into one document. Duplicate
+            // register declarations are folded when the pipeline auto-generates
+            // its NativeBindingLayout; duplicate names resolve to the same slot.
             string vsArr = ExtractBindingsArrayBody(vsJson);
             string psArr = ExtractBindingsArrayBody(psJson);
             var    sb    = new StringBuilder();

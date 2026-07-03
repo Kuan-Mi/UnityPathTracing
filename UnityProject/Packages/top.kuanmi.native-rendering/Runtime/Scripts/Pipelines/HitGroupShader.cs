@@ -74,7 +74,11 @@ namespace NativeRender
         /// <param name="hlslPath">Absolute path to the HLSL file. If null, resolved via AssetDatabase.</param>
         internal void EnsureCompiled(string hlslPath = null)
         {
-            if (HasCompiledBytes) return;
+            if (HasCompiledBytes)
+            {
+                EnsureReflectionCurrent();
+                return;
+            }
 
             if (string.IsNullOrEmpty(hlslPath))
                 hlslPath = GetHlslPath();
@@ -98,6 +102,28 @@ namespace NativeRender
             Marshal.Copy(nativePtr, _compiledDxil, 0, (int)nativeSize);
             NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Free(nativePtr);
 
+            ReflectCompiledDxil();
+
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
+            Debug.Log($"[HitGroupShader] Compiled {nativeSize} bytes: {hlslPath}");
+            OnRecompiled?.Invoke(this);
+        }
+
+        private void EnsureReflectionCurrent()
+        {
+            if (!HasCompiledBytes || ShaderReflectionInfo.HasBindingCounts(_reflectionJson))
+                return;
+
+            ReflectCompiledDxil();
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
+        }
+
+        private void ReflectCompiledDxil()
+        {
             _reflectionJson = "";
             if (NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_ReflectLib(
                     _compiledDxil, (uint)_compiledDxil.Length, out IntPtr jsonPtr, out uint jsonLen)
@@ -106,12 +132,6 @@ namespace NativeRender
                 _reflectionJson = Marshal.PtrToStringAnsi(jsonPtr, (int)jsonLen);
                 NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Free(jsonPtr);
             }
-
-#if UNITY_EDITOR
-            UnityEditor.EditorUtility.SetDirty(this);
-#endif
-            Debug.Log($"[HitGroupShader] Compiled {nativeSize} bytes: {hlslPath}");
-            OnRecompiled?.Invoke(this);
         }
 
         /// <summary>Clears the cached DXIL bytes and recompiles.</summary>

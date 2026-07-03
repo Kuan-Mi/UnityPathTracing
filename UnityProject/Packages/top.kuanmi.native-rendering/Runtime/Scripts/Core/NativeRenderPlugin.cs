@@ -565,7 +565,7 @@ namespace NativeRender
         // -----------------------------------------------------------------------
 
         /// <summary>
-        /// One slot per reflected binding. Filled on the main thread; read on the render thread.
+        /// One slot per binding-layout item. Filled on the main thread; read on the render thread.
         /// Must match C++ BindingSlot exactly (Pack=4, 24 bytes).
         /// </summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]

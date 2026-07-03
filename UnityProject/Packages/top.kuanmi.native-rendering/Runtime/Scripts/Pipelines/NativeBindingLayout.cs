@@ -289,6 +289,9 @@ namespace NativeRender
             for (int i = 0; i < bindings.Count; i++)
             {
                 var b = bindings[i];
+                if (layout.HasLayoutItemFor(b))
+                    continue;
+
                 switch (b.RegClass)
                 {
                     case BindingRegClass.Sampler:
@@ -336,6 +339,12 @@ namespace NativeRender
             return layout;
         }
 
+        private bool HasLayoutItemFor(in ReflectedBinding b)
+        {
+            int slot = ResolveSlot(b);
+            return slot >= 0 || (b.RegClass == BindingRegClass.Sampler && HasStaticSampler(b.Reg, b.Space));
+        }
+
         private static bool NameIn(string[] names, string name)
         {
             if (names == null) return false;
@@ -347,6 +356,9 @@ namespace NativeRender
 
         private void AddStaticSamplerFor(in ReflectedBinding b, SamplerHint[] hints)
         {
+            if (HasStaticSampler(b.Reg, b.Space))
+                return;
+
             if (hints != null)
             {
                 for (int i = 0; i < hints.Length; i++)

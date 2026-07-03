@@ -34,7 +34,8 @@ namespace NativeRender
         public uint MaxAnisotropy = 16;
 
         /// <summary>Resolves this definition into the wire-format <see cref="SamplerHint"/> for the
-        /// given HLSL sampler variable name (which the native plugin matches by name).</summary>
+        /// given HLSL sampler variable name. The pipeline resolves that name to a
+        /// sampler register from import-time reflection before creating the native root signature.</summary>
         public SamplerHint ToHint(string hlslName) => new SamplerHint
         {
             Name          = hlslName,
@@ -72,8 +73,9 @@ namespace NativeRender
 
     /// <summary>
     /// Resolves an array of <see cref="SamplerBinding"/> (HLSL name + shared sampler asset)
-    /// into the wire-format <see cref="SamplerHint"/>[] consumed by the pipelines' BuildHintsJson.
-    /// Bindings with no assigned sampler are skipped, leaving them to native name-inference.
+    /// into the <see cref="SamplerHint"/>[] consumed while auto-generating a
+    /// <see cref="NativeBindingLayout"/>. Bindings with no assigned sampler are
+    /// skipped, leaving them to C# name-inference.
     /// Shared by all three shader assets so the resolution rule lives in one place.
     /// </summary>
     internal static class SamplerBindingResolver
