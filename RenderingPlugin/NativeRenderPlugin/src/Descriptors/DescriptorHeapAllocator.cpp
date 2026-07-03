@@ -5,19 +5,29 @@
 
 bool DescriptorHeapAllocator::Initialize(ID3D12Device* device)
 {
+    return Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                      kCapacity, L"DescriptorHeapAllocator::m_heap");
+}
+
+bool DescriptorHeapAllocator::Initialize(ID3D12Device* device,
+                                         D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                         uint32_t capacity,
+                                         const wchar_t* debugName)
+{
     D3D12_DESCRIPTOR_HEAP_DESC d = {};
-    d.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    d.NumDescriptors = kCapacity;
+    d.Type           = type;
+    d.NumDescriptors = capacity;
     d.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     if (FAILED(device->CreateDescriptorHeap(&d, IID_PPV_ARGS(&m_heap))))
     {
         printf("[DescriptorHeapAllocator] CreateDescriptorHeap failed\n");
         return false;
     }
-    //Set Name for debugging
-    m_heap->SetName(L"DescriptorHeapAllocator::m_heap");
+    if (debugName) m_heap->SetName(debugName);
 
-    m_incSize  = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_type     = type;
+    m_capacity = capacity;
+    m_incSize  = device->GetDescriptorHandleIncrementSize(type);
     m_bumpNext = 0;
     m_freeList.clear();
     return true;
@@ -54,11 +64,11 @@ uint32_t DescriptorHeapAllocator::Allocate(uint32_t count)
 
     // Bump allocate
     uint32_t base = m_bumpNext;
-    if (base + count > kCapacity)
+    if (base + count > m_capacity)
     {
         printf("[DescriptorHeapAllocator] ERROR: out of descriptor slots "
                "(requested %u, bumpNext=%u, capacity=%u) – increase kCapacity\n",
-               count, m_bumpNext, kCapacity);
+               count, m_bumpNext, m_capacity);
         return UINT32_MAX;
     }
     m_bumpNext += count;

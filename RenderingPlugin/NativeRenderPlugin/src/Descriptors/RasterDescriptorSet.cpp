@@ -50,9 +50,10 @@ void RasterDescriptorSet::Draw(
     const uint32_t numRT = (draw.numRenderTargets <= kMaxRTV) ? draw.numRenderTargets : kMaxRTV;
 
     // --- SRV/UAV input descriptors ---
-    uint32_t srvBase, uavBase;
-    if (!AllocateTransientTables(srvBase, uavBase)) return;
+    uint32_t srvBase, uavBase, samplerBase;
+    if (!AllocateTransientTables(srvBase, uavBase, samplerBase)) return;
     WriteDescriptors(slots, slotCount, srvBase, uavBase);
+    WriteSamplerDescriptors(slots, slotCount, samplerBase);
 
     // --- Resource states: inputs (shared helper) + render targets ---
     RequestResourceStates(slots, slotCount);
@@ -87,7 +88,7 @@ void RasterDescriptorSet::Draw(
 
     // --- Pipeline + root params ---
     cmdList->SetPipelineState(m_shader->GetPSO());
-    BindRootParams(cmdList, slots, slotCount, srvBase, uavBase);
+    BindRootParams(cmdList, slots, slotCount, srvBase, uavBase, samplerBase);
 
     // Constant blend color for the constant-color blend mode (donut bloom composite).
     // All four channels carry the same factor, matching nvrhi::Color(blendFactor); ignored by

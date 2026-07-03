@@ -38,6 +38,7 @@ namespace NativeRender
         protected const uint ObjKindRootConstants      = 4;
         protected const uint ObjKindNativeBuffer       = 5; // unified plugin buffer (VolatileConstantBuffer / DeviceBuffer / UploadBuffer)
         protected const uint ObjKindBindlessUAVTexture = 6;
+        protected const uint ObjKindSampler            = 7;
 
         // -------------------------------------------------------------------
         // Global binding-name interning (à la UnityEngine.Shader.PropertyToID)
@@ -646,6 +647,48 @@ namespace NativeRender
         /// <summary>Binds a BindlessUAVTexture to an unbounded RWTexture2D[] variable.</summary>
         public void SetBindlessRWTexture(string name, BindlessUAVTexture uav, IntPtr baseResource = default)
             => SetBindlessRWTexture(PropertyToID(name), uav, baseResource);
+
+        private static uint PackSamplerAddress(SamplerAddress addressU, SamplerAddress addressV,
+            SamplerAddress addressW, bool mips)
+        {
+            return ((uint)addressU & 0xffu) |
+                   (((uint)addressV & 0xffu) << 8) |
+                   (((uint)addressW & 0xffu) << 16) |
+                   (mips ? (1u << 24) : 0u);
+        }
+
+        public void SetSampler(int nameId, SamplerFilter filter, SamplerAddress addressU,
+            SamplerAddress addressV, SamplerAddress addressW, bool mips = true, uint maxAnisotropy = 16)
+        {
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr  = 0;
+            _stagingSlots[i].objectKind = ObjKindSampler;
+            _stagingSlots[i].count      = (uint)filter;
+            _stagingSlots[i].stride     = PackSamplerAddress(addressU, addressV, addressW, mips);
+            _stagingSlots[i].format     = maxAnisotropy;
+        }
+
+        public void SetSampler(string name, SamplerFilter filter, SamplerAddress addressU,
+            SamplerAddress addressV, SamplerAddress addressW, bool mips = true, uint maxAnisotropy = 16)
+            => SetSampler(PropertyToID(name), filter, addressU, addressV, addressW, mips, maxAnisotropy);
+
+        public void SetSampler(int nameId, NativeSampler sampler)
+        {
+            if (sampler == null) return;
+            SetSampler(nameId, sampler.Filter, sampler.AddressU, sampler.AddressV,
+                sampler.AddressW, sampler.Mips, sampler.MaxAnisotropy);
+        }
+
+        public void SetSampler(string name, NativeSampler sampler)
+            => SetSampler(PropertyToID(name), sampler);
+
+        public void SetSampler(int nameId, SamplerHint hint)
+            => SetSampler(nameId, hint.Filter, hint.AddressU, hint.AddressV,
+                hint.AddressW, hint.Mips, hint.MaxAnisotropy);
+
+        public void SetSampler(string name, SamplerHint hint)
+            => SetSampler(PropertyToID(name), hint);
 
         /// <summary>
         /// Pushes inline 32-bit constants directly into the root signature.

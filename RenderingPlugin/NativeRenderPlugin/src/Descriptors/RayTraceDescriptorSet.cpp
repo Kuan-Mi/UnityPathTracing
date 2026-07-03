@@ -15,13 +15,14 @@ void RayTraceDescriptorSet::Dispatch(
     if (!slots && slotCount > 0) return;
     if (!ValidateBindings(slots, slotCount)) return;
 
-    uint32_t srvBase, uavBase;
-    if (!AllocateTransientTables(srvBase, uavBase)) return;
+    uint32_t srvBase, uavBase, samplerBase;
+    if (!AllocateTransientTables(srvBase, uavBase, samplerBase)) return;
     WriteDescriptors(slots, slotCount, srvBase, uavBase);
+    WriteSamplerDescriptors(slots, slotCount, samplerBase);
 
     cmdList->SetPipelineState1(m_shader->GetPSO());
     RequestResourceStates(slots, slotCount);
-    BindRootParams(cmdList, slots, slotCount, srvBase, uavBase);
+    BindRootParams(cmdList, slots, slotCount, srvBase, uavBase, samplerBase);
 
     // DispatchRays
     const UINT stride = 64;

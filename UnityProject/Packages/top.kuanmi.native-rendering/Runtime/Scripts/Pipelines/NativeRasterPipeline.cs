@@ -44,6 +44,7 @@ namespace NativeRender
         private RootConstantsHint[]                        _rootConstantsHints;
         private string[]                                   _rootSRVHints;
         private SamplerHint[]                              _samplerHints;
+        private NativeBindingLayout                        _sharedLayout;
 
         private Dictionary<string, uint> _nameToSlot;
         private uint                     _slotCount;
@@ -68,6 +69,25 @@ namespace NativeRender
             NativeRenderPlugin.RasterPipelineStateDesc state,
             RootConstantsHint[] rootConstantsHints,
             string[] rootSRVHints)
+            : this(shader, state, rootConstantsHints, rootSRVHints, null)
+        {
+        }
+
+        public NativeRasterPipeline(NativeRasterShader shader,
+            NativeRenderPlugin.RasterPipelineStateDesc state,
+            NativeBindingLayout sharedLayout)
+            : this(shader, state,
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null,
+                sharedLayout)
+        {
+        }
+
+        public NativeRasterPipeline(NativeRasterShader shader,
+            NativeRenderPlugin.RasterPipelineStateDesc state,
+            RootConstantsHint[] rootConstantsHints,
+            string[] rootSRVHints,
+            NativeBindingLayout sharedLayout)
         {
             if (shader == null) throw new ArgumentNullException(nameof(shader));
             _shader             = shader;
@@ -75,6 +95,7 @@ namespace NativeRender
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
             _samplerHints       = shader.ResolveSamplerHints();
+            _sharedLayout       = sharedLayout;
             BuildNativeHandle();
             BuildSlotLayout();
             NativeRasterShader.OnRecompiled += OnShaderRecompiled;
@@ -88,7 +109,7 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeRasterPipeline] Shader compilation failed for: {_shader.GetHlslPath()}");
 
-            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
+            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _sharedLayout);
             if (hintsJson != null)
                 _handle = NativeRenderPlugin.NR_CreateRasterShaderEx(
                     vs, (uint)vs.Length, ps, (uint)ps.Length, ref _state, _shader.name, hintsJson);
@@ -102,12 +123,13 @@ namespace NativeRender
         }
 
         private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-            SamplerHint[] samplerHints)
+            SamplerHint[] samplerHints, NativeBindingLayout sharedLayout)
         {
             bool hasRC   = rcHints != null && rcHints.Length > 0;
             bool hasSRV  = srvHints != null && srvHints.Length > 0;
             bool hasSamp = SamplerHintJson.Has(samplerHints);
-            if (!hasRC && !hasSRV && !hasSamp) return null;
+            bool hasLayout = sharedLayout != null && !sharedLayout.IsEmpty;
+            if (!hasRC && !hasSRV && !hasSamp && !hasLayout) return null;
 
             var sb = new System.Text.StringBuilder();
             sb.Append('{');
@@ -143,6 +165,13 @@ namespace NativeRender
             {
                 if (any) sb.Append(',');
                 SamplerHintJson.Append(sb, samplerHints);
+                any = true;
+            }
+
+            if (hasLayout)
+            {
+                if (any) sb.Append(',');
+                sharedLayout.AppendJson(sb);
             }
 
             sb.Append('}');

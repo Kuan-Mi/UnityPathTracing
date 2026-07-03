@@ -111,6 +111,7 @@ namespace NativeRender
         private RootConstantsHint[] _rootConstantsHints; // may be null
         private string[]            _rootSRVHints; // may be null
         private SamplerHint[]       _samplerHints; // from shader asset; may be null
+        private NativeBindingLayout _sharedLayout; // optional RTXPT/NVRHI-style shared root layout
 
         // Slot layout: name → slot index as reported by NR_CS_GetSlotIndex
         private Dictionary<string, uint> _nameToSlot;
@@ -165,6 +166,20 @@ namespace NativeRender
         /// descriptor-table entry, reducing shader execution overhead.
         /// </summary>
         public NativeComputePipeline(NativeComputeShader shader, RootConstantsHint[] rootConstantsHints, string[] rootSRVHints)
+            : this(shader, rootConstantsHints, rootSRVHints, null)
+        {
+        }
+
+        public NativeComputePipeline(NativeComputeShader shader, NativeBindingLayout sharedLayout)
+            : this(shader,
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null,
+                sharedLayout)
+        {
+        }
+
+        public NativeComputePipeline(NativeComputeShader shader, RootConstantsHint[] rootConstantsHints,
+            string[] rootSRVHints, NativeBindingLayout sharedLayout)
         {
             if (shader == null)
                 throw new ArgumentNullException(nameof(shader));
@@ -173,6 +188,7 @@ namespace NativeRender
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
             _samplerHints       = shader.ResolveSamplerHints();
+            _sharedLayout       = sharedLayout;
             BuildNativeHandle(shader);
             BuildSlotLayout(shader);
             NativeComputeShader.OnRecompiled += OnShaderRecompiled;
@@ -185,7 +201,7 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
+            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _sharedLayout);
             if (hintsJson != null)
                 _handle = NativeRenderPlugin.NR_CreateComputeShaderEx(dxil, (uint)dxil.Length, shader.name, hintsJson);
             else
@@ -197,12 +213,13 @@ namespace NativeRender
         }
 
         private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-            SamplerHint[] samplerHints)
+            SamplerHint[] samplerHints, NativeBindingLayout sharedLayout)
         {
             bool hasRC   = rcHints != null && rcHints.Length > 0;
             bool hasSRV  = srvHints != null && srvHints.Length > 0;
             bool hasSamp = SamplerHintJson.Has(samplerHints);
-            if (!hasRC && !hasSRV && !hasSamp) return null;
+            bool hasLayout = sharedLayout != null && !sharedLayout.IsEmpty;
+            if (!hasRC && !hasSRV && !hasSamp && !hasLayout) return null;
 
             var sb = new System.Text.StringBuilder();
             sb.Append('{');
@@ -247,6 +264,13 @@ namespace NativeRender
             {
                 if (any) sb.Append(',');
                 SamplerHintJson.Append(sb, samplerHints);
+                any = true;
+            }
+
+            if (hasLayout)
+            {
+                if (any) sb.Append(',');
+                sharedLayout.AppendJson(sb);
             }
 
             sb.Append('}');

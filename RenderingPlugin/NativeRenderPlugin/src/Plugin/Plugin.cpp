@@ -61,6 +61,7 @@ static IUnityGraphicsD3D12v7*    s_D3D12       = nullptr;
 static IUnityGraphicsD3D12v8*    s_D3D12v8     = nullptr;
 static IUnityLog*                s_Log         = nullptr;
 static DescriptorHeapAllocator   s_DescHeap;   // global shared GPU-visible CBV/SRV/UAV heap
+static DescriptorHeapAllocator   s_SamplerHeap; // global shared GPU-visible sampler heap
 static ComPtr<ID3D12DescriptorHeap> s_ClearCpuHeap; // 1-slot CPU-only heap for ClearUnorderedAccessViewUint
 static bool                      s_RendererReady = false;
 
@@ -80,11 +81,15 @@ uint64_t g_frameSerial = 0;
 // sub-range of s_DescHeap at renderer init; descriptor-set dispatches bump-allocate
 // SRV/UAV tables out of it and the ring reclaims them once the frame fence completes.
 TransientDescriptorRing g_transientRing;
+TransientDescriptorRing g_samplerTransientRing;
+DescriptorHeapAllocator* g_samplerHeapAllocator = nullptr;
 
 // Capacity of the transient ring in descriptor slots. Sized so it can absorb several
 // frames-in-flight worth of dispatches across all descriptor sets without exhaustion.
 // Must be <= DescriptorHeapAllocator::kCapacity minus expected bindless usage.
 static constexpr uint32_t kTransientRingCapacity = 32768u;
+static constexpr uint32_t kSamplerHeapCapacity = 2048u;
+static constexpr uint32_t kSamplerTransientRingCapacity = 2048u;
 
 // Shared UPLOAD-heap chunk pool (see PluginInternal.h). Stages CPU writes into
 // DEFAULT-heap buffers; chunks are recycled once the frame fence completes.
@@ -245,6 +250,15 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             if (!g_transientRing.Initialize(&s_DescHeap, kTransientRingCapacity))
                 NR_ERROR("TransientDescriptorRing initialization failed");
 
+            if (!s_SamplerHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+                                          kSamplerHeapCapacity, L"NativeRenderPlugin::SamplerHeap"))
+                NR_ERROR("Sampler DescriptorHeapAllocator initialization failed");
+            else
+                g_samplerHeapAllocator = &s_SamplerHeap;
+
+            if (!g_samplerTransientRing.Initialize(&s_SamplerHeap, kSamplerTransientRingCapacity))
+                NR_ERROR("Sampler TransientDescriptorRing initialization failed");
+
             // Shared UPLOAD-heap chunk pool for staging CPU writes into DEFAULT buffers.
             if (!g_uploadPool.Initialize(device))
                 NR_ERROR("SharedUploadPool initialization failed");
@@ -296,6 +310,9 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         g_scratchPool.Shutdown();
         s_DescHeap.Shutdown();
         s_ClearCpuHeap.Reset();
+        g_samplerTransientRing.Shutdown();
+        g_samplerHeapAllocator = nullptr;
+        s_SamplerHeap.Shutdown();
         s_RendererReady = false;
         s_D3D12         = nullptr;
         s_D3D12v8       = nullptr;
@@ -929,6 +946,8 @@ static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
         const uint64_t base       = nextValue > completedValue ? nextValue : completedValue;
         const uint64_t frameFence = base + kDeleteDelay;
         g_transientRing.EndFrame(frameFence, completedValue);
+        if (g_samplerTransientRing.IsInitialized())
+            g_samplerTransientRing.EndFrame(frameFence, completedValue);
 
         // Recycle shared upload chunks under the same frame-fence discipline.
         if (g_uploadPool.IsInitialized())
@@ -1782,6 +1801,53 @@ static void ApplyRootSRVHints(ShaderBase* shader, const char* hintsJson)
     }
 }
 
+// Parses:
+// "sharedLayout":{"items":[{"kind":0,"slot":1,"space":0,"count":1,"num32":0},...]}
+// Kind values match ShaderBase::SharedLayoutKind.
+static void ApplySharedLayoutHints(ShaderBase* shader, const char* hintsJson)
+{
+    if (!shader || !hintsJson || hintsJson[0] == '\0') return;
+    const char* tag = strstr(hintsJson, "\"sharedLayout\"");
+    if (!tag) return;
+    const char* itemsTag = strstr(tag, "\"items\"");
+    if (!itemsTag) return;
+    const char* arrStart = strchr(itemsTag, '[');
+    if (!arrStart) return;
+    const char* arrEnd = strchr(arrStart, ']');
+    if (!arrEnd) return;
+
+    auto ReadUInt = [](const char* objBegin, const char* objEnd,
+                       const char* key, uint32_t fallback) -> uint32_t {
+        const char* k = strstr(objBegin, key);
+        if (!k || k >= objEnd) return fallback;
+        const char* colon = strchr(k, ':');
+        if (!colon || colon >= objEnd) return fallback;
+        return static_cast<uint32_t>(strtoul(colon + 1, nullptr, 10));
+    };
+
+    shader->ClearSharedLayout();
+    const char* p = arrStart + 1;
+    while (p < arrEnd)
+    {
+        const char* objStart = strchr(p, '{');
+        if (!objStart || objStart >= arrEnd) break;
+        const char* objEnd = strchr(objStart, '}');
+        if (!objEnd || objEnd > arrEnd) break;
+
+        uint32_t kind  = ReadUInt(objStart, objEnd, "\"kind\"", 0);
+        uint32_t slot  = ReadUInt(objStart, objEnd, "\"slot\"", 0);
+        uint32_t space = ReadUInt(objStart, objEnd, "\"space\"", 0);
+        uint32_t count = ReadUInt(objStart, objEnd, "\"count\"", 1);
+        uint32_t num32 = ReadUInt(objStart, objEnd, "\"num32\"", 0);
+
+        shader->AddSharedLayoutItem(
+            static_cast<ShaderBase::SharedLayoutKind>(kind),
+            slot, space, count, num32);
+
+        p = objEnd + 1;
+    }
+}
+
 // Parses "samplers":[{"name":"...","filter":N,"addressU":N,"addressV":N,"addressW":N,
 // "mips":N,"aniso":N}] from the hints JSON. Each entry overrides the static-sampler
 // attributes for the matching HLSL sampler variable (see ShaderBase::SetSamplerHint).
@@ -1913,6 +1979,7 @@ NR_CreateRayTraceShaderFromBytesEx(
         dev5->Release();
         return 0;
     }
+    ApplySharedLayoutHints(shader, hintsJson);
     ApplyRootConstantsHints(shader, hintsJson);
     ApplyRootSRVHints(shader, hintsJson);
     ApplySamplerHints(shader, hintsJson);
@@ -1968,6 +2035,7 @@ NR_CreateRayTracePipelineFromBlobsEx(
         dev5->Release();
         return 0;
     }
+    ApplySharedLayoutHints(shader, hintsJson);
     ApplyRootConstantsHints(shader, hintsJson);
     ApplyRootSRVHints(shader, hintsJson);
     ApplySamplerHints(shader, hintsJson);
@@ -2009,6 +2077,7 @@ NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* na
         dev5->Release();
         return 0;
     }
+    ApplySharedLayoutHints(cs, hintsJson);
     ApplyRootConstantsHints(cs, hintsJson);
     ApplyRootSRVHints(cs, hintsJson);
     ApplySamplerHints(cs, hintsJson);
@@ -2320,6 +2389,7 @@ static uint64_t CreateRasterShaderImpl(
         dev5->Release();
         return 0;
     }
+    ApplySharedLayoutHints(rs, hintsJson);
     ApplyRootConstantsHints(rs, hintsJson);
     ApplyRootSRVHints(rs, hintsJson);
     ApplySamplerHints(rs, hintsJson);

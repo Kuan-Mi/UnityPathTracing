@@ -605,7 +605,7 @@ namespace NativeRender
             public ulong objectPtr; // resource/wrapper/payload pointer, interpreted per objectKind
             public uint  count; // element count  (StructuredBuffer or typed buffer)
             public uint  stride; // element stride (StructuredBuffer; 0 = raw/typed)
-            public uint  objectKind; // 0=None(raw ID3D12Resource*),1=AccelStruct,2=BindlessTex,3=BindlessBuf,4=RootConstants,5=NativeBuffer,6=BindlessUAVTex
+            public uint  objectKind; // 0=None(raw ID3D12Resource*),1=AccelStruct,2=BindlessTex,3=BindlessBuf,4=RootConstants,5=NativeBuffer,6=BindlessUAVTex,7=Sampler
             public uint  format; // DXGI_FORMAT for typed buffer UAV (0 = raw/structured)
         }
 

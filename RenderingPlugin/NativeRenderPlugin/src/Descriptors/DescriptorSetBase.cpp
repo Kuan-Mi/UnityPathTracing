@@ -96,6 +96,7 @@ void DescriptorSetBase<ShaderT>::EnsureCategoryIndices()
         case BindingType::ROOT_CONSTANTS: m_idxRootConst.push_back(i); break;
         case BindingType::SRV_ARRAY:      m_idxSRVArray.push_back(i);  break;
         case BindingType::UAV_ARRAY:      m_idxUAVArray.push_back(i);  break;
+        case BindingType::SAMPLER:        m_idxSampler.push_back(i);   break;
         }
     }
 
@@ -114,7 +115,7 @@ void DescriptorSetBase<ShaderT>::EnsureCategoryIndices()
 
 template<typename ShaderT>
 bool DescriptorSetBase<ShaderT>::AllocateTransientTables(
-    uint32_t& outSrvBase, uint32_t& outUavBase) const
+    uint32_t& outSrvBase, uint32_t& outUavBase, uint32_t& outSamplerBase) const
 {
     // Slot totals (not binding counts): a bounded array occupies arrayCount contiguous slots.
     const uint32_t numSRV = m_shader->GetNumSRVSlots();
@@ -125,21 +126,47 @@ bool DescriptorSetBase<ShaderT>::AllocateTransientTables(
     {
         outSrvBase = kInvalidAlloc;
         outUavBase = kInvalidAlloc;
+    }
+    else
+    {
+        uint32_t base = g_transientRing.Allocate(total);
+        if (base == UINT32_MAX)
+        {
+            Logf(kUnityLogTypeError,
+                 "DescriptorSet::Dispatch [%s]: transient descriptor ring exhausted "
+                 "(needed %u slots) - skipping dispatch",
+                 m_shader->GetName(), total);
+            return false;
+        }
+
+        outSrvBase = (numSRV > 0) ? base                : kInvalidAlloc;
+        outUavBase = (numUAV > 0) ? (base + numSRV)     : kInvalidAlloc;
+    }
+
+    const uint32_t numSampler = m_shader->GetNumSamplerSlots();
+    if (numSampler == 0)
+    {
+        outSamplerBase = kInvalidAlloc;
         return true;
     }
 
-    uint32_t base = g_transientRing.Allocate(total);
-    if (base == UINT32_MAX)
+    if (!g_samplerHeapAllocator || !g_samplerTransientRing.IsInitialized())
     {
         Logf(kUnityLogTypeError,
-             "DescriptorSet::Dispatch [%s]: transient descriptor ring exhausted "
-             "(needed %u slots) - skipping dispatch",
-             m_shader->GetName(), total);
+             "DescriptorSet::Dispatch [%s]: sampler descriptor table requested but sampler heap is not initialized",
+             m_shader->GetName());
         return false;
     }
 
-    outSrvBase = (numSRV > 0) ? base                : kInvalidAlloc;
-    outUavBase = (numUAV > 0) ? (base + numSRV)     : kInvalidAlloc;
+    outSamplerBase = g_samplerTransientRing.Allocate(numSampler);
+    if (outSamplerBase == UINT32_MAX)
+    {
+        Logf(kUnityLogTypeError,
+             "DescriptorSet::Dispatch [%s]: transient sampler descriptor ring exhausted "
+             "(needed %u slots) - skipping dispatch",
+             m_shader->GetName(), numSampler);
+        return false;
+    }
     return true;
 }
 
@@ -152,7 +179,7 @@ bool DescriptorSetBase<ShaderT>::AllocateTransientTables(
 // ===========================================================================
 
 template<typename ShaderT>
-bool DescriptorSetBase<ShaderT>::EnsureStagingHeap(uint32_t totalSlots)
+bool DescriptorSetBase<ShaderT>::EnsureStagingHeap(uint32_t totalSlots, uint32_t srvSlots)
 {
     if (m_stagingHeap) return true;
     if (m_stagingFailed || !m_device || totalSlots == 0) return false;
@@ -172,6 +199,31 @@ bool DescriptorSetBase<ShaderT>::EnsureStagingHeap(uint32_t totalSlots)
     }
     m_stagingBase = m_stagingHeap->GetCPUDescriptorHandleForHeapStart();
     m_descSize    = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    for (uint32_t i = 0; i < totalSlots; ++i)
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE h = m_stagingBase;
+        h.ptr += static_cast<SIZE_T>(i) * m_descSize;
+        if (i < srvSlots)
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
+            s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
+            s.Format             = DXGI_FORMAT_R32_TYPELESS;
+            s.Buffer.Flags       = D3D12_BUFFER_SRV_FLAG_RAW;
+            s.Buffer.NumElements = 1;
+            m_device->CreateShaderResourceView(nullptr, &s, h);
+        }
+        else
+        {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
+            u.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
+            u.Format             = DXGI_FORMAT_R32_TYPELESS;
+            u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
+            u.Buffer.NumElements = 1;
+            m_device->CreateUnorderedAccessView(nullptr, nullptr, &u, h);
+        }
+    }
     return true;
 }
 
@@ -199,7 +251,7 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
     const uint32_t total  = numSRV + numUAV;
     if (total == 0) return;
 
-    const bool staged = EnsureStagingHeap(total);
+    const bool staged = EnsureStagingHeap(total, numSRV);
 
     // Destination for an SRV-table / UAV-table slot. The staging layout mirrors
     // the transient block AllocateTransientTables hands out: SRV slots occupy
@@ -566,6 +618,74 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
 }
 
 // ===========================================================================
+// WriteSamplerDescriptors
+//   Writes the shared-layout sampler descriptor table. Sampler slots encode
+//   NativeSampler fields directly: count=filter, stride=packed address/mips,
+//   format=maxAnisotropy. This keeps sampler binding descriptor-set local
+//   without adding a separate native sampler object lifetime.
+// ===========================================================================
+
+template<typename ShaderT>
+void DescriptorSetBase<ShaderT>::WriteSamplerDescriptors(
+    const BindingSlot* slots, uint32_t slotCount,
+    uint32_t samplerBase)
+{
+    if (samplerBase == kInvalidAlloc || !g_samplerHeapAllocator) return;
+    EnsureCategoryIndices();
+
+    const auto& bindings = m_shader->GetBindings();
+    auto AddressFrom = [](uint32_t a) -> D3D12_TEXTURE_ADDRESS_MODE {
+        switch (a)
+        {
+        case 1:  return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        case 2:  return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        case 3:  return D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
+        case 4:  return D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        default: return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        }
+    };
+    auto FilterFrom = [](uint32_t f) -> D3D12_FILTER {
+        switch (f)
+        {
+        case 0:  return D3D12_FILTER_MIN_MAG_MIP_POINT;
+        case 2:  return D3D12_FILTER_ANISOTROPIC;
+        default: return D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        }
+    };
+
+    for (uint32_t i : m_idxSampler)
+    {
+        const auto& b = bindings[i];
+        const BindingSlot slot = (i < slotCount) ? slots[i] : BindingSlot{};
+
+        const uint32_t packed = slot.stride;
+        const uint32_t addrU  =  packed        & 0xffu;
+        const uint32_t addrV  = (packed >> 8)  & 0xffu;
+        const uint32_t addrW  = (packed >> 16) & 0xffu;
+        const bool     mips   = ((packed >> 24) & 0x1u) != 0;
+
+        D3D12_SAMPLER_DESC sd = {};
+        sd.Filter         = FilterFrom(slot.count);
+        sd.AddressU       = AddressFrom(addrU);
+        sd.AddressV       = AddressFrom(addrV);
+        sd.AddressW       = AddressFrom(addrW);
+        sd.MipLODBias     = 0.0f;
+        sd.MaxAnisotropy  = (sd.Filter == D3D12_FILTER_ANISOTROPIC)
+                           ? (slot.format ? slot.format : 16u)
+                           : 0u;
+        sd.ComparisonFunc = D3D12_COMPARISON_FUNC_NONE;
+        sd.BorderColor[0] = 0.0f;
+        sd.BorderColor[1] = 0.0f;
+        sd.BorderColor[2] = 0.0f;
+        sd.BorderColor[3] = 0.0f;
+        sd.MinLOD         = 0.0f;
+        sd.MaxLOD         = mips ? 16.0f : 0.0f;
+
+        m_device->CreateSampler(&sd, g_samplerHeapAllocator->GetCPUHandle(samplerBase + b.heapOffset));
+    }
+}
+
+// ===========================================================================
 // RequestResourceStates
 // ===========================================================================
 
@@ -831,6 +951,10 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
             kind = "ROOT_CONSTANTS";
             ok = slot.objectPtr != 0;
             break;
+        case BindingType::SAMPLER:
+            kind = "SAMPLER";
+            ok = slot.objectKind == BindingObjectKind::Sampler;
+            break;
         }
 
         if (!ok)
@@ -857,7 +981,8 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
     const BindingSlot*      slots,
     uint32_t                   slotCount,
     uint32_t                   srvBase,
-    uint32_t                   uavBase)
+    uint32_t                   uavBase,
+    uint32_t                   samplerBase)
 {
     EnsureCategoryIndices();
 
@@ -886,15 +1011,20 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
         else     cmdList->SetComputeRoot32BitConstants(p, n, d, off);
     };
 
-    // Bind the global shared heap
-    ID3D12DescriptorHeap* heapsToBind[1] = { m_allocator->GetHeap() };
-    cmdList->SetDescriptorHeaps(1, heapsToBind);
+    // Bind the global shared heaps. D3D12 has separate heap classes for
+    // CBV/SRV/UAV and samplers; shared-layout sampler tables need both.
+    ID3D12DescriptorHeap* heapsToBind[2] = { m_allocator->GetHeap(), nullptr };
+    UINT heapCount = 1;
+    if (g_samplerHeapAllocator && m_shader->GetRootParamSampler() != kInvalidAlloc)
+        heapsToBind[heapCount++] = g_samplerHeapAllocator->GetHeap();
+    cmdList->SetDescriptorHeaps(heapCount, heapsToBind);
 
     SetRootSig(m_shader->GetRootSignature());
 
     const auto& bindings        = m_shader->GetBindings();
     const uint32_t rootParamSRV     = m_shader->GetRootParamSRV();
     const uint32_t rootParamUAV     = m_shader->GetRootParamUAV();
+    const uint32_t rootParamSampler = m_shader->GetRootParamSampler();
     const uint32_t rootParamCBVBase = m_shader->GetRootParamCBVBase();
 
     auto slotOf = [&](uint32_t i) -> BindingSlot { return (i < slotCount) ? slots[i] : BindingSlot{}; };
@@ -906,6 +1036,9 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
     // UAV descriptor table
     if (rootParamUAV != kInvalidAlloc && uavBase != kInvalidAlloc)
         SetTable(rootParamUAV, m_allocator->GetGPUHandle(uavBase));
+
+    if (rootParamSampler != kInvalidAlloc && samplerBase != kInvalidAlloc && g_samplerHeapAllocator)
+        SetTable(rootParamSampler, g_samplerHeapAllocator->GetGPUHandle(samplerBase));
 
     // SRV_ARRAY bindings — each has its own root parameter
     for (uint32_t i : m_idxSRVArray)

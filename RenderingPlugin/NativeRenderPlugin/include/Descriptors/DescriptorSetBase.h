@@ -58,7 +58,8 @@ protected:
     // outUavBase with absolute heap slot indices (or kInvalidAlloc if the
     // shader uses zero SRVs / zero UAVs).  On ring exhaustion logs an error
     // and returns false; callers must skip the dispatch in that case.
-    bool AllocateTransientTables(uint32_t& outSrvBase, uint32_t& outUavBase) const;
+    bool AllocateTransientTables(uint32_t& outSrvBase, uint32_t& outUavBase,
+                                 uint32_t& outSamplerBase) const;
 
     // Write SRV/TLAS and UAV descriptors into the supplied transient table
     // bases.  ROOT_SRV / CBV / ROOT_CONSTANTS / SRV_ARRAY / UAV_ARRAY are
@@ -74,11 +75,14 @@ protected:
     void WriteDescriptors(const BindingSlot* slots, uint32_t slotCount,
                           uint32_t srvBase, uint32_t uavBase);
 
+    void WriteSamplerDescriptors(const BindingSlot* slots, uint32_t slotCount,
+                                 uint32_t samplerBase);
+
     // Lazily creates the CPU-only staging heap backing WriteDescriptors.
     // Returns false (and disables staging permanently for this set) on failure,
     // in which case WriteDescriptors falls back to creating descriptors directly
     // into the transient range every dispatch.
-    bool EnsureStagingHeap(uint32_t totalSlots);
+    bool EnsureStagingHeap(uint32_t totalSlots, uint32_t srvSlots);
 
     void RequestResourceStates(const BindingSlot* slots, uint32_t slotCount);
     void NotifyResourceStates (const BindingSlot* slots, uint32_t slotCount);
@@ -123,7 +127,8 @@ protected:
                         const BindingSlot*      slots,
                         uint32_t                   slotCount,
                         uint32_t                   srvBase,
-                        uint32_t                   uavBase);
+                        uint32_t                   uavBase,
+                        uint32_t                   samplerBase);
 
     // --- State ---
     ShaderT*                 m_shader    = nullptr;
@@ -151,6 +156,7 @@ protected:
     std::vector<uint32_t> m_idxRootConst;  // BindingType::ROOT_CONSTANTS
     std::vector<uint32_t> m_idxSRVArray;   // BindingType::SRV_ARRAY
     std::vector<uint32_t> m_idxUAVArray;   // BindingType::UAV_ARRAY
+    std::vector<uint32_t> m_idxSampler;    // BindingType::SAMPLER
     bool                  m_categoriesBuilt = false;
 
     // Cached SRV/UAV view descriptors, one entry per binding index.  The transient

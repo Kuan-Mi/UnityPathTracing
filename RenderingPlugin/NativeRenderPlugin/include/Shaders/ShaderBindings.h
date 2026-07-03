@@ -16,6 +16,7 @@ enum class BindingType
     TLAS,           // RaytracingAccelerationStructure
     ROOT_CONSTANTS, // ConstantBuffer<T> pushed via SetComputeRoot32BitConstants
     ROOT_SRV,       // buffer SRV / TLAS promoted to inline root descriptor
+    SAMPLER,        // SamplerState bound through a sampler descriptor table
 };
 
 struct Binding
@@ -52,6 +53,7 @@ enum class BindingObjectKind : uint32_t
     RootConstants      = 4, // objectPtr is a raw pointer to the 32-bit-constants payload
     NativeBuffer       = 5, // objectPtr is an INativeResource* (volatile / DEFAULT-staged / UAV buffer)
     BindlessUAVTexture = 6, // objectPtr is a BindlessUAVTexture*
+    Sampler            = 7, // slot fields encode a D3D12_SAMPLER_DESC
 };
 
 struct BindingSlot

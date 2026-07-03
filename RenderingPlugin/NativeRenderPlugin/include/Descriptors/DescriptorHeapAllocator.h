@@ -8,7 +8,7 @@ using Microsoft::WRL::ComPtr;
 
 // ---------------------------------------------------------------------------
 // DescriptorHeapAllocator
-//   Manages one large GPU-visible CBV/SRV/UAV descriptor heap shared by all
+//   Manages one large GPU-visible descriptor heap shared by all
 //   NativeRender objects (RayTraceShader, BindlessTexture, …).
 //
 //   D3D12 only allows one shader-visible CBV/SRV/UAV heap bound at a time, so
@@ -22,13 +22,20 @@ using Microsoft::WRL::ComPtr;
 class DescriptorHeapAllocator
 {
 public:
-    // Total number of CBV/SRV/UAV descriptor slots in the shared heap.
+    // Total number of descriptor slots in the shared heap.
     // Sized to leave ~65536 general-purpose slots after the TransientDescriptorRing
     // reserves its sub-range at renderer init (see kTransientRingCapacity in Plugin.cpp).
     static constexpr uint32_t kCapacity = 98304u;
 
-    // Create the D3D12 heap.  Must be called once before any other method.
+    // Create a shader-visible CBV/SRV/UAV heap. Must be called once before any other method.
     bool Initialize(ID3D12Device* device);
+
+    // Create a shader-visible heap with an explicit type/capacity. Used for the
+    // separate D3D12 sampler heap required by sampler descriptor tables.
+    bool Initialize(ID3D12Device* device,
+                    D3D12_DESCRIPTOR_HEAP_TYPE type,
+                    uint32_t capacity,
+                    const wchar_t* debugName);
 
     // Release the heap and reset all state.
     void Shutdown();
@@ -56,7 +63,9 @@ public:
 
 private:
     ComPtr<ID3D12DescriptorHeap> m_heap;
+    D3D12_DESCRIPTOR_HEAP_TYPE m_type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     UINT     m_incSize  = 0;
+    uint32_t m_capacity = kCapacity;
     uint32_t m_bumpNext = 0;    // next un-allocated slot (bump pointer)
 
     struct FreeRange { uint32_t base, count; };

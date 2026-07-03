@@ -60,6 +60,8 @@ extern uint64_t g_frameSerial;
 //   reclaimed by the frame fence at each NR_FrameTick.
 // ---------------------------------------------------------------------------
 extern TransientDescriptorRing g_transientRing;
+extern TransientDescriptorRing g_samplerTransientRing;
+extern DescriptorHeapAllocator* g_samplerHeapAllocator;
 
 // ---------------------------------------------------------------------------
 // g_uploadPool

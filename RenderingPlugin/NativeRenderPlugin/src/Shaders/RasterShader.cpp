@@ -108,7 +108,7 @@ bool RasterShader::ReflectBlobInto(IDxcBlob* shaderBlob)
         D3D12_SHADER_INPUT_BIND_DESC bind = {};
         if (FAILED(refl->GetResourceBindingDesc(ri, &bind))) continue;
 
-        if (bind.Type == D3D_SIT_SAMPLER)
+        if (bind.Type == D3D_SIT_SAMPLER && !UsesSharedSamplerTable())
         {
             const std::string sname(bind.Name);
             bool found = false;

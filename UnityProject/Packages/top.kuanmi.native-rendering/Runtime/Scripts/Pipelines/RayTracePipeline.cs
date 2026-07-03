@@ -26,6 +26,7 @@ namespace NativeRender
         private RootConstantsHint[] _rootConstantsHints;
         private string[]            _rootSRVHints;
         private SamplerHint[]       _samplerHints;
+        private NativeBindingLayout _sharedLayout;
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -85,6 +86,20 @@ namespace NativeRender
         }
 
         public RayTracePipeline(RayTraceShader shader, RootConstantsHint[] rootConstantsHints, string[] rootSRVHints)
+            : this(shader, rootConstantsHints, rootSRVHints, null)
+        {
+        }
+
+        public RayTracePipeline(RayTraceShader shader, NativeBindingLayout sharedLayout)
+            : this(shader,
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null,
+                sharedLayout)
+        {
+        }
+
+        public RayTracePipeline(RayTraceShader shader, RootConstantsHint[] rootConstantsHints,
+            string[] rootSRVHints, NativeBindingLayout sharedLayout)
         {
             if (shader == null)
                 throw new ArgumentNullException(nameof(shader));
@@ -93,6 +108,7 @@ namespace NativeRender
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
             _samplerHints       = shader.ResolveSamplerHints();
+            _sharedLayout       = sharedLayout;
             BuildNativeHandle(shader);
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
         }
@@ -119,6 +135,29 @@ namespace NativeRender
             RootConstantsHint[] rootConstantsHints,
             string[] rootSRVHints = null,
             bool[] hitGroupAnyHit = null)
+            : this(primaryShader, hitGroupShaders, rootConstantsHints, rootSRVHints, hitGroupAnyHit, null)
+        {
+        }
+
+        public RayTracePipeline(
+            RayTraceShader primaryShader,
+            HitGroupShader[] hitGroupShaders,
+            NativeBindingLayout sharedLayout)
+            : this(primaryShader, hitGroupShaders,
+                primaryShader != null ? primaryShader.RootConstantsHints : null,
+                primaryShader != null ? primaryShader.RootSRVHints : null,
+                null,
+                sharedLayout)
+        {
+        }
+
+        public RayTracePipeline(
+            RayTraceShader primaryShader,
+            HitGroupShader[] hitGroupShaders,
+            RootConstantsHint[] rootConstantsHints,
+            string[] rootSRVHints,
+            bool[] hitGroupAnyHit,
+            NativeBindingLayout sharedLayout)
         {
             if (primaryShader == null)
                 throw new ArgumentNullException(nameof(primaryShader));
@@ -132,6 +171,7 @@ namespace NativeRender
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
             _samplerHints       = primaryShader.ResolveSamplerHints();
+            _sharedLayout       = sharedLayout;
 
             BuildNativeHandleMultiBlob(primaryShader, hitGroupShaders);
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
@@ -149,7 +189,7 @@ namespace NativeRender
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
             string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
-            string hintsJson  = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
+            string hintsJson  = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _sharedLayout);
             _handle = hintsJson != null
                 ? NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName, hintsJson)
                 : NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
@@ -197,7 +237,7 @@ namespace NativeRender
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
-                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _hitGroupAnyHit);
+                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _sharedLayout, _hitGroupAnyHit);
                 _handle = hintsJson != null
                     ? NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
                         ptrs, sizes, (uint)totalBlobs,
@@ -238,13 +278,14 @@ namespace NativeRender
         }
 
         private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-            SamplerHint[] samplerHints, bool[] hitGroupAnyHit = null)
+            SamplerHint[] samplerHints, NativeBindingLayout sharedLayout, bool[] hitGroupAnyHit = null)
         {
             bool hasRC   = rcHints != null && rcHints.Length > 0;
             bool hasSRV  = srvHints != null && srvHints.Length > 0;
             bool hasSamp = SamplerHintJson.Has(samplerHints);
+            bool hasLayout = sharedLayout != null && !sharedLayout.IsEmpty;
             bool hasHgAH = hitGroupAnyHit != null && hitGroupAnyHit.Length > 0;
-            if (!hasRC && !hasSRV && !hasSamp && !hasHgAH) return null;
+            if (!hasRC && !hasSRV && !hasSamp && !hasLayout && !hasHgAH) return null;
 
             var sb = new System.Text.StringBuilder();
             sb.Append('{');
@@ -287,6 +328,13 @@ namespace NativeRender
             {
                 if (any) sb.Append(',');
                 SamplerHintJson.Append(sb, samplerHints);
+                any = true;
+            }
+
+            if (hasLayout)
+            {
+                if (any) sb.Append(',');
+                sharedLayout.AppendJson(sb);
                 any = true;
             }
 

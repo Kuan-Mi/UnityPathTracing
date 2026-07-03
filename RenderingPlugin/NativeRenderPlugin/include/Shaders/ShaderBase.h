@@ -51,6 +51,24 @@ public:
                         uint32_t addressU, uint32_t addressV, uint32_t addressW,
                         bool mips, uint32_t maxAnisotropy);
 
+    enum class SharedLayoutKind : uint32_t
+    {
+        SRV = 0,
+        UAV = 1,
+        CBV = 2,
+        VolatileCBV = 3,
+        PushConstants = 4,
+        TLAS = 5,
+        BindlessSRV = 6,
+        BindlessUAV = 7,
+        RootSRV = 8,
+        Sampler = 9,
+    };
+
+    void ClearSharedLayout();
+    void AddSharedLayoutItem(SharedLayoutKind kind, uint32_t shaderRegister,
+                             uint32_t space, uint32_t count, uint32_t num32BitValues);
+
     // --- Binding metadata queries ---
     uint32_t    GetBindingCount() const;
     uint32_t    GetSlotIndex   (const char* name) const;
@@ -61,6 +79,7 @@ public:
     const std::vector<Binding>& GetBindings()            const { return m_bindings; }
     uint32_t GetRootParamSRV()         const { return m_rootParamSRV; }
     uint32_t GetRootParamUAV()         const { return m_rootParamUAV; }
+    uint32_t GetRootParamSampler()     const { return m_rootParamSampler; }
     uint32_t GetRootParamCBVBase()     const { return m_rootParamCBVBase; }
     uint32_t GetRootParamRootSRVBase() const { return m_rootParamRootSRVBase; }
     uint32_t GetNumSRV()               const { return m_numSRV; }
@@ -69,7 +88,10 @@ public:
     // singles as 1). Equals GetNumSRV()/GetNumUAV() unless a shader uses a bounded array.
     uint32_t GetNumSRVSlots()          const { return m_numSRVSlots; }
     uint32_t GetNumUAVSlots()          const { return m_numUAVSlots; }
+    uint32_t GetNumSamplerSlots()      const { return m_numSamplerSlots; }
     const char* GetName()              const { return m_name.c_str(); }
+    bool UsesSharedLayout()            const { return !m_sharedLayout.empty(); }
+    bool UsesSharedSamplerTable()      const;
 
     static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
 
@@ -82,6 +104,7 @@ protected:
     //   Called by both ComputeShader::LoadShaderFromBytes and
     //   RayTraceShader::LoadShaderFromBytes after ReflectBindings().
     bool BuildRootSignature();
+    bool BuildSharedRootSignature();
 
     // --- Shared reflection helpers ---
     //   ClassifyBinding: fills type/num fields on a Binding from a
@@ -112,6 +135,7 @@ protected:
     // Root parameter indices (populated by BuildRootSignature)
     uint32_t m_rootParamSRV         = kInvalidAlloc;
     uint32_t m_rootParamUAV         = kInvalidAlloc;
+    uint32_t m_rootParamSampler     = kInvalidAlloc;
     uint32_t m_rootParamCBVBase     = kInvalidAlloc;
     uint32_t m_rootParamRootSRVBase = kInvalidAlloc;
 
@@ -120,11 +144,13 @@ protected:
     uint32_t m_numUAV           = 0;    // # of UAV bindings
     uint32_t m_numSRVSlots      = 0;    // total SRV/TLAS descriptors (sum of arrayCount)
     uint32_t m_numUAVSlots      = 0;    // total UAV descriptors (sum of arrayCount)
+    uint32_t m_numSamplerSlots  = 0;    // total sampler descriptors in shared sampler table
     uint32_t m_numCBV           = 0;
     uint32_t m_numSRVArray      = 0;
     uint32_t m_numUAVArray      = 0;
     uint32_t m_numRootConstants = 0;
     uint32_t m_numRootSRV       = 0;
+    uint32_t m_numSampler       = 0;
 
     // Editor-authored static-sampler override (see SetSamplerHint).
     struct SamplerHint
@@ -141,4 +167,16 @@ protected:
     std::unordered_map<std::string, uint32_t>    m_rootConstantsHints;
     std::unordered_set<std::string>              m_rootSRVHints;
     std::unordered_map<std::string, SamplerHint> m_samplerHints;
+
+    struct SharedLayoutItem
+    {
+        SharedLayoutKind kind = SharedLayoutKind::SRV;
+        uint32_t shaderRegister = 0;
+        uint32_t space = 0;
+        uint32_t count = 1;
+        uint32_t num32BitValues = 0;
+        uint32_t tableOffset = 0;
+        uint32_t rootParam = kInvalidAlloc;
+    };
+    std::vector<SharedLayoutItem> m_sharedLayout;
 };
