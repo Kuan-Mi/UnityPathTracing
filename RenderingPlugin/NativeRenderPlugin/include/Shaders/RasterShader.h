@@ -33,15 +33,12 @@ struct RasterPipelineStateDesc
 
 // ---------------------------------------------------------------------------
 // RasterShader
-//   One self-contained graphics pipeline (vertex + pixel stage).  Binding
-//   metadata, root-signature build, logging and hints are provided by
-//   ShaderBase, exactly like ComputeShader / RayTraceShader; only the
-//   two-stage reflection merge and the graphics PSO build are specific here.
-//
-//   Resources are reflected from BOTH the VS and PS blobs and merged (deduped
-//   by HLSL variable name) into the single shared binding table, so the root
-//   signature covers every stage.  Render targets are bound separately at draw
-//   time (OMSetRenderTargets) and are NOT part of the reflected binding set.
+//   One self-contained graphics pipeline (vertex + pixel stage).  Root
+//   signature and binding table are derived entirely from the explicit
+//   binding layout declared before load (nvrhi BindingLayout model — see
+//   ShaderBase); the VS/PS DXIL is never reflected.  The one layout covers
+//   both stages.  Render targets are bound separately at draw time
+//   (OMSetRenderTargets) and are NOT part of the binding set.
 // ---------------------------------------------------------------------------
 class RasterShader : public ShaderBase
 {
@@ -62,10 +59,6 @@ public:
     D3D12_PRIMITIVE_TOPOLOGY GetPrimitiveTopology() const { return m_primTopology; }
 
 private:
-    // Reflect one DXIL blob (VS or PS) into the shared binding state without
-    // resetting it, deduping by name.  Mirrors ComputeShader::ReflectBindings but
-    // is additive so VS and PS contributions merge.
-    bool ReflectBlobInto(IDxcBlob* shaderBlob);
     bool BuildPipeline(IDxcBlob* vsBlob, IDxcBlob* psBlob);
 
     ComPtr<ID3D12PipelineState> m_pso;

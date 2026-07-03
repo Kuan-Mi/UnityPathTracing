@@ -218,34 +218,10 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_RTS_DestroyDescriptorSet(ulong handle);
 
-        /// <summary>Returns the number of resource bindings in the shader (slot count).</summary>
+        /// <summary>Returns the layout slot count (one slot per binding-layout item).
+        /// The name→slot mapping is built C#-side from the layout + import-time reflection.</summary>
         [DllImport(DllName)]
         public static extern uint NR_RTS_GetBindingCount(ulong shaderHandle);
-
-        /// <summary>Returns the slot index for the named binding, or uint.MaxValue if not found.</summary>
-        [DllImport(DllName)]
-        public static extern uint NR_RTS_GetSlotIndex(ulong shaderHandle,
-            [MarshalAs(UnmanagedType.LPStr)] string name);
-
-        /// <summary>Returns the HLSL variable name for the binding at the given index, or null.</summary>
-        [DllImport(DllName)]
-        public static extern IntPtr NR_RTS_GetBindingName(ulong shaderHandle, uint index);
-
-        /// <summary>
-        /// Hints that the named CBV binding should be treated as 32-bit root constants.
-        /// Must be called BEFORE NR_CreateRayTraceShaderFromBytes.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern void NR_RTS_SetRootConstantsHint(ulong shaderHandle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, uint num32BitValues);
-
-        /// <summary>
-        /// Hints that the named SRV or TLAS binding should be bound as an inline root SRV descriptor.
-        /// Must be called BEFORE NR_CreateRayTraceShaderFromBytes.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern void NR_RTS_SetRootSRVHint(ulong shaderHandle,
-            [MarshalAs(UnmanagedType.LPStr)] string name);
 
         /// <summary>Returns the render event callback pointer for per-descriptor-set dispatches.</summary>
         [DllImport(DllName)]
@@ -561,17 +537,10 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_DestroyComputeShader(ulong handle);
 
-        /// <summary>Returns the total number of reflected bindings for a compute shader handle.</summary>
+        /// <summary>Returns the layout slot count (one slot per binding-layout item).
+        /// The name→slot mapping is built C#-side from the layout + import-time reflection.</summary>
         [DllImport(DllName)]
         public static extern uint NR_CS_GetBindingCount(ulong handle);
-
-        /// <summary>
-        /// Returns the slot index (0-based) for a given HLSL variable name.
-        /// Returns uint.MaxValue if the name is not found.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern uint NR_CS_GetSlotIndex(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name);
 
         /// <summary>Returns the render event callback pointer for compute dispatches.</summary>
         [DllImport(DllName)]
@@ -758,18 +727,10 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_RAS_DestroyDescriptorSet(ulong handle);
 
-        /// <summary>Returns the number of reflected bindings (slot count) for the shader.</summary>
+        /// <summary>Returns the layout slot count (one slot per binding-layout item).
+        /// The name→slot mapping is built C#-side from the layout + import-time reflection.</summary>
         [DllImport(DllName)]
         public static extern uint NR_RAS_GetBindingCount(ulong handle);
-
-        /// <summary>Returns the slot index for the named binding, or uint.MaxValue if not found.</summary>
-        [DllImport(DllName)]
-        public static extern uint NR_RAS_GetSlotIndex(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name);
-
-        /// <summary>Returns the HLSL variable name for the binding at the given index, or null.</summary>
-        [DllImport(DllName)]
-        public static extern IntPtr NR_RAS_GetBindingName(ulong handle, uint index);
 
         /// <summary>Returns the render event callback pointer for per-descriptor-set draws.</summary>
         [DllImport(DllName)]

@@ -977,6 +977,11 @@ void DescriptorSetBase<ShaderT>::RestoreSubresourceUAVStates(ID3D12GraphicsComma
 
 // ===========================================================================
 // ValidateBindings
+//   The binding table is derived from the declared layout, which is usually a
+//   superset of what any one shader touches (e.g. the RTXPT global layout).
+//   An UNBOUND slot is therefore legal — it gets a null descriptor, exactly
+//   like nvrhi's unmatched binding-set slots — and only a slot that IS bound
+//   but with an object kind incompatible with the layout item is an error.
 // ===========================================================================
 
 template<typename ShaderT>
@@ -984,17 +989,20 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
     const BindingSlot* slots, uint32_t slotCount) const
 {
     const auto& bindings = m_shader->GetBindings();
-    bool anyMissing = false;
+    bool anyBad = false;
 
     for (size_t i = 0; i < bindings.size(); ++i)
     {
         const auto& b = bindings[i];
         const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
+
+        // Unbound → null descriptor / skipped root param.
+        if (slot.objectPtr == 0 && slot.objectKind == BindingObjectKind::None)
+            continue;
+
         bool ok = false;
         const char* kind = "?";
 
-        // A non-null objectPtr is required; the kind set narrows which wrappers are
-        // valid for the binding type (None == a raw ID3D12Resource* in objectPtr).
         const bool isNone        = slot.objectKind == BindingObjectKind::None;
         const bool isNativeBuf   = slot.objectKind == BindingObjectKind::NativeBuffer;
         const bool isAccelStruct = slot.objectKind == BindingObjectKind::AccelStruct;
@@ -1003,36 +1011,36 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
         {
         case BindingType::TLAS:
             kind = "TLAS";
-            ok = slot.objectPtr != 0 && (isNone || isAccelStruct);
+            ok = isNone || isAccelStruct;
             break;
         case BindingType::SRV:
             kind = "SRV";
-            ok = slot.objectPtr != 0 && (isNone || isNativeBuf);
+            ok = isNone || isNativeBuf;
             break;
         case BindingType::UAV:
             kind = "UAV";
-            ok = slot.objectPtr != 0 && (isNone || isNativeBuf);
+            ok = isNone || isNativeBuf;
             break;
         case BindingType::ROOT_SRV:
             kind = "ROOT_SRV";
-            ok = slot.objectPtr != 0 && (isNone || isAccelStruct || isNativeBuf);
+            ok = isNone || isAccelStruct || isNativeBuf;
             break;
         case BindingType::CBV:
             kind = "CBV";
-            ok = slot.objectPtr != 0 && (isNone || isNativeBuf);
+            ok = isNone || isNativeBuf;
             break;
         case BindingType::SRV_ARRAY:
             kind = "SRV_ARRAY";
-            ok = (slot.objectKind == BindingObjectKind::BindlessTexture && slot.objectPtr != 0) ||
-                 (slot.objectKind == BindingObjectKind::BindlessBuffer  && slot.objectPtr != 0);
+            ok = slot.objectKind == BindingObjectKind::BindlessTexture ||
+                 slot.objectKind == BindingObjectKind::BindlessBuffer;
             break;
         case BindingType::UAV_ARRAY:
             kind = "UAV_ARRAY";
-            ok = (slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr != 0);
+            ok = slot.objectKind == BindingObjectKind::BindlessUAVTexture;
             break;
         case BindingType::ROOT_CONSTANTS:
             kind = "ROOT_CONSTANTS";
-            ok = slot.objectPtr != 0;
+            ok = slot.objectKind == BindingObjectKind::RootConstants || isNone;
             break;
         case BindingType::SAMPLER:
             kind = "SAMPLER";
@@ -1043,12 +1051,14 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
         if (!ok)
         {
             Logf(kUnityLogTypeError,
-                 "DescriptorSet::Dispatch: '%s' binding '%s' (%s, space%u, reg%u) is not set",
-                 m_shader->GetName(), b.name.c_str(), kind, b.space, b.registerIndex);
-            anyMissing = true;
+                 "DescriptorSet::Dispatch: '%s' slot %zu (%s, space%u, reg%u) is bound with an "
+                 "incompatible object kind %u",
+                 m_shader->GetName(), i, kind, b.space, b.registerIndex,
+                 static_cast<uint32_t>(slot.objectKind));
+            anyBad = true;
         }
     }
-    return !anyMissing;
+    return !anyBad;
 }
 
 // ===========================================================================
@@ -1194,7 +1204,10 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
         {
             const auto& b = bindings[i];
             if (b.rootParam == kInvalidAlloc) continue;   // table CBV
-            SetCBV(b.rootParam, resolveCbvVA(slotOf(i)));
+            // Unbound volatile CBV (superset layout, shader doesn't read it):
+            // leave the root param unset rather than binding VA 0.
+            const D3D12_GPU_VIRTUAL_ADDRESS va = resolveCbvVA(slotOf(i));
+            if (va) SetCBV(b.rootParam, va);
         }
     }
     else if (rootParamCBVBase != kInvalidAlloc)

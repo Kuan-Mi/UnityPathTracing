@@ -12,16 +12,10 @@ class NativeBuffer;
 
 // ---------------------------------------------------------------------------
 // ComputeShader
-//   One self-contained compute shader object.  Common binding metadata,
-//   root-signature build, logging, and hints are provided by ShaderBase.
-//
-// Root parameter layout (built dynamically from reflection):
-//   0   - SRV descriptor table (one range per SRV binding)           optional
-//   1   - UAV descriptor table (one range per UAV binding)            optional
-//   2+  - one descriptor table per SRV_ARRAY (unbounded SRV) binding
-//   N+  - one descriptor table per UAV_ARRAY (unbounded UAV) binding
-//   M+  - one root CBV descriptor per CBV binding
-//   P+  - one root 32-bit constants slot per ROOT_CONSTANTS binding
+//   One self-contained compute shader object.  Root signature and binding
+//   table are derived entirely from the explicit binding layout declared by
+//   the caller before load (nvrhi BindingLayout model — see ShaderBase); the
+//   DXIL is never reflected.
 // ---------------------------------------------------------------------------
 class ComputeShader : public ShaderBase
 {
@@ -41,7 +35,6 @@ public:
     uint32_t GetNumRootSRV()              const { return m_numRootSRV; }
 
 private:
-    bool ReflectBindings(IDxcBlob* shaderBlob);
     bool BuildPipeline  (IDxcBlob* shaderBlob);
 
     ComPtr<ID3D12PipelineState> m_pso;

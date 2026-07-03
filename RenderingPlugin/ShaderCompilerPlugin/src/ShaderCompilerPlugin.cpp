@@ -726,6 +726,9 @@ bool NR_SC_ReflectCS(
         json += std::to_string(bd.Space);
         json += ", \"reg\": ";
         json += std::to_string(bd.BindPoint);
+        // BindCount: 1 = single, N = bounded array (Texture2D t[N]), 0 = unbounded array.
+        json += ", \"count\": ";
+        json += std::to_string(bd.BindCount);
         json += ", \"dim\": \"";
         json += dim;
         json += "\", \"retType\": \"";
@@ -831,7 +834,7 @@ bool NR_SC_ReflectLib(
     // Collect unique bindings across all exported functions
     // Use a map keyed on (name, space, reg) to deduplicate.
     struct BindKey { std::string name; UINT space; UINT reg; };
-    struct BindVal { std::string type; std::string dim; std::string retType; UINT size; };
+    struct BindVal { std::string type; std::string dim; std::string retType; UINT size; UINT count; };
     std::vector<std::pair<BindKey, BindVal>> bindings;
 
     auto alreadyAdded = [&](const std::string& name, UINT space, UINT reg) -> bool {
@@ -929,7 +932,8 @@ bool NR_SC_ReflectLib(
             }
 
             BindKey k{ name, bd.Space, bd.BindPoint };
-            BindVal v{ typeName, SrvDimensionToString(bd.Dimension), ReturnTypeToString(bd.ReturnType), cbByteSize };
+            BindVal v{ typeName, SrvDimensionToString(bd.Dimension), ReturnTypeToString(bd.ReturnType), cbByteSize,
+                       bd.BindCount };
             bindings.push_back({ k, v });
         }
     }
@@ -962,6 +966,9 @@ bool NR_SC_ReflectLib(
         json += std::to_string(k.space);
         json += ", \"reg\": ";
         json += std::to_string(k.reg);
+        // BindCount: 1 = single, N = bounded array, 0 = unbounded array.
+        json += ", \"count\": ";
+        json += std::to_string(v.count);
         json += ", \"dim\": \"";
         json += v.dim;
         json += "\", \"retType\": \"";

@@ -14,7 +14,7 @@ bool RasterShader::Initialize(ID3D12Device5* device, IUnityLog* log,
 
 // ---------------------------------------------------------------------------
 // LoadShaderFromBlobs
-//   VS + PS DXIL → reflected (merged) bindings → root signature → graphics PSO.
+//   VS + PS DXIL + explicit binding layout → root signature → graphics PSO.
 // ---------------------------------------------------------------------------
 bool RasterShader::LoadShaderFromBlobs(const uint8_t* vsDxil, uint32_t vsSize,
                                        const uint8_t* psDxil, uint32_t psSize,
@@ -51,83 +51,16 @@ bool RasterShader::LoadShaderFromBlobs(const uint8_t* vsDxil, uint32_t vsSize,
     m_pso.Reset();
     m_rootSig.Reset();
     m_bindings.clear();
-    m_bindingIndex.clear();
-    m_samplerBindings.clear();
-    m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
-    m_numSRVSlots = m_numUAVSlots = 0;
-    m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
-    // Reflect both stages into the shared binding table (deduped by name), then
-    // assign heap offsets once over the merged set.
-    if (!ReflectBlobInto(vsBlob.Get())) return false;
-    if (!ReflectBlobInto(psBlob.Get())) return false;
-    AssignHeapOffsets();
-
-    if (!BuildRootSignature())           return false;
+    // Explicit layout is the whole binding contract (both stages) — no DXIL
+    // reflection.
+    if (!BuildSharedRootSignature())                return false;
+    BuildBindingsFromLayout();
     if (!BuildPipeline(vsBlob.Get(), psBlob.Get())) return false;
 
     Logf(kUnityLogTypeLog,
-         "RasterShader '%s': pipeline ready (%u SRV, %u UAV, %u CBV, %u RT)",
-         m_name.c_str(), m_numSRV, m_numUAV, m_numCBV, m_state.numRenderTargets);
-    return true;
-}
-
-// ---------------------------------------------------------------------------
-// ReflectBlobInto
-//   Single-blob reflection (ID3D12ShaderReflection), additive: appends bindings
-//   not already present (deduped by HLSL variable name) so VS + PS merge.
-// ---------------------------------------------------------------------------
-bool RasterShader::ReflectBlobInto(IDxcBlob* shaderBlob)
-{
-    ComPtr<IDxcUtils> utils;
-    if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils))))
-    {
-        Log(kUnityLogTypeError, "RasterShader: failed to create IDxcUtils for reflection");
-        return false;
-    }
-
-    DxcBuffer buf;
-    buf.Ptr      = shaderBlob->GetBufferPointer();
-    buf.Size     = shaderBlob->GetBufferSize();
-    buf.Encoding = 0;
-
-    ComPtr<ID3D12ShaderReflection> refl;
-    HRESULT hr = utils->CreateReflection(&buf, IID_PPV_ARGS(&refl));
-    if (FAILED(hr))
-    {
-        Logf(kUnityLogTypeWarning,
-             "RasterShader: CreateReflection failed (hr=0x%08X) - stage skipped", hr);
-        return true; // not fatal: a stage may legitimately bind no resources
-    }
-
-    D3D12_SHADER_DESC shDesc = {};
-    refl->GetDesc(&shDesc);
-
-    for (UINT ri = 0; ri < shDesc.BoundResources; ++ri)
-    {
-        D3D12_SHADER_INPUT_BIND_DESC bind = {};
-        if (FAILED(refl->GetResourceBindingDesc(ri, &bind))) continue;
-
-        if (bind.Type == D3D_SIT_SAMPLER && !UsesSharedSamplerTable())
-        {
-            const std::string sname(bind.Name);
-            bool found = false;
-            for (const auto& s : m_samplerBindings)
-                if (s.name == sname) { found = true; break; }
-            if (!found)
-                m_samplerBindings.push_back({ sname, bind.BindPoint, bind.Space });
-            continue;
-        }
-
-        const std::string bname(bind.Name);
-        if (m_bindingIndex.count(bname)) continue; // already contributed by the other stage
-
-        Binding cb = {};
-        if (!ClassifyBinding(bind, bname, cb)) continue;
-
-        m_bindingIndex[bname] = m_bindings.size();
-        m_bindings.push_back(std::move(cb));
-    }
+         "RasterShader '%s': pipeline ready (%u layout slots: %u SRV, %u UAV, %u CBV, %u RT)",
+         m_name.c_str(), GetBindingCount(), m_numSRV, m_numUAV, m_numCBV, m_state.numRenderTargets);
     return true;
 }
 

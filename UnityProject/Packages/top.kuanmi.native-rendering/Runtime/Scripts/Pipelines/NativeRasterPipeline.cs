@@ -44,12 +44,16 @@ namespace NativeRender
         private RootConstantsHint[]                        _rootConstantsHints;
         private string[]                                   _rootSRVHints;
         private SamplerHint[]                              _samplerHints;
-        private NativeBindingLayout                        _sharedLayout;
+        private NativeBindingLayout                        _userLayout; // hand-authored; null = auto-generate
+        private NativeBindingLayout                        _layout;     // the effective (mandatory) layout
 
         private Dictionary<string, uint> _nameToSlot;
         private uint                     _slotCount;
 
         public bool IsValid => _handle != 0;
+
+        /// <summary>The effective binding layout (hand-authored or auto-generated).</summary>
+        public NativeBindingLayout Layout => _layout;
 
         internal IReadOnlyDictionary<string, uint> NameToSlot => _nameToSlot;
         internal uint SlotCount => _slotCount;
@@ -95,10 +99,53 @@ namespace NativeRender
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
             _samplerHints       = shader.ResolveSamplerHints();
-            _sharedLayout       = sharedLayout;
+            _userLayout         = (sharedLayout != null && !sharedLayout.IsEmpty) ? sharedLayout : null;
+            BuildBindingContract();
             BuildNativeHandle();
-            BuildSlotLayout();
             NativeRasterShader.OnRecompiled += OnShaderRecompiled;
+        }
+
+        /// <summary>
+        /// Establishes the binding contract before the native pipeline exists:
+        /// picks (or auto-generates) the layout from the merged VS+PS reflection,
+        /// resolves every reflected binding into it (name → layout slot), and
+        /// fails loudly when a hand-authored layout doesn't cover the shader.
+        /// </summary>
+        private void BuildBindingContract()
+        {
+            byte[] vs = _shader.GetOrCompileVsDxil();
+            byte[] ps = _shader.GetOrCompilePsDxil();
+            if (vs == null || vs.Length == 0 || ps == null || ps.Length == 0)
+                throw new InvalidOperationException(
+                    $"[NativeRasterPipeline] Shader compilation failed for: {_shader.GetHlslPath()}");
+
+            var reflected = ShaderReflectionInfo.Parse(_shader.ReflectionJson);
+            _layout = _userLayout ?? NativeBindingLayout.FromReflection(
+                reflected, _rootConstantsHints, _rootSRVHints, _samplerHints);
+
+            _slotCount  = (uint)_layout.Items.Count;
+            _nameToSlot = new Dictionary<string, uint>(reflected.Count);
+
+            List<string> missing = null;
+            for (int i = 0; i < reflected.Count; i++)
+            {
+                var b = reflected[i];
+                int slot = _layout.ResolveSlot(b);
+                if (slot >= 0)
+                {
+                    _nameToSlot[b.Name] = (uint)slot;
+                }
+                else if (!(b.RegClass == BindingRegClass.Sampler && _layout.HasStaticSampler(b.Reg, b.Space)))
+                {
+                    (missing ??= new List<string>()).Add(
+                        $"'{b.Name}' ({b.RegClass} reg {b.Reg}, space {b.Space})");
+                }
+            }
+
+            if (missing != null)
+                throw new InvalidOperationException(
+                    $"[NativeRasterPipeline] '{_shader.name}': binding layout has no item for " +
+                    string.Join(", ", missing));
         }
 
         private void BuildNativeHandle()
@@ -109,107 +156,13 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeRasterPipeline] Shader compilation failed for: {_shader.GetHlslPath()}");
 
-            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _sharedLayout);
-            if (hintsJson != null)
-                _handle = NativeRenderPlugin.NR_CreateRasterShaderEx(
-                    vs, (uint)vs.Length, ps, (uint)ps.Length, ref _state, _shader.name, hintsJson);
-            else
-                _handle = NativeRenderPlugin.NR_CreateRasterShader(
-                    vs, (uint)vs.Length, ps, (uint)ps.Length, ref _state, _shader.name);
+            string layoutJson = _layout.BuildCreationJson();
+            _handle = NativeRenderPlugin.NR_CreateRasterShaderEx(
+                vs, (uint)vs.Length, ps, (uint)ps.Length, ref _state, _shader.name, layoutJson);
 
             if (_handle == 0)
                 throw new InvalidOperationException(
-                    $"[NativeRasterPipeline] NR_CreateRasterShader returned 0 for: {_shader.name}");
-        }
-
-        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-            SamplerHint[] samplerHints, NativeBindingLayout sharedLayout)
-        {
-            bool hasRC   = rcHints != null && rcHints.Length > 0;
-            bool hasSRV  = srvHints != null && srvHints.Length > 0;
-            bool hasSamp = SamplerHintJson.Has(samplerHints);
-            bool hasLayout = sharedLayout != null && !sharedLayout.IsEmpty;
-            if (!hasRC && !hasSRV && !hasSamp && !hasLayout) return null;
-
-            var sb = new System.Text.StringBuilder();
-            sb.Append('{');
-            bool any = false;
-            if (hasRC)
-            {
-                sb.Append("\"rootConstants\":[");
-                for (int i = 0; i < rcHints.Length; i++)
-                {
-                    if (i > 0) sb.Append(',');
-                    sb.Append("{\"name\":\"").Append(rcHints[i].Name).Append("\",\"count\":").Append(rcHints[i].Count).Append('}');
-                }
-
-                sb.Append(']');
-                any = true;
-            }
-
-            if (hasSRV)
-            {
-                if (any) sb.Append(',');
-                sb.Append("\"rootSRV\":[");
-                for (int i = 0; i < srvHints.Length; i++)
-                {
-                    if (i > 0) sb.Append(',');
-                    sb.Append('"').Append(srvHints[i]).Append('"');
-                }
-
-                sb.Append(']');
-                any = true;
-            }
-
-            if (hasSamp)
-            {
-                if (any) sb.Append(',');
-                SamplerHintJson.Append(sb, samplerHints);
-                any = true;
-            }
-
-            if (hasLayout)
-            {
-                if (any) sb.Append(',');
-                sharedLayout.AppendJson(sb);
-            }
-
-            sb.Append('}');
-            return sb.ToString();
-        }
-
-        private void BuildSlotLayout()
-        {
-            _slotCount  = NativeRenderPlugin.NR_RAS_GetBindingCount(_handle);
-            _nameToSlot = new Dictionary<string, uint>((int)_slotCount);
-
-            string json = _shader.ReflectionJson ?? "";
-            if (_slotCount > 0 && json.Length > 0)
-            {
-                int bindingsIdx = json.IndexOf("\"bindings\"", StringComparison.Ordinal);
-                int arrayStart  = bindingsIdx >= 0 ? json.IndexOf('[', bindingsIdx) : -1;
-                if (arrayStart >= 0)
-                {
-                    int pos = arrayStart + 1;
-                    while (pos < json.Length)
-                    {
-                        int objStart = json.IndexOf('{', pos);
-                        if (objStart < 0) break;
-                        int objEnd = json.IndexOf('}', objStart);
-                        if (objEnd < 0) break;
-                        string obj  = json.Substring(objStart + 1, objEnd - objStart - 1);
-                        string name = ExtractJsonString(obj, "name");
-                        if (!string.IsNullOrEmpty(name) && !_nameToSlot.ContainsKey(name))
-                        {
-                            uint idx = NativeRenderPlugin.NR_RAS_GetSlotIndex(_handle, name);
-                            if (idx != uint.MaxValue)
-                                _nameToSlot[name] = idx;
-                        }
-
-                        pos = objEnd + 1;
-                    }
-                }
-            }
+                    $"[NativeRasterPipeline] NR_CreateRasterShaderEx returned 0 for: {_shader.name}");
         }
 
         private void OnShaderRecompiled(NativeRasterShader shader)
@@ -228,8 +181,8 @@ namespace NativeRender
 
             try
             {
+                BuildBindingContract();
                 BuildNativeHandle();
-                BuildSlotLayout();
                 Debug.Log($"[NativeRasterPipeline] Rebuilt pipeline for: {shader.name}");
                 OnRebuilt?.Invoke(this);
             }
@@ -266,20 +219,6 @@ namespace NativeRender
             if (headerPtr == IntPtr.Zero) return;
 
             cmd.IssuePluginEventAndData(NativeRenderPlugin.NR_RAS_GetRenderEventFunc(), 1, headerPtr);
-        }
-
-        private static string ExtractJsonString(string obj, string key)
-        {
-            string search = "\"" + key + "\"";
-            int    ki     = obj.IndexOf(search, StringComparison.Ordinal);
-            if (ki < 0) return null;
-            int colon = obj.IndexOf(':', ki + search.Length);
-            if (colon < 0) return null;
-            int q1 = obj.IndexOf('"', colon + 1);
-            if (q1 < 0) return null;
-            int q2 = obj.IndexOf('"', q1 + 1);
-            if (q2 < 0) return null;
-            return obj.Substring(q1 + 1, q2 - q1 - 1);
         }
     }
 }

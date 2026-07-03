@@ -1,5 +1,6 @@
 #pragma once
 #include "ShaderBase.h"  // pulls in all D3D12/DXC/Unity headers + Binding types
+#include <unordered_map>
 
 // RayTraceBindingType and RayTraceBinding are kept as aliases for call-site
 // readability; shared descriptor-set logic uses Binding / BindingType directly.
@@ -8,16 +9,10 @@ using RayTraceBinding     = Binding;
 
 // ---------------------------------------------------------------------------
 // RayTraceShader
-//   One self-contained DXR pipeline.  Common binding metadata, root-signature
-//   build, logging, and hints are provided by ShaderBase.
-//
-// Root parameter layout (built dynamically from reflection):
-//   0   – SRV descriptor table (one range per SRV/TLAS binding)     optional
-//   1   – UAV descriptor table (one range per UAV binding)           optional
-//   2+  – one descriptor table per SRV_ARRAY binding
-//   N+  – one descriptor table per UAV_ARRAY binding
-//   M+  – one root CBV descriptor per CBV binding
-//   P+  – one inline root SRV per ROOT_SRV binding
+//   One self-contained DXR pipeline.  Root signature and binding table are
+//   derived entirely from the explicit binding layout (nvrhi BindingLayout
+//   model — see ShaderBase); library reflection is used only to discover the
+//   raygen/miss/hit-group entry points.
 //   Q+  – one root 32-bit constants slot per ROOT_CONSTANTS binding
 // ---------------------------------------------------------------------------
 class RayTraceShader : public ShaderBase
@@ -73,8 +68,10 @@ public:
     uint32_t        GetHitGroupVariantCount() const { return static_cast<uint32_t>(m_hitGroups.size()); }
 
 private:
-    bool ReflectBindings(IDxcBlob* shaderLib);
-    bool ReflectBindingsFromBlob(IDxcBlob* shaderLib); // reflects into existing state (no reset)
+    // Entry-point discovery only (raygen/miss/hit groups). Resource bindings
+    // come exclusively from the explicit binding layout (nvrhi model).
+    bool ReflectEntryPoints(IDxcBlob* shaderLib);
+    bool ReflectEntryPointsFromBlob(IDxcBlob* shaderLib); // merges into existing state (no reset)
     bool BuildPipeline  (const std::vector<ComPtr<IDxcBlob>>& libs);
     bool BuildPipeline  (IDxcBlob* shaderLib); // single-blob convenience
     bool BuildShaderTable();

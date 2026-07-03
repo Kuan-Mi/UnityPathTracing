@@ -120,8 +120,10 @@ namespace PathTracing
             {
                 // Bindless layout — one root param with two unbounded ranges, both
                 // aliasing the same descriptor table (donut DescriptorTableManager).
-                l.BindlessSRV(space: 1)         // t_BindlessBuffers[]
-                 .BindlessSRV(space: 2);        // t_BindlessTextures[]
+                // groupWithPrevious merges the second range into the first item's
+                // root parameter instead of giving it its own table.
+                l.BindlessSRV(space: 1)                                  // t_BindlessBuffers[]
+                 .BindlessSRV(space: 2, groupWithPrevious: true);        // t_BindlessTextures[]
             }
             return l;
         }

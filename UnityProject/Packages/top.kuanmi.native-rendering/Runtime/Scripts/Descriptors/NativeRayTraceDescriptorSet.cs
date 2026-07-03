@@ -50,7 +50,7 @@ namespace NativeRender
 
         private void CopySlotLayout(RayTracePipeline pipeline)
         {
-            CopySlotLayoutCommon(pipeline.SlotCount, pipeline.NameToSlot);
+            CopySlotLayoutCommon(pipeline.Layout, pipeline.SlotCount, pipeline.NameToSlot);
         }
 
         private void AllocateRingBuffers()

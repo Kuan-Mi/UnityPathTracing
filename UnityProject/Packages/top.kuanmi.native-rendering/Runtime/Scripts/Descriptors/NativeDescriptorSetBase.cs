@@ -85,6 +85,10 @@ namespace NativeRender
         // Slot layout mirrored from the pipeline (refreshed on hot-reload).
         protected uint _slotCount;
 
+        // The pipeline's binding layout — slot i of the staging array IS layout
+        // item i, so register-addressed binding-set items resolve against it.
+        private NativeBindingLayout _layout;
+
         // Maps a global PropertyToID id → this set's slot index (-1 = not a binding of this set).
         // Rebuilt whenever the slot layout is (re)copied, so cached ids survive hot-reloads.
         private int[] _idToSlot;
@@ -109,8 +113,10 @@ namespace NativeRender
         // Shared ring-buffer helpers
         // -------------------------------------------------------------------
 
-        protected void CopySlotLayoutCommon(uint slotCount, IReadOnlyDictionary<string, uint> nameToSlot)
+        protected void CopySlotLayoutCommon(NativeBindingLayout layout, uint slotCount,
+            IReadOnlyDictionary<string, uint> nameToSlot)
         {
+            _layout    = layout;
             _slotCount = slotCount;
 
             // Intern every binding name, then map its global id → local slot index.  Sizing the
@@ -223,6 +229,64 @@ namespace NativeRender
         /// can validate a name once and decide whether to bind.
         /// </summary>
         public int GetSlotIndex(string name) => SlotFromId(PropertyToID(name));
+
+        // -------------------------------------------------------------------
+        // nvrhi-style register-addressed binding (BindingSetDesc / BindingSet)
+        // -------------------------------------------------------------------
+
+        // Layout misses already reported by Bind(desc), so per-frame reuse of a
+        // desc with a stale register doesn't spam the console.
+        private HashSet<ulong> _reportedBindMisses;
+
+        /// <summary>
+        /// Stages every item of an nvrhi-style <see cref="NativeBindingSetDesc"/>,
+        /// resolving each register-addressed item against the pipeline's binding
+        /// layout (declaration-driven — no shader reflection involved). Items
+        /// matching no layout item are skipped with a one-time error.
+        /// Staged values persist on the set like any <c>Set*</c> call.
+        /// </summary>
+        public void Bind(NativeBindingSetDesc desc)
+        {
+            if (desc == null || _layout == null) return;
+            var items = desc.Items;
+            for (int i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                int slot = _layout.ResolveSlot(item.RegClass, item.Slot, item.Space,
+                    item.Unbounded, item.IsTlas);
+                if (slot < 0)
+                {
+                    ulong key = ((ulong)item.RegClass << 56) | ((ulong)item.Space << 32) | item.Slot;
+                    _reportedBindMisses ??= new HashSet<ulong>();
+                    if (_reportedBindMisses.Add(key))
+                        Debug.LogError(
+                            $"[NativeDescriptorSet] binding-set item ({item.RegClass} reg {item.Slot}, " +
+                            $"space {item.Space}) matches no binding-layout item");
+                    continue;
+                }
+                WriteSetItem(slot, item);
+            }
+        }
+
+        /// <summary>Stages a pre-resolved <see cref="NativeBindingSet"/> (resolution
+        /// happened once at its creation — the nvrhi immutable-set pattern).</summary>
+        public void Bind(NativeBindingSet set)
+        {
+            if (set == null) return;
+            var resolved = set.Resolved;
+            for (int i = 0; i < resolved.Length; i++)
+                WriteSetItem(resolved[i].Slot, resolved[i].Item);
+        }
+
+        private void WriteSetItem(int slot, in NativeBindingSetItem item)
+        {
+            if ((uint)slot >= _slotCount) return;
+            _stagingSlots[slot].objectPtr  = item.ObjectPtr;
+            _stagingSlots[slot].objectKind = item.ObjectKind;
+            _stagingSlots[slot].count      = item.Count;
+            _stagingSlots[slot].stride     = item.Stride;
+            _stagingSlots[slot].format     = item.Format;
+        }
 
         /// <summary>Binds a raw/structured buffer (SRV).</summary>
         public void SetBuffer(int nameId, IntPtr bufferPtr)

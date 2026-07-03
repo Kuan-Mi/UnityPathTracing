@@ -26,7 +26,8 @@ namespace NativeRender
         private RootConstantsHint[] _rootConstantsHints;
         private string[]            _rootSRVHints;
         private SamplerHint[]       _samplerHints;
-        private NativeBindingLayout _sharedLayout;
+        private NativeBindingLayout _userLayout;   // hand-authored layout; null = auto-generate
+        private NativeBindingLayout _layout;       // the effective (mandatory) layout
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -34,10 +35,14 @@ namespace NativeRender
         /// <summary>Opaque native handle (pointer to RayTraceShader). Used by NativeRayTraceDescriptorSet.</summary>
         public ulong Handle => _handle;
 
-        /// <summary>Number of resource binding slots in this shader.</summary>
+        /// <summary>The effective binding layout (hand-authored or auto-generated).</summary>
+        public NativeBindingLayout Layout => _layout;
+
+        /// <summary>Number of resource binding slots (= layout item count).</summary>
         public uint SlotCount => _slotCount;
 
-        /// <summary>Maps HLSL variable names to slot indices (for NativeRayTraceDescriptorSet).</summary>
+        /// <summary>Maps HLSL variable names to layout slot indices (for NativeRayTraceDescriptorSet).
+        /// Built from the import-time reflection JSON against the layout.</summary>
         public IReadOnlyDictionary<string, uint> NameToSlot => _nameToSlot;
 
         /// <summary>Fired (on the main thread) whenever the pipeline is rebuilt after a hot-reload.</summary>
@@ -108,7 +113,7 @@ namespace NativeRender
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
             _samplerHints       = shader.ResolveSamplerHints();
-            _sharedLayout       = sharedLayout;
+            _userLayout         = (sharedLayout != null && !sharedLayout.IsEmpty) ? sharedLayout : null;
             BuildNativeHandle(shader);
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
         }
@@ -171,7 +176,7 @@ namespace NativeRender
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
             _samplerHints       = primaryShader.ResolveSamplerHints();
-            _sharedLayout       = sharedLayout;
+            _userLayout         = (sharedLayout != null && !sharedLayout.IsEmpty) ? sharedLayout : null;
 
             BuildNativeHandleMultiBlob(primaryShader, hitGroupShaders);
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
@@ -185,19 +190,20 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
+            // Contract first: layout + name map + validation, all C#-side.
+            var reflected = ShaderReflectionInfo.Parse(shader.ReflectionJson);
+            BuildBindingContract(reflected, shader.name);
+
             uint flags      = ProfileSupportsOpacityMicromaps(shader.TargetProfile) ? 1u : 0u;
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
             string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
-            string hintsJson  = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _sharedLayout);
-            _handle = hintsJson != null
-                ? NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName, hintsJson)
-                : NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
+            string hintsJson  = BuildCreationJson(_layout, null);
+            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(
+                dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName, hintsJson);
             if (_handle == 0)
                 throw new InvalidOperationException(
-                    $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");
-
-            RefreshSlotLayout();
+                    $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytesEx returned 0 for: {shader.name}");
         }
 
         private void BuildNativeHandleMultiBlob(RayTraceShader primaryShader, HitGroupShader[] hitGroupShaders)
@@ -232,23 +238,27 @@ namespace NativeRender
                     sizes[i] = (uint)dxils[i].Length;
                 }
 
+                // Contract first: merge the reflection of every blob (primary +
+                // hit-group shaders), then resolve/validate against the layout.
+                var reflected = new List<ReflectedBinding>();
+                ShaderReflectionInfo.ParseInto(primaryShader.ReflectionJson, reflected);
+                for (int i = 0; i < hitGroupShaders.Length; ++i)
+                    ShaderReflectionInfo.ParseInto(hitGroupShaders[i].ReflectionJson, reflected);
+                BuildBindingContract(reflected, primaryShader.name);
+
                 uint   flags      = ProfileSupportsOpacityMicromaps(primaryShader.TargetProfile) ? 1u : 0u;
                 uint   maxPayload = primaryShader.MaxPayloadSizeInBytes;
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
-                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints, _sharedLayout, _hitGroupAnyHit);
-                _handle = hintsJson != null
-                    ? NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
-                        ptrs, sizes, (uint)totalBlobs,
-                        primaryShader.name, flags, maxPayload, rayGenName, hintsJson)
-                    : NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobs(
-                        ptrs, sizes, (uint)totalBlobs,
-                        primaryShader.name, flags, maxPayload, rayGenName);
+                string hintsJson = BuildCreationJson(_layout, _hitGroupAnyHit);
+                _handle = NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
+                    ptrs, sizes, (uint)totalBlobs,
+                    primaryShader.name, flags, maxPayload, rayGenName, hintsJson);
 
                 if (_handle == 0)
                     throw new InvalidOperationException(
-                        $"[RayTracePipeline] NR_CreateRayTracePipelineFromBlobs returned 0 for: {primaryShader.name}");
+                        $"[RayTracePipeline] NR_CreateRayTracePipelineFromBlobsEx returned 0 for: {primaryShader.name}");
             }
             finally
             {
@@ -256,8 +266,6 @@ namespace NativeRender
                     if (pin.IsAllocated)
                         pin.Free();
             }
-
-            RefreshSlotLayout();
         }
 
         /// <summary>
@@ -277,103 +285,59 @@ namespace NativeRender
             return major > 6 || (major == 6 && minor >= 9);
         }
 
-        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
-            SamplerHint[] samplerHints, NativeBindingLayout sharedLayout, bool[] hitGroupAnyHit = null)
+        /// <summary>
+        /// Establishes the binding contract before the native pipeline exists:
+        /// picks (or auto-generates) the layout, resolves every reflected HLSL
+        /// binding into it (name → layout slot), and fails loudly — naming the
+        /// HLSL variables — when a hand-authored layout doesn't cover the
+        /// shaders. C#-side safety net replacing the plugin's runtime reflection.
+        /// </summary>
+        private void BuildBindingContract(List<ReflectedBinding> reflected, string shaderName)
         {
-            bool hasRC   = rcHints != null && rcHints.Length > 0;
-            bool hasSRV  = srvHints != null && srvHints.Length > 0;
-            bool hasSamp = SamplerHintJson.Has(samplerHints);
-            bool hasLayout = sharedLayout != null && !sharedLayout.IsEmpty;
-            bool hasHgAH = hitGroupAnyHit != null && hitGroupAnyHit.Length > 0;
-            if (!hasRC && !hasSRV && !hasSamp && !hasLayout && !hasHgAH) return null;
+            _layout = _userLayout ?? NativeBindingLayout.FromReflection(
+                reflected, _rootConstantsHints, _rootSRVHints, _samplerHints);
 
-            var sb = new System.Text.StringBuilder();
-            sb.Append('{');
-            bool any = false;
+            _slotCount = (uint)_layout.Items.Count;
+            _nameToSlot.Clear();
 
-            if (hasRC)
+            List<string> missing = null;
+            for (int i = 0; i < reflected.Count; i++)
             {
-                sb.Append("\"rootConstants\":[");
-                for (int i = 0; i < rcHints.Length; i++)
+                var b = reflected[i];
+                int slot = _layout.ResolveSlot(b);
+                if (slot >= 0)
                 {
-                    if (i > 0) sb.Append(',');
-                    sb.Append("{\"name\":\"");
-                    sb.Append(rcHints[i].Name);
-                    sb.Append("\",\"count\":");
-                    sb.Append(rcHints[i].Count);
-                    sb.Append('}');
+                    _nameToSlot[b.Name] = (uint)slot;
                 }
-
-                sb.Append(']');
-                any = true;
-            }
-
-            if (hasSRV)
-            {
-                if (any) sb.Append(',');
-                sb.Append("\"rootSRV\":[");
-                for (int i = 0; i < srvHints.Length; i++)
+                else if (!(b.RegClass == BindingRegClass.Sampler && _layout.HasStaticSampler(b.Reg, b.Space)))
                 {
-                    if (i > 0) sb.Append(',');
-                    sb.Append('"');
-                    sb.Append(srvHints[i]);
-                    sb.Append('"');
+                    (missing ??= new List<string>()).Add(
+                        $"'{b.Name}' ({b.RegClass} reg {b.Reg}, space {b.Space})");
                 }
-
-                sb.Append(']');
-                any = true;
             }
 
-            if (hasSamp)
-            {
-                if (any) sb.Append(',');
-                SamplerHintJson.Append(sb, samplerHints);
-                any = true;
-            }
-
-            if (hasLayout)
-            {
-                if (any) sb.Append(',');
-                sharedLayout.AppendJson(sb);
-                any = true;
-            }
-
-            if (hasHgAH)
-            {
-                if (any) sb.Append(',');
-                sb.Append("\"hitGroupAnyHit\":[");
-                for (int i = 0; i < hitGroupAnyHit.Length; i++)
-                {
-                    if (i > 0) sb.Append(',');
-                    sb.Append(hitGroupAnyHit[i] ? "true" : "false");
-                }
-                sb.Append(']');
-            }
-
-            sb.Append('}');
-            return sb.ToString();
+            if (missing != null)
+                throw new InvalidOperationException(
+                    $"[RayTracePipeline] '{shaderName}': binding layout has no item for " +
+                    string.Join(", ", missing));
         }
 
-        private void RefreshSlotLayout()
+        private static string BuildCreationJson(NativeBindingLayout layout, bool[] hitGroupAnyHit)
         {
-            _nameToSlot.Clear();
-            if (_handle == 0)
-            {
-                _slotCount = 0;
-                return;
-            }
+            string layoutJson = layout.BuildCreationJson();
+            if (hitGroupAnyHit == null || hitGroupAnyHit.Length == 0) return layoutJson;
 
-            _slotCount = NativeRenderPlugin.NR_RTS_GetBindingCount(_handle);
-            for (uint i = 0; i < _slotCount; i++)
+            // Splice "hitGroupAnyHit" into the layout's top-level JSON object.
+            var sb = new System.Text.StringBuilder(layoutJson, layoutJson.Length + 64);
+            sb.Length -= 1; // drop trailing '}'
+            sb.Append(",\"hitGroupAnyHit\":[");
+            for (int i = 0; i < hitGroupAnyHit.Length; i++)
             {
-                IntPtr namePtr = NativeRenderPlugin.NR_RTS_GetBindingName(_handle, i);
-                if (namePtr != IntPtr.Zero)
-                {
-                    string n = Marshal.PtrToStringAnsi(namePtr);
-                    if (!string.IsNullOrEmpty(n))
-                        _nameToSlot[n] = i;
-                }
+                if (i > 0) sb.Append(',');
+                sb.Append(hitGroupAnyHit[i] ? "true" : "false");
             }
+            sb.Append("]}");
+            return sb.ToString();
         }
 
         private void OnShaderRecompiled(RayTraceShader shader)

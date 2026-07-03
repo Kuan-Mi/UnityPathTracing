@@ -882,48 +882,15 @@ NR_RTS_DestroyDescriptorSet(uint64_t handle)
 }
 
 // ---------------------------------------------------------------------------
-// NR_RTS_GetBindingCount / NR_RTS_GetSlotIndex / NR_RTS_GetBindingName
-//   Slot-layout queries on the RayTraceShader.  C# uses these to build its
-//   NativeRayTraceDescriptorSet slot map at construction time.
+// NR_RTS_GetBindingCount
+//   Layout slot count on the RayTraceShader (one slot per layout item).
+//   The name→slot mapping lives entirely on the C# side now.
 // ---------------------------------------------------------------------------
 extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_RTS_GetBindingCount(uint64_t shaderHandle)
 {
     if (!shaderHandle) return 0;
     return reinterpret_cast<RayTraceShader*>(shaderHandle)->GetBindingCount();
-}
-
-extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_GetSlotIndex(uint64_t shaderHandle, const char* name)
-{
-    if (!shaderHandle || !name) return UINT32_MAX;
-    return reinterpret_cast<RayTraceShader*>(shaderHandle)->GetSlotIndex(name);
-}
-
-extern "C" UNITY_INTERFACE_EXPORT const char* UNITY_INTERFACE_API
-NR_RTS_GetBindingName(uint64_t shaderHandle, uint32_t index)
-{
-    if (!shaderHandle) return nullptr;
-    return reinterpret_cast<RayTraceShader*>(shaderHandle)->GetBindingName(index);
-}
-
-// ---------------------------------------------------------------------------
-// NR_RTS_SetRootConstantsHint / NR_RTS_SetRootSRVHint
-//   Must be called BEFORE NR_CreateRayTraceShaderFromBytes so the reflection
-//   pass applies the correct binding types.
-// ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetRootConstantsHint(uint64_t shaderHandle, const char* name, uint32_t num32BitValues)
-{
-    if (!shaderHandle || !name) return;
-    reinterpret_cast<RayTraceShader*>(shaderHandle)->SetRootConstantsHint(name, num32BitValues);
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetRootSRVHint(uint64_t shaderHandle, const char* name)
-{
-    if (!shaderHandle || !name) return;
-    reinterpret_cast<RayTraceShader*>(shaderHandle)->SetRootSRVHint(name);
 }
 
 static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
@@ -1741,66 +1708,6 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
     return reinterpret_cast<uint64_t>(cs);
 }
 
-// ---------------------------------------------------------------------------
-// NR_CreateComputeShaderEx
-//   Like NR_CreateComputeShader but accepts a hintsJson string that promotes
-//   selected CBV bindings to root 32-bit constants.
-//   hintsJson format: [{"name":"MyConstants","count":4}, ...]
-//   Must be called before Unity sets up resource bindings.
-// ---------------------------------------------------------------------------
-static void ApplyRootConstantsHints(ShaderBase* shader, const char* hintsJson)
-{
-    if (!hintsJson || hintsJson[0] == '\0') return;
-    // Lightweight JSON array parser: find {"name":"...","count":N} objects
-    const char* p = hintsJson;
-    while (*p)
-    {
-        const char* nameStart = strstr(p, "\"name\"");
-        if (!nameStart) break;
-        const char* q1 = strchr(nameStart + 6, '"');
-        if (!q1) break;
-        const char* q2 = strchr(q1 + 1, '"');
-        if (!q2) break;
-        std::string name(q1 + 1, q2);
-
-        const char* countTag = strstr(q2 + 1, "\"count\"");
-        if (!countTag) break;
-        const char* colon = strchr(countTag + 7, ':');
-        if (!colon) break;
-        uint32_t count = static_cast<uint32_t>(atoi(colon + 1));
-
-        shader->SetRootConstantsHint(name.c_str(), count);
-        p = colon + 1;
-    }
-}
-
-// Parses "rootSRV":["name1","name2",...] from a JSON object.
-static void ApplyRootSRVHints(ShaderBase* shader, const char* hintsJson)
-{
-    if (!hintsJson || hintsJson[0] == '\0') return;
-    const char* tag = strstr(hintsJson, "\"rootSRV\"");
-    if (!tag) return;
-    const char* arrStart = strchr(tag + 9, '[');
-    if (!arrStart) return;
-    const char* p = arrStart + 1;
-    while (*p)
-    {
-        const char* q1 = strchr(p, '"');
-        if (!q1) break;
-        const char* q2 = strchr(q1 + 1, '"');
-        if (!q2) break;
-        std::string name(q1 + 1, q2);
-        if (!name.empty())
-            shader->SetRootSRVHint(name.c_str());
-        p = q2 + 1;
-        // stop at end of array
-        const char* nextComma    = strchr(p, ',');
-        const char* arrEnd       = strchr(p, ']');
-        if (!arrEnd) break;
-        if (!nextComma || arrEnd < nextComma) break;
-    }
-}
-
 // Parses:
 // "sharedLayout":{"items":[{"kind":0,"slot":1,"space":0,"count":1,"num32":0},...]}
 // Kind values match ShaderBase::SharedLayoutKind.
@@ -1839,26 +1746,26 @@ static void ApplySharedLayoutHints(ShaderBase* shader, const char* hintsJson)
         uint32_t space = ReadUInt(objStart, objEnd, "\"space\"", 0);
         uint32_t count = ReadUInt(objStart, objEnd, "\"count\"", 1);
         uint32_t num32 = ReadUInt(objStart, objEnd, "\"num32\"", 0);
+        uint32_t grp   = ReadUInt(objStart, objEnd, "\"grp\"",   0);
 
         shader->AddSharedLayoutItem(
             static_cast<ShaderBase::SharedLayoutKind>(kind),
-            slot, space, count, num32);
+            slot, space, count, num32, grp != 0);
 
         p = objEnd + 1;
     }
 }
 
-// Parses "samplers":[{"name":"...","filter":N,"addressU":N,"addressV":N,"addressW":N,
-// "mips":N,"aniso":N}] from the hints JSON. Each entry overrides the static-sampler
-// attributes for the matching HLSL sampler variable (see ShaderBase::SetSamplerHint).
-// Missing numeric fields default to 0, except aniso which defaults to 16. A single
-// "address" key (if present) is used as the fallback for any missing per-axis field.
-static void ApplySamplerHints(ShaderBase* shader, const char* hintsJson)
+// Parses "staticSamplers":[{"reg":N,"space":N,"filter":N,"addressU":N,"addressV":N,
+// "addressW":N,"mips":N,"aniso":N}] from the hints JSON. C# resolves sampler registers
+// (from import-time reflection) and filter/address config (editor hints or naming
+// convention) itself; the plugin just forwards explicit descs into the root signature.
+static void ApplyStaticSamplerHints(ShaderBase* shader, const char* hintsJson)
 {
     if (!hintsJson || hintsJson[0] == '\0') return;
-    const char* tag = strstr(hintsJson, "\"samplers\"");
+    const char* tag = strstr(hintsJson, "\"staticSamplers\"");
     if (!tag) return;
-    const char* arrStart = strchr(tag + 10, '[');
+    const char* arrStart = strchr(tag + 16, '[');
     if (!arrStart) return;
     const char* arrEnd = strchr(arrStart, ']');
     if (!arrEnd) return;
@@ -1881,33 +1788,17 @@ static void ApplySamplerHints(ShaderBase* shader, const char* hintsJson)
         const char* objEnd = strchr(objStart, '}');
         if (!objEnd) break;
 
-        // name
-        const char* nameTag = strstr(objStart, "\"name\"");
-        std::string name;
-        if (nameTag && nameTag < objEnd)
-        {
-            const char* q1 = strchr(nameTag + 6, '"');
-            const char* q2 = q1 ? strchr(q1 + 1, '"') : nullptr;
-            if (q1 && q2 && q2 < objEnd) name.assign(q1 + 1, q2);
-        }
+        ShaderBase::StaticSamplerDef def;
+        def.reg           = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"reg\"",      0));
+        def.space         = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"space\"",    0));
+        def.filter        = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"filter\"",   1));
+        def.addressU      = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"addressU\"", 0));
+        def.addressV      = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"addressV\"", 0));
+        def.addressW      = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"addressW\"", 0));
+        def.mips          = ReadInt(objStart, objEnd, "\"mips\"", 0) != 0;
+        def.maxAnisotropy = static_cast<uint32_t>(ReadInt(objStart, objEnd, "\"aniso\"", 16));
+        shader->AddStaticSampler(def);
 
-        if (!name.empty())
-        {
-            int filter   = ReadInt(objStart, objEnd, "\"filter\"",   1);
-            int address  = ReadInt(objStart, objEnd, "\"address\"",  0); // legacy single-axis fallback
-            int addressU = ReadInt(objStart, objEnd, "\"addressU\"", address);
-            int addressV = ReadInt(objStart, objEnd, "\"addressV\"", address);
-            int addressW = ReadInt(objStart, objEnd, "\"addressW\"", address);
-            int mips     = ReadInt(objStart, objEnd, "\"mips\"",     0);
-            int aniso    = ReadInt(objStart, objEnd, "\"aniso\"",    16);
-            shader->SetSamplerHint(name.c_str(),
-                                   static_cast<uint32_t>(filter),
-                                   static_cast<uint32_t>(addressU),
-                                   static_cast<uint32_t>(addressV),
-                                   static_cast<uint32_t>(addressW),
-                                   mips != 0,
-                                   static_cast<uint32_t>(aniso));
-        }
         p = objEnd + 1;
     }
 }
@@ -1980,9 +1871,7 @@ NR_CreateRayTraceShaderFromBytesEx(
         return 0;
     }
     ApplySharedLayoutHints(shader, hintsJson);
-    ApplyRootConstantsHints(shader, hintsJson);
-    ApplyRootSRVHints(shader, hintsJson);
-    ApplySamplerHints(shader, hintsJson);
+    ApplyStaticSamplerHints(shader, hintsJson);
     if (!shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes, rayGenName))
     {
         delete shader;
@@ -2036,9 +1925,7 @@ NR_CreateRayTracePipelineFromBlobsEx(
         return 0;
     }
     ApplySharedLayoutHints(shader, hintsJson);
-    ApplyRootConstantsHints(shader, hintsJson);
-    ApplyRootSRVHints(shader, hintsJson);
-    ApplySamplerHints(shader, hintsJson);
+    ApplyStaticSamplerHints(shader, hintsJson);
     if (!shader->LoadShaderFromMultipleBlobs(descs.data(), blobCount, name, flags,
                                              maxPayloadSizeInBytes, rayGenName))
     {
@@ -2078,9 +1965,7 @@ NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* na
         return 0;
     }
     ApplySharedLayoutHints(cs, hintsJson);
-    ApplyRootConstantsHints(cs, hintsJson);
-    ApplyRootSRVHints(cs, hintsJson);
-    ApplySamplerHints(cs, hintsJson);
+    ApplyStaticSamplerHints(cs, hintsJson);
     if (!cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;
@@ -2121,27 +2006,15 @@ NR_CS_DestroyDescriptorSet(uint64_t handle)
 }
 
 // ---------------------------------------------------------------------------
-// Resource binding queries (slot layout discovery)
+// NR_CS_GetBindingCount
+//   Layout slot count (one slot per layout item). The name→slot mapping
+//   lives entirely on the C# side now.
 // ---------------------------------------------------------------------------
 extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CS_GetBindingCount(uint64_t handle)
 {
     if (!handle) return 0;
     return reinterpret_cast<ComputeShader*>(handle)->GetBindingCount();
-}
-
-extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_GetSlotIndex(uint64_t handle, const char* name)
-{
-    if (!handle) return UINT32_MAX;
-    return reinterpret_cast<ComputeShader*>(handle)->GetSlotIndex(name);
-}
-
-extern "C" UNITY_INTERFACE_EXPORT const char* UNITY_INTERFACE_API
-NR_CS_GetBindingName(uint64_t handle, uint32_t index)
-{
-    if (!handle) return nullptr;
-    return reinterpret_cast<ComputeShader*>(handle)->GetBindingName(index);
 }
 
 // ---------------------------------------------------------------------------
@@ -2390,9 +2263,7 @@ static uint64_t CreateRasterShaderImpl(
         return 0;
     }
     ApplySharedLayoutHints(rs, hintsJson);
-    ApplyRootConstantsHints(rs, hintsJson);
-    ApplyRootSRVHints(rs, hintsJson);
-    ApplySamplerHints(rs, hintsJson);
+    ApplyStaticSamplerHints(rs, hintsJson);
     if (!rs->LoadShaderFromBlobs(vsDxil, vsSize, psDxil, psSize, *state, name))
     {
         delete rs;
@@ -2454,20 +2325,6 @@ NR_RAS_GetBindingCount(uint64_t handle)
 {
     if (!handle) return 0;
     return reinterpret_cast<RasterShader*>(handle)->GetBindingCount();
-}
-
-extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RAS_GetSlotIndex(uint64_t handle, const char* name)
-{
-    if (!handle) return UINT32_MAX;
-    return reinterpret_cast<RasterShader*>(handle)->GetSlotIndex(name);
-}
-
-extern "C" UNITY_INTERFACE_EXPORT const char* UNITY_INTERFACE_API
-NR_RAS_GetBindingName(uint64_t handle, uint32_t index)
-{
-    if (!handle) return nullptr;
-    return reinterpret_cast<RasterShader*>(handle)->GetBindingName(index);
 }
 
 // ---------------------------------------------------------------------------
