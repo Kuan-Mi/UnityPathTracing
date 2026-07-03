@@ -165,6 +165,14 @@ namespace NativeRender
         {
         }
 
+        public NativeComputePipeline(NativeComputeShader shader, BindingLayoutDesc[] bindingLayouts)
+            : this(shader,
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null,
+                NativeBindingLayout.FromDescs(bindingLayouts))
+        {
+        }
+
         public NativeComputePipeline(NativeComputeShader shader, RootConstantsHint[] rootConstantsHints,
             string[] rootSRVHints, NativeBindingLayout sharedLayout)
         {
@@ -233,12 +241,10 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            var layoutItems = _layout.BuildNativeItems();
-            var staticSamplers = _layout.BuildNativeStaticSamplers();
+            var layoutHandles = _layout.GetNativeLayoutHandles();
             _handle = NativeRenderPlugin.NR_CreateComputeShaderEx(
                 dxil, (uint)dxil.Length, shader.name,
-                layoutItems, (uint)layoutItems.Length,
-                staticSamplers, (uint)staticSamplers.Length);
+                layoutHandles, (uint)layoutHandles.Length);
 
             if (_handle == 0)
                 throw new InvalidOperationException(

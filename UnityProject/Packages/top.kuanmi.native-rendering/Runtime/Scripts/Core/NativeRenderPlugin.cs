@@ -179,10 +179,8 @@ namespace NativeRender
             uint flags,
             uint maxPayloadSizeInBytes,
             string rayGenName,
-            [In] NR_BindingLayoutItem[] layoutItems,
-            uint layoutItemCount,
-            [In] NR_StaticSampler[] staticSamplers,
-            uint staticSamplerCount);
+            [In] ulong[] layoutHandles,
+            uint layoutHandleCount);
 
         /// <summary>
         /// Builds a DXR pipeline from N pre-compiled DXIL blobs merged into one RTPSO.
@@ -210,10 +208,8 @@ namespace NativeRender
             uint flags,
             uint maxPayloadSizeInBytes,
             string rayGenName,
-            [In] NR_BindingLayoutItem[] layoutItems,
-            uint layoutItemCount,
-            [In] NR_StaticSampler[] staticSamplers,
-            uint staticSamplerCount,
+            [In] ulong[] layoutHandles,
+            uint layoutHandleCount,
             [In] byte[] hitGroupAnyHit,
             uint hitGroupAnyHitCount);
 
@@ -529,7 +525,7 @@ namespace NativeRender
         public static extern ulong NR_CreateComputeShader(byte[] dxilBytes, uint size, string name);
 
         /// <summary>
-        /// Like NR_CreateComputeShader, but accepts the explicit binding layout and static samplers
+        /// Like NR_CreateComputeShader, but accepts native binding layout handles
         /// that shape the native root signature.
         /// Must be called before resource bindings are set up.
         /// Returns an opaque handle on success, 0 on failure.
@@ -538,10 +534,8 @@ namespace NativeRender
         public static extern ulong NR_CreateComputeShaderEx(
             byte[] dxilBytes, uint size,
             [MarshalAs(UnmanagedType.LPStr)] string name,
-            [In] NR_BindingLayoutItem[] layoutItems,
-            uint layoutItemCount,
-            [In] NR_StaticSampler[] staticSamplers,
-            uint staticSamplerCount);
+            [In] ulong[] layoutHandles,
+            uint layoutHandleCount);
 
         /// <summary>Destroys a ComputeShader created by NR_CreateComputeShader.</summary>
         [DllImport(DllName)]
@@ -588,19 +582,37 @@ namespace NativeRender
             public uint  format; // DXGI_FORMAT for typed buffer UAV (0 = raw/structured)
         }
 
-        /// <summary>One explicit binding-layout item sent to the native plugin at pipeline creation.</summary>
+        /// <summary>One nvrhi-style binding layout descriptor sent when creating a native binding layout.</summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct NR_BindingLayoutDesc
+        {
+            public uint visibility;
+            public uint registerSpace;
+            public uint firstItem;
+            public uint itemCount;
+        }
+
+        /// <summary>One nvrhi-style binding-layout item sent when creating a native binding layout.</summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct NR_BindingLayoutItem
         {
-            public uint kind;
+            public uint type;
             public uint slot;
-            public uint space;
-            public uint count;
-            public uint num32;
-            public uint groupWithPrevious;
+            public uint size;
         }
 
-        /// <summary>One explicit static-sampler definition sent to the native plugin at pipeline creation.</summary>
+        /// <summary>One nvrhi-style bindless layout descriptor.</summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct NR_BindlessLayoutDesc
+        {
+            public uint visibility;
+            public uint firstSlot;
+            public uint maxCapacity;
+            public uint firstItem;
+            public uint itemCount;
+        }
+
+        /// <summary>One explicit static-sampler definition sent when creating a native binding layout.</summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct NR_StaticSampler
         {
@@ -613,6 +625,25 @@ namespace NativeRender
             public uint mips;
             public uint maxAnisotropy;
         }
+
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateBindingLayout(
+            [In] NR_BindingLayoutDesc[] layoutDescs,
+            uint layoutDescCount,
+            [In] NR_BindingLayoutItem[] layoutItems,
+            uint layoutItemCount,
+            [In] NR_StaticSampler[] staticSamplers,
+            uint staticSamplerCount);
+
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateBindlessLayout(
+            [In] NR_BindlessLayoutDesc[] bindlessDescs,
+            uint bindlessDescCount,
+            [In] NR_BindingLayoutItem[] layoutItems,
+            uint layoutItemCount);
+
+        [DllImport(DllName)]
+        public static extern void NR_DestroyBindingLayout(ulong handle);
 
         /// <summary>
         /// Event data for NR_CS_GetRenderEventFunc dispatches.
@@ -743,16 +774,14 @@ namespace NativeRender
             ref RasterPipelineStateDesc state,
             [MarshalAs(UnmanagedType.LPStr)] string name);
 
-        /// <summary>Like NR_CreateRasterShader, with an explicit binding layout and static samplers.</summary>
+        /// <summary>Like NR_CreateRasterShader, with explicit native binding layout handles.</summary>
         [DllImport(DllName)]
         public static extern ulong NR_CreateRasterShaderEx(
             byte[] vsDxil, uint vsSize, byte[] psDxil, uint psSize,
             ref RasterPipelineStateDesc state,
             [MarshalAs(UnmanagedType.LPStr)] string name,
-            [In] NR_BindingLayoutItem[] layoutItems,
-            uint layoutItemCount,
-            [In] NR_StaticSampler[] staticSamplers,
-            uint staticSamplerCount);
+            [In] ulong[] layoutHandles,
+            uint layoutHandleCount);
 
         /// <summary>Destroys a RasterShader created by NR_CreateRasterShader(Ex) (deferred).</summary>
         [DllImport(DllName)]

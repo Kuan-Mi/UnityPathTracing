@@ -44,15 +44,22 @@ void ShaderBase::ClearSharedLayout()
 
 void ShaderBase::AddSharedLayoutItem(SharedLayoutKind kind, uint32_t shaderRegister,
                                      uint32_t space, uint32_t count, uint32_t num32BitValues,
-                                     bool groupWithPrev)
+                                     uint32_t visibility, uint32_t bindlessLayoutIndex)
 {
+    auto NormalizeVisibility = [](uint32_t v) {
+        if (v <= static_cast<uint32_t>(D3D12_SHADER_VISIBILITY_PIXEL))
+            return static_cast<D3D12_SHADER_VISIBILITY>(v);
+        return D3D12_SHADER_VISIBILITY_ALL;
+    };
+
     SharedLayoutItem item;
     item.kind           = kind;
     item.shaderRegister = shaderRegister;
     item.space          = space;
     item.count          = (count == 0) ? 1 : count;
     item.num32BitValues = num32BitValues;
-    item.groupWithPrev  = groupWithPrev;
+    item.visibility     = NormalizeVisibility(visibility);
+    item.bindlessLayoutIndex = bindlessLayoutIndex;
     m_sharedLayout.push_back(item);
 }
 
@@ -133,12 +140,12 @@ bool ShaderBase::BuildSharedRootSignature()
     samplerRanges.reserve(m_sharedLayout.size());
     bindlessRanges.reserve(m_sharedLayout.size());
 
-    // Bindless groups: a run of consecutive Bindless* items maps to ONE root
-    // parameter whose table holds one unbounded range per item (nvrhi bindless
-    // layout with several registerSpaces). first = index into bindlessRanges.
+    // Bindless groups: each nvrhi-style bindless layout maps to ONE root
+    // parameter whose table holds one unbounded range per register space.
     struct BindlessGroup { uint32_t first, count; };
     std::vector<BindlessGroup> bindlessGroups;
     std::vector<uint32_t> bindlessGroupOfItem(m_sharedLayout.size(), kInvalidAlloc);
+    std::unordered_map<uint32_t, uint32_t> bindlessGroupByLayout;
 
     uint32_t srvEtcSlots  = 0;
     uint32_t samplerSlots = 0;
@@ -146,7 +153,6 @@ bool ShaderBase::BuildSharedRootSignature()
     RangeClass prevClass  = RangeClass::None;
     uint32_t prevEndReg   = 0;    // one past the last register of the previous table item
     uint32_t prevSpace    = ~0u;
-    bool prevWasBindless  = false;
 
     for (size_t itemIdx = 0; itemIdx < m_sharedLayout.size(); ++itemIdx)
     {
@@ -156,13 +162,20 @@ bool ShaderBase::BuildSharedRootSignature()
         if (item.kind == SharedLayoutKind::BindlessSRV ||
             item.kind == SharedLayoutKind::BindlessUAV)
         {
-            // A bindless item joins the previous item's root parameter only when
-            // explicitly marked (all ranges of a group alias ONE descriptor
-            // table); otherwise it gets its own table.
-            if (!prevWasBindless || !item.groupWithPrev)
+            uint32_t group = kInvalidAlloc;
+            auto it = bindlessGroupByLayout.find(item.bindlessLayoutIndex);
+            if (it == bindlessGroupByLayout.end())
+            {
+                group = static_cast<uint32_t>(bindlessGroups.size());
                 bindlessGroups.push_back({ static_cast<uint32_t>(bindlessRanges.size()), 0 });
-            bindlessGroupOfItem[itemIdx] = static_cast<uint32_t>(bindlessGroups.size() - 1);
-            ++bindlessGroups.back().count;
+                bindlessGroupByLayout[item.bindlessLayoutIndex] = group;
+            }
+            else
+            {
+                group = it->second;
+            }
+            bindlessGroupOfItem[itemIdx] = group;
+            ++bindlessGroups[group].count;
 
             D3D12_DESCRIPTOR_RANGE1 r = {};
             r.RangeType                         = (item.kind == SharedLayoutKind::BindlessSRV)
@@ -175,11 +188,9 @@ bool ShaderBase::BuildSharedRootSignature()
             r.OffsetInDescriptorsFromTableStart = 0;
             bindlessRanges.push_back(r);
 
-            prevWasBindless = true;
             prevClass = RangeClass::None;
             continue;
         }
-        prevWasBindless = false;
 
         if (cls == RangeClass::Sampler)
         {
@@ -254,7 +265,7 @@ bool ShaderBase::BuildSharedRootSignature()
         p.Constants.Num32BitValues = item.num32BitValues
                                     ? item.num32BitValues
                                     : ((item.count >= 4) ? (item.count / 4) : item.count);
-        p.ShaderVisibility         = D3D12_SHADER_VISIBILITY_ALL;
+        p.ShaderVisibility         = item.visibility;
         params.push_back(p);
     }
 
@@ -272,7 +283,7 @@ bool ShaderBase::BuildSharedRootSignature()
         p.Descriptor.ShaderRegister = item.shaderRegister;
         p.Descriptor.RegisterSpace  = item.space;
         p.Descriptor.Flags          = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
-        p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
+        p.ShaderVisibility          = item.visibility;
         params.push_back(p);
     }
 
@@ -288,7 +299,7 @@ bool ShaderBase::BuildSharedRootSignature()
         p.Descriptor.ShaderRegister = item.shaderRegister;
         p.Descriptor.RegisterSpace  = item.space;
         p.Descriptor.Flags          = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
-        p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
+        p.ShaderVisibility          = item.visibility;
         params.push_back(p);
     }
 
@@ -388,7 +399,8 @@ bool ShaderBase::BuildSharedRootSignature()
             << item.space << ':'
             << item.count << ':'
             << item.num32BitValues << ':'
-            << (item.groupWithPrev ? 1 : 0) << ';';
+            << static_cast<uint32_t>(item.visibility) << ':'
+            << item.bindlessLayoutIndex << ';';
     }
     key << "|static_samp|";
     for (const auto& s : staticSamplers)

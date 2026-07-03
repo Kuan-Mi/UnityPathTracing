@@ -103,6 +103,14 @@ namespace NativeRender
         {
         }
 
+        public RayTracePipeline(RayTraceShader shader, BindingLayoutDesc[] bindingLayouts)
+            : this(shader,
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null,
+                NativeBindingLayout.FromDescs(bindingLayouts))
+        {
+        }
+
         public RayTracePipeline(RayTraceShader shader, RootConstantsHint[] rootConstantsHints,
             string[] rootSRVHints, NativeBindingLayout sharedLayout)
         {
@@ -159,6 +167,18 @@ namespace NativeRender
         public RayTracePipeline(
             RayTraceShader primaryShader,
             HitGroupShader[] hitGroupShaders,
+            BindingLayoutDesc[] bindingLayouts)
+            : this(primaryShader, hitGroupShaders,
+                primaryShader != null ? primaryShader.RootConstantsHints : null,
+                primaryShader != null ? primaryShader.RootSRVHints : null,
+                null,
+                NativeBindingLayout.FromDescs(bindingLayouts))
+        {
+        }
+
+        public RayTracePipeline(
+            RayTraceShader primaryShader,
+            HitGroupShader[] hitGroupShaders,
             RootConstantsHint[] rootConstantsHints,
             string[] rootSRVHints,
             bool[] hitGroupAnyHit,
@@ -198,12 +218,10 @@ namespace NativeRender
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
             string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
-            var layoutItems = _layout.BuildNativeItems();
-            var staticSamplers = _layout.BuildNativeStaticSamplers();
+            var layoutHandles = _layout.GetNativeLayoutHandles();
             _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(
                 dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName,
-                layoutItems, (uint)layoutItems.Length,
-                staticSamplers, (uint)staticSamplers.Length);
+                layoutHandles, (uint)layoutHandles.Length);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytesEx returned 0 for: {shader.name}");
@@ -254,14 +272,12 @@ namespace NativeRender
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
-                var layoutItems = _layout.BuildNativeItems();
-                var staticSamplers = _layout.BuildNativeStaticSamplers();
+                var layoutHandles = _layout.GetNativeLayoutHandles();
                 var hitGroupAnyHit = BuildHitGroupAnyHitBytes(_hitGroupAnyHit);
                 _handle = NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
                     ptrs, sizes, (uint)totalBlobs,
                     primaryShader.name, flags, maxPayload, rayGenName,
-                    layoutItems, (uint)layoutItems.Length,
-                    staticSamplers, (uint)staticSamplers.Length,
+                    layoutHandles, (uint)layoutHandles.Length,
                     hitGroupAnyHit, (uint)hitGroupAnyHit.Length);
 
                 if (_handle == 0)

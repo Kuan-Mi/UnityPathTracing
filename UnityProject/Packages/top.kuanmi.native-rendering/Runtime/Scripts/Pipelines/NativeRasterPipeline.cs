@@ -89,6 +89,16 @@ namespace NativeRender
 
         public NativeRasterPipeline(NativeRasterShader shader,
             NativeRenderPlugin.RasterPipelineStateDesc state,
+            BindingLayoutDesc[] bindingLayouts)
+            : this(shader, state,
+                shader != null ? shader.RootConstantsHints : null,
+                shader != null ? shader.RootSRVHints : null,
+                NativeBindingLayout.FromDescs(bindingLayouts))
+        {
+        }
+
+        public NativeRasterPipeline(NativeRasterShader shader,
+            NativeRenderPlugin.RasterPipelineStateDesc state,
             RootConstantsHint[] rootConstantsHints,
             string[] rootSRVHints,
             NativeBindingLayout sharedLayout)
@@ -156,12 +166,10 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeRasterPipeline] Shader compilation failed for: {_shader.GetHlslPath()}");
 
-            var layoutItems = _layout.BuildNativeItems();
-            var staticSamplers = _layout.BuildNativeStaticSamplers();
+            var layoutHandles = _layout.GetNativeLayoutHandles();
             _handle = NativeRenderPlugin.NR_CreateRasterShaderEx(
                 vs, (uint)vs.Length, ps, (uint)ps.Length, ref _state, _shader.name,
-                layoutItems, (uint)layoutItems.Length,
-                staticSamplers, (uint)staticSamplers.Length);
+                layoutHandles, (uint)layoutHandles.Length);
 
             if (_handle == 0)
                 throw new InvalidOperationException(

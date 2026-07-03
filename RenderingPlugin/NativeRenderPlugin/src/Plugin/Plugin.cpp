@@ -1710,14 +1710,28 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
 }
 
 #pragma pack(push, 4)
+struct NR_BindingLayoutDesc
+{
+    uint32_t visibility;
+    uint32_t registerSpace;
+    uint32_t firstItem;
+    uint32_t itemCount;
+};
+
 struct NR_BindingLayoutItem
 {
-    uint32_t kind;
+    uint32_t type;
     uint32_t slot;
-    uint32_t space;
-    uint32_t count;
-    uint32_t num32;
-    uint32_t groupWithPrevious;
+    uint32_t size;
+};
+
+struct NR_BindlessLayoutDesc
+{
+    uint32_t visibility;
+    uint32_t firstSlot;
+    uint32_t maxCapacity;
+    uint32_t firstItem;
+    uint32_t itemCount;
 };
 
 struct NR_StaticSampler
@@ -1733,29 +1747,135 @@ struct NR_StaticSampler
 };
 #pragma pack(pop)
 
-static_assert(sizeof(NR_BindingLayoutItem) == 24, "NR_BindingLayoutItem ABI mismatch");
+static_assert(sizeof(NR_BindingLayoutDesc) == 16, "NR_BindingLayoutDesc ABI mismatch");
+static_assert(sizeof(NR_BindingLayoutItem) == 12, "NR_BindingLayoutItem ABI mismatch");
+static_assert(sizeof(NR_BindlessLayoutDesc) == 20, "NR_BindlessLayoutDesc ABI mismatch");
 static_assert(sizeof(NR_StaticSampler) == 32, "NR_StaticSampler ABI mismatch");
 
-static void ApplyBindingLayout(
-    ShaderBase* shader,
+struct NativeBindingLayoutResource
+{
+    std::vector<ShaderBase::SharedLayoutItem> items;
+    std::vector<ShaderBase::StaticSamplerDef> staticSamplers;
+};
+
+static bool IsBindlessLayoutKind(ShaderBase::SharedLayoutKind kind)
+{
+    return kind == ShaderBase::SharedLayoutKind::BindlessSRV ||
+           kind == ShaderBase::SharedLayoutKind::BindlessUAV;
+}
+
+static void AppendLayoutItem(
+    NativeBindingLayoutResource* layout,
+    ShaderBase::SharedLayoutKind kind,
+    uint32_t shaderRegister,
+    uint32_t space,
+    uint32_t count,
+    uint32_t num32BitValues,
+    uint32_t visibility,
+    uint32_t bindlessLayoutIndex = ShaderBase::kInvalidAlloc)
+{
+    if (!layout) return;
+
+    ShaderBase::SharedLayoutItem item;
+    item.kind = kind;
+    item.shaderRegister = shaderRegister;
+    item.space = space;
+    item.count = count == 0 ? 1 : count;
+    item.num32BitValues = num32BitValues;
+    item.visibility = static_cast<D3D12_SHADER_VISIBILITY>(visibility);
+    item.bindlessLayoutIndex = bindlessLayoutIndex;
+    layout->items.push_back(item);
+}
+
+static void BuildBindingLayoutResource(
+    NativeBindingLayoutResource* layout,
+    const NR_BindingLayoutDesc* layoutDescs,
+    uint32_t layoutDescCount,
     const NR_BindingLayoutItem* layoutItems,
     uint32_t layoutItemCount,
+    const NR_BindlessLayoutDesc* bindlessDescs,
+    uint32_t bindlessDescCount,
     const NR_StaticSampler* staticSamplers,
     uint32_t staticSamplerCount)
 {
-    if (!shader) return;
+    if (!layout) return;
 
-    shader->ClearSharedLayout();
+    struct ItemMeta
+    {
+        bool regular = false;
+        bool bindless = false;
+        uint32_t visibility = D3D12_SHADER_VISIBILITY_ALL;
+        uint32_t registerSpace = 0;
+        uint32_t firstSlot = 0;
+        uint32_t maxCapacity = 1;
+        uint32_t bindlessLayoutIndex = ShaderBase::kInvalidAlloc;
+    };
+    std::vector<ItemMeta> itemMeta(layoutItemCount);
+
+    for (uint32_t d = 0; layoutDescs && d < layoutDescCount; ++d)
+    {
+        const NR_BindingLayoutDesc& desc = layoutDescs[d];
+        if (!layoutItems || desc.firstItem > layoutItemCount ||
+            desc.itemCount > layoutItemCount - desc.firstItem)
+            continue;
+
+        const uint32_t endItem = desc.firstItem + desc.itemCount;
+        for (uint32_t i = desc.firstItem; i < endItem; ++i)
+        {
+            itemMeta[i].regular = true;
+            itemMeta[i].visibility = desc.visibility;
+            itemMeta[i].registerSpace = desc.registerSpace;
+        }
+    }
+
+    for (uint32_t d = 0; bindlessDescs && d < bindlessDescCount; ++d)
+    {
+        const NR_BindlessLayoutDesc& desc = bindlessDescs[d];
+        if (!layoutItems || desc.firstItem > layoutItemCount ||
+            desc.itemCount > layoutItemCount - desc.firstItem)
+            continue;
+
+        const uint32_t endItem = desc.firstItem + desc.itemCount;
+        for (uint32_t i = desc.firstItem; i < endItem; ++i)
+        {
+            itemMeta[i].bindless = true;
+            itemMeta[i].visibility = desc.visibility;
+            itemMeta[i].firstSlot = desc.firstSlot;
+            itemMeta[i].maxCapacity = desc.maxCapacity == 0 ? 1 : desc.maxCapacity;
+            itemMeta[i].bindlessLayoutIndex = d;
+        }
+    }
+
     for (uint32_t i = 0; layoutItems && i < layoutItemCount; ++i)
     {
         const NR_BindingLayoutItem& item = layoutItems[i];
-        shader->AddSharedLayoutItem(
-            static_cast<ShaderBase::SharedLayoutKind>(item.kind),
-            item.slot,
-            item.space,
-            item.count,
-            item.num32,
-            item.groupWithPrevious != 0);
+        const auto kind = static_cast<ShaderBase::SharedLayoutKind>(item.type);
+        if (itemMeta[i].bindless)
+        {
+            AppendLayoutItem(
+                layout,
+                kind,
+                itemMeta[i].firstSlot,
+                item.slot,
+                itemMeta[i].maxCapacity,
+                0,
+                itemMeta[i].visibility,
+                itemMeta[i].bindlessLayoutIndex);
+        }
+        else if (itemMeta[i].regular)
+        {
+            const bool isPushConstants = item.type == static_cast<uint32_t>(ShaderBase::SharedLayoutKind::PushConstants);
+            const uint32_t count = item.size == 0 ? 1 : item.size;
+            const uint32_t num32 = isPushConstants ? item.size / 4 : 0;
+            AppendLayoutItem(
+                layout,
+                kind,
+                item.slot,
+                itemMeta[i].registerSpace,
+                count,
+                num32,
+                itemMeta[i].visibility);
+        }
     }
 
     for (uint32_t i = 0; staticSamplers && i < staticSamplerCount; ++i)
@@ -1770,8 +1890,94 @@ static void ApplyBindingLayout(
         def.addressW      = sampler.addressW;
         def.mips          = sampler.mips != 0;
         def.maxAnisotropy = sampler.maxAnisotropy;
-        shader->AddStaticSampler(def);
+        layout->staticSamplers.push_back(def);
     }
+}
+
+static void ApplyBindingLayouts(
+    ShaderBase* shader,
+    const uint64_t* layoutHandles,
+    uint32_t layoutHandleCount)
+{
+    if (!shader) return;
+
+    shader->ClearSharedLayout();
+    uint32_t nextBindlessLayoutIndex = 0;
+
+    for (uint32_t h = 0; layoutHandles && h < layoutHandleCount; ++h)
+    {
+        auto* layout = reinterpret_cast<NativeBindingLayoutResource*>(layoutHandles[h]);
+        if (!layout) continue;
+
+        std::map<uint32_t, uint32_t> bindlessIndexMap;
+        for (const auto& item : layout->items)
+        {
+            uint32_t bindlessLayoutIndex = ShaderBase::kInvalidAlloc;
+            if (IsBindlessLayoutKind(item.kind))
+            {
+                auto found = bindlessIndexMap.find(item.bindlessLayoutIndex);
+                if (found == bindlessIndexMap.end())
+                {
+                    found = bindlessIndexMap.emplace(
+                        item.bindlessLayoutIndex,
+                        nextBindlessLayoutIndex++).first;
+                }
+                bindlessLayoutIndex = found->second;
+            }
+
+            shader->AddSharedLayoutItem(
+                item.kind,
+                item.shaderRegister,
+                item.space,
+                item.count,
+                item.num32BitValues,
+                static_cast<uint32_t>(item.visibility),
+                bindlessLayoutIndex);
+        }
+
+        for (const auto& sampler : layout->staticSamplers)
+            shader->AddStaticSampler(sampler);
+    }
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateBindingLayout(
+    const NR_BindingLayoutDesc* layoutDescs,
+    uint32_t layoutDescCount,
+    const NR_BindingLayoutItem* layoutItems,
+    uint32_t layoutItemCount,
+    const NR_StaticSampler* staticSamplers,
+    uint32_t staticSamplerCount)
+{
+    auto* layout = new NativeBindingLayoutResource();
+    BuildBindingLayoutResource(layout,
+                               layoutDescs, layoutDescCount,
+                               layoutItems, layoutItemCount,
+                               nullptr, 0,
+                               staticSamplers, staticSamplerCount);
+    return reinterpret_cast<uint64_t>(layout);
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateBindlessLayout(
+    const NR_BindlessLayoutDesc* bindlessDescs,
+    uint32_t bindlessDescCount,
+    const NR_BindingLayoutItem* layoutItems,
+    uint32_t layoutItemCount)
+{
+    auto* layout = new NativeBindingLayoutResource();
+    BuildBindingLayoutResource(layout,
+                               nullptr, 0,
+                               layoutItems, layoutItemCount,
+                               bindlessDescs, bindlessDescCount,
+                               nullptr, 0);
+    return reinterpret_cast<uint64_t>(layout);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyBindingLayout(uint64_t handle)
+{
+    delete reinterpret_cast<NativeBindingLayoutResource*>(handle);
 }
 
 static void ApplyHitGroupAnyHitHints(
@@ -1796,10 +2002,8 @@ NR_CreateRayTraceShaderFromBytesEx(
     uint32_t flags,
     uint32_t maxPayloadSizeInBytes,
     const char* rayGenName,
-    const NR_BindingLayoutItem* layoutItems,
-    uint32_t layoutItemCount,
-    const NR_StaticSampler* staticSamplers,
-    uint32_t staticSamplerCount)
+    const uint64_t* layoutHandles,
+    uint32_t layoutHandleCount)
 {
     if (!s_RendererReady)
     {
@@ -1820,7 +2024,7 @@ NR_CreateRayTraceShaderFromBytesEx(
         dev5->Release();
         return 0;
     }
-    ApplyBindingLayout(shader, layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
+    ApplyBindingLayouts(shader, layoutHandles, layoutHandleCount);
     if (!shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes, rayGenName))
     {
         delete shader;
@@ -1840,10 +2044,8 @@ NR_CreateRayTracePipelineFromBlobsEx(
     uint32_t        flags,
     uint32_t        maxPayloadSizeInBytes,
     const char*     rayGenName,
-    const NR_BindingLayoutItem* layoutItems,
-    uint32_t        layoutItemCount,
-    const NR_StaticSampler* staticSamplers,
-    uint32_t        staticSamplerCount,
+    const uint64_t* layoutHandles,
+    uint32_t        layoutHandleCount,
     const uint8_t*  hitGroupAnyHit,
     uint32_t        hitGroupAnyHitCount)
 {
@@ -1878,7 +2080,7 @@ NR_CreateRayTracePipelineFromBlobsEx(
         dev5->Release();
         return 0;
     }
-    ApplyBindingLayout(shader, layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
+    ApplyBindingLayouts(shader, layoutHandles, layoutHandleCount);
     if (!shader->LoadShaderFromMultipleBlobs(descs.data(), blobCount, name, flags,
                                              maxPayloadSizeInBytes, rayGenName))
     {
@@ -1895,10 +2097,8 @@ NR_CreateComputeShaderEx(
     const uint8_t* dxilBytes,
     uint32_t size,
     const char* name,
-    const NR_BindingLayoutItem* layoutItems,
-    uint32_t layoutItemCount,
-    const NR_StaticSampler* staticSamplers,
-    uint32_t staticSamplerCount)
+    const uint64_t* layoutHandles,
+    uint32_t layoutHandleCount)
 {
     if (!s_RendererReady)
     {
@@ -1924,7 +2124,7 @@ NR_CreateComputeShaderEx(
         dev5->Release();
         return 0;
     }
-    ApplyBindingLayout(cs, layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
+    ApplyBindingLayouts(cs, layoutHandles, layoutHandleCount);
     if (!cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;
@@ -2190,10 +2390,8 @@ static uint64_t CreateRasterShaderImpl(
     const uint8_t* psDxil, uint32_t psSize,
     const RasterPipelineStateDesc* state,
     const char* name,
-    const NR_BindingLayoutItem* layoutItems,
-    uint32_t layoutItemCount,
-    const NR_StaticSampler* staticSamplers,
-    uint32_t staticSamplerCount)
+    const uint64_t* layoutHandles,
+    uint32_t layoutHandleCount)
 {
     if (!s_RendererReady)
     {
@@ -2224,7 +2422,7 @@ static uint64_t CreateRasterShaderImpl(
         dev5->Release();
         return 0;
     }
-    ApplyBindingLayout(rs, layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
+    ApplyBindingLayouts(rs, layoutHandles, layoutHandleCount);
     if (!rs->LoadShaderFromBlobs(vsDxil, vsSize, psDxil, psSize, *state, name))
     {
         delete rs;
@@ -2241,20 +2439,18 @@ NR_CreateRasterShader(const uint8_t* vsDxil, uint32_t vsSize,
                       const RasterPipelineStateDesc* state, const char* name)
 {
     return CreateRasterShaderImpl(vsDxil, vsSize, psDxil, psSize, state, name,
-                                  nullptr, 0, nullptr, 0);
+                                  nullptr, 0);
 }
 
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateRasterShaderEx(const uint8_t* vsDxil, uint32_t vsSize,
                         const uint8_t* psDxil, uint32_t psSize,
                         const RasterPipelineStateDesc* state, const char* name,
-                        const NR_BindingLayoutItem* layoutItems,
-                        uint32_t layoutItemCount,
-                        const NR_StaticSampler* staticSamplers,
-                        uint32_t staticSamplerCount)
+                        const uint64_t* layoutHandles,
+                        uint32_t layoutHandleCount)
 {
     return CreateRasterShaderImpl(vsDxil, vsSize, psDxil, psSize, state, name,
-                                  layoutItems, layoutItemCount, staticSamplers, staticSamplerCount);
+                                  layoutHandles, layoutHandleCount);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

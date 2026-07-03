@@ -1,5 +1,6 @@
 using System;
 using NativeRender;
+using static NativeRender.BindingLayoutItem;
 
 namespace PathTracing
 {
@@ -38,92 +39,94 @@ namespace PathTracing
 
         private static NativeBindingLayout CreateGlobalLayout(bool includeBindless)
         {
-            var l = new NativeBindingLayout()
-                .VolatileConstantBuffer(0)      // g_Const
-                .PushConstants(1, 16)           // g_MiniConst (SampleMiniConstants = 16 dwords)
-                .RayTracingAccelStruct(0)       // SceneBVH
-                .StructuredBufferSRV(1)         // t_SubInstanceData
-                .StructuredBufferSRV(2)         // t_InstanceData
-                .StructuredBufferSRV(3)         // t_GeometryData
-                .StructuredBufferSRV(4)         // t_GeometryDebugData
-                .StructuredBufferSRV(5)         // t_PTMaterialData
-                .TextureSRV(6)                  // t_LdrColorScratch
-                .TextureSRV(10)                 // t_EnvironmentMap
-                .TextureSRV(11)                 // t_EnvironmentMapImportanceMap (unused, kept for parity)
-                .StructuredBufferSRV(12)        // t_LightsCB
-                .StructuredBufferSRV(13)        // t_Lights
-                .StructuredBufferSRV(14)        // t_LightsEx
-                .StructuredBufferSRV(15)        // t_LightProxyCounters
-                .StructuredBufferSRV(16)        // t_LightProxyIndices
-                .StructuredBufferSRV(17)        // t_LightLocalSamplingBuffer
-                .TextureSRV(18)                 // t_EnvLookupMap
-                .TextureUAV(20)                 // u_LightFeedbackTotalWeight
-                .TextureUAV(21)                 // u_LightFeedbackCandidates
-                .Sampler(0)                     // s_MaterialSampler
-                .Sampler(1)                     // s_EnvironmentMapSampler
-                .Sampler(2)                     // s_EnvironmentMapImportanceSampler
-                .TextureUAV(0)                  // u_OutputColor
-                .TextureUAV(1)                  // u_ProcessedOutputColor
-                .TextureUAV(2)                  // u_PostTonemapOutputColor
-                .TextureUAV(4)                  // u_Throughput
-                .TextureUAV(5)                  // u_MotionVectors
-                .TextureUAV(6)                  // u_Depth
-                .TextureUAV(7)                  // u_SpecularHitT
-                .TextureUAV(8)                  // u_ScratchFloat1
-                .TextureUAV(31)                 // u_DenoiserViewspaceZ
-                .TextureUAV(32)                 // u_DenoiserMotionVectors
-                .TextureUAV(33)                 // u_DenoiserNormalRoughness
-                .TextureUAV(34)                 // u_DenoiserDiffRadianceHitDist
-                .TextureUAV(35)                 // u_DenoiserSpecRadianceHitDist
-                .TextureUAV(36)                 // u_DenoiserDisocclusionThresholdMix
-                .TextureUAV(37)                 // u_CombinedHistoryClampRelax
-                .StructuredBufferUAV(51)        // u_FeedbackBuffer
-                .StructuredBufferUAV(52)        // u_DebugLinesBuffer
-                .StructuredBufferUAV(53)        // u_DebugDeltaPathTree
-                .StructuredBufferUAV(54)        // u_DeltaPathSearchStack
-                .TextureUAV(60)                 // u_SecondarySurfacePositionNormal (ReSTIR GI)
-                .TextureUAV(61)                 // u_SecondarySurfaceRadiance (ReSTIR GI)
-                .TextureUAV(70)                 // u_RRDiffuseAlbedo
-                .TextureUAV(71)                 // u_RRSpecAlbedo
-                .TextureUAV(72)                 // u_RRNormalsAndRoughness
-                .TextureUAV(73)                 // u_RRSpecMotionVectors
-                .TextureUAV(74)                 // u_RRTransparencyLayer
-                .TextureUAV(75)                 // u_DenoisingAvgLayerRadiance
-                .StructuredBufferUAV(125)       // u_ShaderDebugBuffer (SHADER_DEBUG_BUFFER_UAV_INDEX)
-                .TextureUAV(126)                // u_ShaderDebugVizTextureBuffer (SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
+            var global = new BindingLayoutDesc(registerSpace: 0).AddItems(
+                VolatileConstantBuffer(0),      // g_Const
+                PushConstants(1, 16 * 4),       // g_MiniConst (SampleMiniConstants = 16 dwords)
+                RayTracingAccelStruct(0),       // SceneBVH
+                StructuredBuffer_SRV(1),        // t_SubInstanceData
+                StructuredBuffer_SRV(2),        // t_InstanceData
+                StructuredBuffer_SRV(3),        // t_GeometryData
+                StructuredBuffer_SRV(4),        // t_GeometryDebugData
+                StructuredBuffer_SRV(5),        // t_PTMaterialData
+                Texture_SRV(6),                 // t_LdrColorScratch
+                Texture_SRV(10),                // t_EnvironmentMap
+                Texture_SRV(11),                // t_EnvironmentMapImportanceMap (unused, kept for parity)
+                StructuredBuffer_SRV(12),       // t_LightsCB
+                StructuredBuffer_SRV(13),       // t_Lights
+                StructuredBuffer_SRV(14),       // t_LightsEx
+                StructuredBuffer_SRV(15),       // t_LightProxyCounters
+                StructuredBuffer_SRV(16),       // t_LightProxyIndices
+                StructuredBuffer_SRV(17),       // t_LightLocalSamplingBuffer
+                Texture_SRV(18),                // t_EnvLookupMap
+                Texture_UAV(20),                // u_LightFeedbackTotalWeight
+                Texture_UAV(21),                // u_LightFeedbackCandidates
+                Sampler(0),                     // s_MaterialSampler
+                Sampler(1),                     // s_EnvironmentMapSampler
+                Sampler(2),                     // s_EnvironmentMapImportanceSampler
+                Texture_UAV(0),                 // u_OutputColor
+                Texture_UAV(1),                 // u_ProcessedOutputColor
+                Texture_UAV(2),                 // u_PostTonemapOutputColor
+                Texture_UAV(4),                 // u_Throughput
+                Texture_UAV(5),                 // u_MotionVectors
+                Texture_UAV(6),                 // u_Depth
+                Texture_UAV(7),                 // u_SpecularHitT
+                Texture_UAV(8),                 // u_ScratchFloat1
+                Texture_UAV(31),                // u_DenoiserViewspaceZ
+                Texture_UAV(32),                // u_DenoiserMotionVectors
+                Texture_UAV(33),                // u_DenoiserNormalRoughness
+                Texture_UAV(34),                // u_DenoiserDiffRadianceHitDist
+                Texture_UAV(35),                // u_DenoiserSpecRadianceHitDist
+                Texture_UAV(36),                // u_DenoiserDisocclusionThresholdMix
+                Texture_UAV(37),                // u_CombinedHistoryClampRelax
+                StructuredBuffer_UAV(51),       // u_FeedbackBuffer
+                StructuredBuffer_UAV(52),       // u_DebugLinesBuffer
+                StructuredBuffer_UAV(53),       // u_DebugDeltaPathTree
+                StructuredBuffer_UAV(54),       // u_DeltaPathSearchStack
+                Texture_UAV(60),                // u_SecondarySurfacePositionNormal (ReSTIR GI)
+                Texture_UAV(61),                // u_SecondarySurfaceRadiance (ReSTIR GI)
+                Texture_UAV(70),                // u_RRDiffuseAlbedo
+                Texture_UAV(71),                // u_RRSpecAlbedo
+                Texture_UAV(72),                // u_RRNormalsAndRoughness
+                Texture_UAV(73),                // u_RRSpecMotionVectors
+                Texture_UAV(74),                // u_RRTransparencyLayer
+                Texture_UAV(75),                // u_DenoisingAvgLayerRadiance
+                StructuredBuffer_UAV(125),      // u_ShaderDebugBuffer (SHADER_DEBUG_BUFFER_UAV_INDEX)
+                Texture_UAV(126),               // u_ShaderDebugVizTextureBuffer (SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
                 // NV HLSL extension UAV — RTXPT appends it whenever NVAPI's
                 // HlslExtensionUAV feature is supported (always on the NVIDIA
                 // hardware both apps are compared on).
-                .StructuredBufferUAV(127)       // g_NvidiaExt (NV_SHADER_EXTN_SLOT)
+                StructuredBuffer_UAV(127),      // g_NvidiaExt (NV_SHADER_EXTN_SLOT)
                 // Stable planes — appended after the main list in Sample.cpp.
-                .TextureUAV(40)                 // u_StablePlanesHeader
-                .StructuredBufferUAV(42)        // u_StablePlanesBuffer
-                .TextureUAV(44)                 // u_StableRadiance
-                .StructuredBufferUAV(45)        // u_SurfaceData
+                Texture_UAV(40),                // u_StablePlanesHeader
+                StructuredBuffer_UAV(42),       // u_StablePlanesBuffer
+                Texture_UAV(44),                // u_StableRadiance
+                StructuredBuffer_UAV(45),       // u_SurfaceData
                 // GBuffer
-                .TextureUAV(100)                // u_BaseColor
-                .TextureUAV(101)                // u_SpecNormal
-                .TextureUAV(102)                // u_RoughnessMetal
-                .TextureUAV(103)                // u_MaterialInfo
-                .TextureUAV(10)                 // u_LocalCubemap
+                Texture_UAV(100),               // u_BaseColor
+                Texture_UAV(101),               // u_SpecNormal
+                Texture_UAV(102),               // u_RoughnessMetal
+                Texture_UAV(103),               // u_MaterialInfo
+                Texture_UAV(10),                // u_LocalCubemap
                 // Reflection system (IntroSample), placeholders in AdvancedSample
-                .TextureSRV(80)                 // t_LocalCubemapGGX
-                .TextureSRV(81)                 // t_DiffuseIrradianceCube
-                .TextureSRV(82)                 // t_SSRBlurChain
-                .TextureSRV(83)                 // t_BRDFLUT
-                .TextureSRV(84)                 // t_DepthHierarchy
-                .ConstantBuffer(10)             // ReflectionConstants (static CBV, lives in the table)
-                .TextureUAV(85)                 // u_SSRResult
-                .TextureSRV(86)                 // t_GTAOOutput
-                .TextureSRV(87);                // t_PrevDepth
+                Texture_SRV(80),                // t_LocalCubemapGGX
+                Texture_SRV(81),                // t_DiffuseIrradianceCube
+                Texture_SRV(82),                // t_SSRBlurChain
+                Texture_SRV(83),                // t_BRDFLUT
+                Texture_SRV(84),                // t_DepthHierarchy
+                ConstantBuffer(10),             // ReflectionConstants (static CBV, lives in the table)
+                Texture_UAV(85),                // u_SSRResult
+                Texture_SRV(86),                // t_GTAOOutput
+                Texture_SRV(87));               // t_PrevDepth
+
+            var l = new NativeBindingLayout(global);
             if (includeBindless)
             {
                 // Bindless layout — one root param with two unbounded ranges, both
                 // aliasing the same descriptor table (donut DescriptorTableManager).
-                // groupWithPrevious merges the second range into the first item's
-                // root parameter instead of giving it its own table.
-                l.BindlessSRV(space: 1)                                  // t_BindlessBuffers[]
-                 .BindlessSRV(space: 2, groupWithPrevious: true);        // t_BindlessTextures[]
+                l.AddBindlessLayout(new BindlessLayoutDesc(firstSlot: 0, maxCapacity: 1024)
+                    .AddRegisterSpaces(
+                        RawBuffer_SRV(1),                                // t_BindlessBuffers[]
+                        Texture_SRV(2)));                                // t_BindlessTextures[]
             }
             return l;
         }

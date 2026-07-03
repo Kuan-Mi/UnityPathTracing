@@ -60,7 +60,8 @@ public:
     void ClearSharedLayout();
     void AddSharedLayoutItem(SharedLayoutKind kind, uint32_t shaderRegister,
                              uint32_t space, uint32_t count, uint32_t num32BitValues,
-                             bool groupWithPrev = false);
+                             uint32_t visibility = D3D12_SHADER_VISIBILITY_ALL,
+                             uint32_t bindlessLayoutIndex = UINT32_MAX);
 
     struct SharedLayoutItem
     {
@@ -69,11 +70,12 @@ public:
         uint32_t space = 0;
         uint32_t count = 1;
         uint32_t num32BitValues = 0;
+        D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL;
         // Bindless items only: share the previous bindless item's root parameter
         // (one table, several unbounded ranges — the nvrhi bindless layout with
         // multiple registerSpaces, e.g. donut's shared descriptor table). When
         // false each bindless item gets its own root parameter/table.
-        bool     groupWithPrev = false;
+        uint32_t bindlessLayoutIndex = kInvalidAlloc;
         uint32_t tableOffset = 0;
         uint32_t rootParam = kInvalidAlloc;
     };
