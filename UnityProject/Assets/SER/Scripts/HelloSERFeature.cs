@@ -91,6 +91,7 @@ namespace SER
             private RTHandle _outputHandle;
             private int _outputWidth;
             private int _outputHeight;
+            private bool _accelBuilt;
             private bool _sbtBuiltOn;
             private bool _sbtBuiltOff;
 
@@ -159,7 +160,11 @@ namespace SER
 
                 cmd.BeginSample(data.Mode == ShaderMode.SEROn ? "HelloSER.Trace.ON" : "HelloSER.Trace.OFF");
 
-                data.Accel.BuildOrUpdate(cmd);
+                if (!_accelBuilt)
+                {
+                    data.Accel.BuildOrUpdate(cmd);
+                    _accelBuilt = true;
+                }
 
                 if (data.Mode == ShaderMode.SEROn)
                 {
@@ -317,6 +322,7 @@ namespace SER
                 _serOffPipeline = null;
                 _accel = null;
                 _rayGenConstantBuffer = null;
+                _accelBuilt = false;
 
                 if (_singleHitGroupVariant.IsCreated)
                     _singleHitGroupVariant.Dispose();
