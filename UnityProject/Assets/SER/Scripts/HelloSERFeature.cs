@@ -267,7 +267,10 @@ namespace SER
 
                 ReleaseOutput();
 
-                var desc = new RenderTextureDescriptor(width, height, GraphicsFormat.R16G16B16A16_SFloat, 0)
+                // Match the DirectX HelloSER sample's output format (R8G8B8A8_UNORM) for an
+                // apples-to-apples DispatchRays comparison; the SER image is barycentric colors
+                // in [0,1] + white, so 8-bit UNORM is visually sufficient.
+                var desc = new RenderTextureDescriptor(width, height, GraphicsFormat.R8G8B8A8_UNorm, 0)
                 {
                     enableRandomWrite = true,
                     useMipMap = false,

@@ -33,7 +33,7 @@ using namespace dx; // dx::HitObject and dx::MaybeReorderThread
 #define USE_VARYING_ARTIFICIAL_WORK
 
 // Number of iterations in the heavy artificial work loop
-#define WORK_LOOP_ITERATIONS_HEAVY 5000
+#define WORK_LOOP_ITERATIONS_HEAVY 50000
 
 // Number of iterations in the light artificial work loop
 #define WORK_LOOP_ITERATIONS_LIGHT 1000
