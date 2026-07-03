@@ -41,10 +41,14 @@ namespace PathTracing
             RayTraceShader buildStablePlanes,
             HitGroupShader[] buildHitGroups = null)
         {
+            // RTXPT parity: the PT pipeline is created against the shared global
+            // binding layout ({ m_bindingLayout, m_bindlessLayout } in Sample.cpp),
+            // so the native plugin emits the same root signature as the original.
             _buildSP = buildHitGroups is { Length: > 0 }
                 ? new RayTracePipeline(buildStablePlanes, buildHitGroups, MiniConstRootConstantsHints,
-                    hitGroupAnyHit: StaticSceneHitGroupAnyHit)
-                : new RayTracePipeline(buildStablePlanes, MiniConstRootConstantsHints);
+                    null, StaticSceneHitGroupAnyHit, RtxptBindings.GlobalLayout)
+                : new RayTracePipeline(buildStablePlanes, MiniConstRootConstantsHints,
+                    null, RtxptBindings.GlobalLayout);
             _buildDs = new NativeRayTraceDescriptorSet(_buildSP);
         }
 
@@ -132,6 +136,7 @@ namespace PathTracing
             ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
             ds.SetRootConstants("g_MiniConst", miniConst);
             ds.SetAccelerationStructure("SceneBVH", tlas);
+            RtxptBindings.BindGlobalSamplers(ds);
 
             ctx.GpuScene.BindToShader(ds);
             ds.SetTexture("t_EnvironmentMap", ctx.BakedEnvCubePtr);

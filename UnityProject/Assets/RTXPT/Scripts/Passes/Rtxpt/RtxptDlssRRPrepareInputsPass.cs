@@ -33,7 +33,9 @@ namespace PathTracing
 
         public RtxptDlssRRPrepareInputsPass(NativeComputeShader shader)
         {
-            _cs = new NativeComputePipeline(shader);
+            // RTXPT parity: PostProcess::Apply builds this PSO against the shared
+            // global layout only ({ m_bindingLayout }, no bindless).
+            _cs = new NativeComputePipeline(shader, RtxptBindings.GlobalLayoutNoBindless);
             _ds = new NativeComputeDescriptorSet(_cs);
         }
 
@@ -79,6 +81,7 @@ namespace PathTracing
             cmd.BeginSample("DLSSRR_PrepareInputs");
 
             ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
+            RtxptBindings.BindGlobalSamplers(ds);
 
             // Input UAVs
             ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);

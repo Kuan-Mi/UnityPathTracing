@@ -69,6 +69,18 @@ public:
     void AddSharedLayoutItem(SharedLayoutKind kind, uint32_t shaderRegister,
                              uint32_t space, uint32_t count, uint32_t num32BitValues);
 
+    struct SharedLayoutItem
+    {
+        SharedLayoutKind kind = SharedLayoutKind::SRV;
+        uint32_t shaderRegister = 0;
+        uint32_t space = 0;
+        uint32_t count = 1;
+        uint32_t num32BitValues = 0;
+        uint32_t tableOffset = 0;
+        uint32_t rootParam = kInvalidAlloc;
+    };
+    const std::vector<SharedLayoutItem>& GetSharedLayout() const { return m_sharedLayout; }
+
     // --- Binding metadata queries ---
     uint32_t    GetBindingCount() const;
     uint32_t    GetSlotIndex   (const char* name) const;
@@ -168,15 +180,5 @@ protected:
     std::unordered_set<std::string>              m_rootSRVHints;
     std::unordered_map<std::string, SamplerHint> m_samplerHints;
 
-    struct SharedLayoutItem
-    {
-        SharedLayoutKind kind = SharedLayoutKind::SRV;
-        uint32_t shaderRegister = 0;
-        uint32_t space = 0;
-        uint32_t count = 1;
-        uint32_t num32BitValues = 0;
-        uint32_t tableOffset = 0;
-        uint32_t rootParam = kInvalidAlloc;
-    };
     std::vector<SharedLayoutItem> m_sharedLayout;
 };

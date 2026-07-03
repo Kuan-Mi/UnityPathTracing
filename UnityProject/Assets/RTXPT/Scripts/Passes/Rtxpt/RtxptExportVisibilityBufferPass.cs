@@ -24,7 +24,9 @@ namespace PathTracing
 
         public RtxptExportVisibilityBufferPass(NativeComputeShader shader)
         {
-            _cs = new NativeComputePipeline(shader);
+            // RTXPT parity: CreatePTPipeline builds this PSO against
+            // { m_bindingLayout, m_bindlessLayout } (needs scene access).
+            _cs = new NativeComputePipeline(shader, RtxptBindings.GlobalLayout);
             _ds = new NativeComputeDescriptorSet(_cs);
         }
 
@@ -69,6 +71,7 @@ namespace PathTracing
             cmd.BeginSample("VBufferExport");
 
             ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
+            RtxptBindings.BindGlobalSamplers(ds);
             ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
             ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
             ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);

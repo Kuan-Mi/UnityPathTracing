@@ -60,9 +60,12 @@ namespace PathTracing
         private IntPtr _ptMaterialGpuBufPtr;
         private IntPtr _geomDebugGpuBufPtr;
 
-        // Bindless
-        private BindlessBuffer  _sceneBuffers;
-        private BindlessTexture _sceneTextures;
+        // Bindless — ONE descriptor table shared by t_BindlessBuffers (space1) and
+        // t_BindlessTextures (space2), mirroring RTXPT's donut DescriptorTableManager:
+        // both HLSL arrays alias the same table through two unbounded ranges in a
+        // single root parameter, so buffer and texture indices share one index space
+        // (textures [0, T), buffers [T, T+B); GeometryData buffer indices are rebased).
+        private BindlessTexture _sceneTable;
         private GraphicsBuffer  _mergedStaticVertexBuffer;
         private GraphicsBuffer  _mergedStaticIndexBuffer;
 
@@ -445,8 +448,9 @@ namespace PathTracing
             ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
-            ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
-            ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
+            // One unified table bound to both bindless arrays (see _sceneTable).
+            ds.SetBindlessTexture("t_BindlessBuffers", _sceneTable);
+            ds.SetBindlessTexture("t_BindlessTextures", _sceneTable);
         }
 
         /// <summary>Builds / updates the TLAS. Call inside a CommandBuffer recording.</summary>
@@ -521,10 +525,8 @@ namespace PathTracing
             _mergedStaticVertexBuffer = null;
             _mergedStaticIndexBuffer?.Release();
             _mergedStaticIndexBuffer = null;
-            _sceneBuffers?.Dispose();
-            _sceneBuffers = null;
-            _sceneTextures?.Dispose();
-            _sceneTextures  = null;
+            _sceneTable?.Dispose();
+            _sceneTable = null;
             _instanceCpu    = null;
             _geometryCpu    = null;
             _subInstanceCpu = null;
@@ -692,13 +694,27 @@ namespace PathTracing
                 texPtrs.Add(_pendingEnvMap.GetNativeTexturePtr());
             }
 
-            _sceneBuffers = new BindlessBuffer(Mathf.Max(bufPtrs.Count, 1));
-            for (int i = 0; i < bufPtrs.Count; i++)
-                _sceneBuffers.SetNativePtr(i, bufPtrs[i]);
+            // Unified bindless table (see _sceneTable): textures keep [0, T), buffers
+            // move to [T, T+B). The baked GeometryData buffer indices are rebased to
+            // the new positions; texture indices (materials, alpha test, env map)
+            // are unchanged. The native BindlessTexture writes raw ByteAddressBuffer
+            // SRVs for buffer resources, so one object serves both HLSL arrays.
+            int bufferIndexBase = texPtrs.Count;
+            for (int i = 0; i < geomList.Count; i++)
+            {
+                var g = geomList[i];
+                g.indexBufferIndex  += bufferIndexBase;
+                g.vertexBufferIndex += bufferIndexBase;
+                if (g.vertexBufferIndex > 0xFFFF)
+                    Debug.LogError($"[RtxptGPUScene] Bindless slot overflow after rebase: VB slot {g.vertexBufferIndex} exceeds 16-bit limit (65535). Rendering will be corrupted.");
+                geomList[i] = g;
+            }
 
-            _sceneTextures = new BindlessTexture(Mathf.Max(texPtrs.Count, 1));
+            _sceneTable = new BindlessTexture(Mathf.Max(bufferIndexBase + bufPtrs.Count, 1));
             for (int i = 0; i < texPtrs.Count; i++)
-                _sceneTextures.SetNativePtr(i, texPtrs[i]);
+                _sceneTable.SetNativePtr(i, texPtrs[i]);
+            for (int i = 0; i < bufPtrs.Count; i++)
+                _sceneTable.SetNativePtr(bufferIndexBase + i, bufPtrs[i]);
 
             if (instList.Count == 0)
             {

@@ -9,6 +9,7 @@
 #include "INativeResource.h"
 #include "TransientDescriptorRing.h"
 #include "PluginInternal.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstdarg>
 
@@ -200,29 +201,58 @@ bool DescriptorSetBase<ShaderT>::EnsureStagingHeap(uint32_t totalSlots, uint32_t
     m_stagingBase = m_stagingHeap->GetCPUDescriptorHandleForHeapStart();
     m_descSize    = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-    for (uint32_t i = 0; i < totalSlots; ++i)
-    {
+    auto slotAt = [&](uint32_t i) -> D3D12_CPU_DESCRIPTOR_HANDLE {
         D3D12_CPU_DESCRIPTOR_HANDLE h = m_stagingBase;
         h.ptr += static_cast<SIZE_T>(i) * m_descSize;
-        if (i < srvSlots)
+        return h;
+    };
+    auto writeNullSRV = [&](D3D12_CPU_DESCRIPTOR_HANDLE h) {
+        D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
+        s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
+        s.Format             = DXGI_FORMAT_R32_TYPELESS;
+        s.Buffer.Flags       = D3D12_BUFFER_SRV_FLAG_RAW;
+        s.Buffer.NumElements = 1;
+        m_device->CreateShaderResourceView(nullptr, &s, h);
+    };
+    auto writeNullUAV = [&](D3D12_CPU_DESCRIPTOR_HANDLE h) {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
+        u.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
+        u.Format             = DXGI_FORMAT_R32_TYPELESS;
+        u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
+        u.Buffer.NumElements = 1;
+        m_device->CreateUnorderedAccessView(nullptr, nullptr, &u, h);
+    };
+    auto writeNullCBV = [&](D3D12_CPU_DESCRIPTOR_HANDLE h) {
+        D3D12_CONSTANT_BUFFER_VIEW_DESC c = {};   // BufferLocation 0, SizeInBytes 0 = null CBV
+        m_device->CreateConstantBufferView(&c, h);
+    };
+
+    if (m_shader->UsesSharedLayout())
+    {
+        // Shared-layout combined table: slot kinds interleave per declaration
+        // order, so prefill each item's slots with the matching null view.
+        for (const auto& item : m_shader->GetSharedLayout())
         {
-            D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
-            s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
-            s.Format             = DXGI_FORMAT_R32_TYPELESS;
-            s.Buffer.Flags       = D3D12_BUFFER_SRV_FLAG_RAW;
-            s.Buffer.NumElements = 1;
-            m_device->CreateShaderResourceView(nullptr, &s, h);
+            using K = ShaderBase::SharedLayoutKind;
+            if (item.kind != K::SRV && item.kind != K::TLAS &&
+                item.kind != K::UAV && item.kind != K::CBV)
+                continue;
+            for (uint32_t k = 0; k < item.count && item.tableOffset + k < totalSlots; ++k)
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE h = slotAt(item.tableOffset + k);
+                if (item.kind == K::UAV)      writeNullUAV(h);
+                else if (item.kind == K::CBV) writeNullCBV(h);
+                else                          writeNullSRV(h);
+            }
         }
-        else
-        {
-            D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
-            u.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
-            u.Format             = DXGI_FORMAT_R32_TYPELESS;
-            u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
-            u.Buffer.NumElements = 1;
-            m_device->CreateUnorderedAccessView(nullptr, nullptr, &u, h);
-        }
+        return true;
+    }
+
+    for (uint32_t i = 0; i < totalSlots; ++i)
+    {
+        if (i < srvSlots) writeNullSRV(slotAt(i));
+        else              writeNullUAV(slotAt(i));
     }
     return true;
 }
@@ -251,11 +281,19 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
     const uint32_t total  = numSRV + numUAV;
     if (total == 0) return;
 
+    // Shared-layout mode uses ONE combined SRV/UAV/CBV table (nvrhi SRVetc):
+    // GetNumSRVSlots() covers the whole table, every table binding's heapOffset
+    // is absolute within it, and UAV/CBV slots share the SRV block/base.
+    const bool combined = m_shader->UsesSharedLayout();
+    if (combined) uavBase = srvBase;
+
     const bool staged = EnsureStagingHeap(total, numSRV);
 
     // Destination for an SRV-table / UAV-table slot. The staging layout mirrors
     // the transient block AllocateTransientTables hands out: SRV slots occupy
-    // [0, numSRV) and UAV slots [numSRV, total).
+    // [0, numSRV) and UAV slots [numSRV, total) — except in combined mode where
+    // offsets are already absolute within the single table.
+    const uint32_t uavStagingBias = combined ? 0 : numSRV;
     auto srvDest = [&](uint32_t off) -> D3D12_CPU_DESCRIPTOR_HANDLE {
         if (!staged) return m_allocator->GetCPUHandle(srvBase + off);
         D3D12_CPU_DESCRIPTOR_HANDLE h = m_stagingBase;
@@ -265,7 +303,7 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
     auto uavDest = [&](uint32_t off) -> D3D12_CPU_DESCRIPTOR_HANDLE {
         if (!staged) return m_allocator->GetCPUHandle(uavBase + off);
         D3D12_CPU_DESCRIPTOR_HANDLE h = m_stagingBase;
-        h.ptr += static_cast<SIZE_T>(numSRV + off) * m_descSize;
+        h.ptr += static_cast<SIZE_T>(uavStagingBias + off) * m_descSize;
         return h;
     };
 
@@ -600,6 +638,51 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                 cv.format = 0;
                 cv.valid  = staged;
             }
+        }
+    }
+
+    // --- Static (table) CBVs — shared-layout mode only ---
+    // Volatile CBVs stay root-bound in BindRootParams; a static CBV occupies a
+    // slot in the combined table (nvrhi ConstantBuffer), so its view is written
+    // here. CBV size comes from the resource width (256-aligned, D3D12 caps a
+    // CBV at 65536 bytes); slots carry no explicit size.
+    if (combined && srvBase != kInvalidAlloc)
+    {
+        for (uint32_t i : m_idxCBV)
+        {
+            const auto& b = bindings[i];
+            if (b.rootParam != kInvalidAlloc)
+                continue;   // volatile CBV → root descriptor
+            const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
+
+            D3D12_GPU_VIRTUAL_ADDRESS va = 0;
+            uint64_t width = 0;
+            ID3D12Resource* res = nullptr;
+            if (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
+                res = reinterpret_cast<INativeResource*>(slot.objectPtr)->GetResource();
+            else
+                res = ResolveBoundResource(slot);
+            if (res)
+            {
+                va    = res->GetGPUVirtualAddress();
+                width = res->GetDesc().Width;
+            }
+            const uint32_t sizeBytes = static_cast<uint32_t>(
+                (std::min<uint64_t>)(((width + 255ull) & ~255ull), 65536ull));
+
+            CachedView& cv = m_viewCache[i];
+            if (staged && cv.valid && cv.res == va && cv.count == sizeBytes)
+                continue;
+
+            D3D12_CONSTANT_BUFFER_VIEW_DESC c = {};
+            c.BufferLocation = va;
+            c.SizeInBytes    = va ? sizeBytes : 0;
+            m_device->CreateConstantBufferView(&c, srvDest(b.heapOffset));
+            cv.res    = va;
+            cv.count  = sizeBytes;
+            cv.stride = 0;
+            cv.format = 0;
+            cv.valid  = staged;
         }
     }
 
@@ -1040,52 +1123,86 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
     if (rootParamSampler != kInvalidAlloc && samplerBase != kInvalidAlloc && g_samplerHeapAllocator)
         SetTable(rootParamSampler, g_samplerHeapAllocator->GetGPUHandle(samplerBase));
 
-    // SRV_ARRAY bindings — each has its own root parameter
+    // Bindless (*_ARRAY) bindings. In shared-layout mode a consecutive run of
+    // bindless items shares ONE root parameter (one table, several unbounded
+    // ranges all at offset 0 — nvrhi bindless layout), so every binding in the
+    // group must resolve to the same descriptor-table base. Set each param
+    // once and flag disagreements instead of silently letting the last win.
+    UINT     setParams[8];
+    uint64_t setHandles[8];
+    uint32_t numSetParams = 0;
+    auto SetTableOnce = [&](UINT p, D3D12_GPU_DESCRIPTOR_HANDLE h, const char* bindingName) {
+        for (uint32_t k = 0; k < numSetParams; ++k)
+        {
+            if (setParams[k] != p) continue;
+            if (setHandles[k] != h.ptr)
+                Logf(kUnityLogTypeError,
+                     "DescriptorSet [%s]: grouped bindless binding '%s' resolves to a "
+                     "different descriptor table than its group — all bindings sharing "
+                     "one bindless root param must use the same table",
+                     m_shader->GetName(), bindingName);
+            return;
+        }
+        SetTable(p, h);
+        if (numSetParams < 8)
+        {
+            setParams[numSetParams]  = p;
+            setHandles[numSetParams] = h.ptr;
+            ++numSetParams;
+        }
+    };
+
     for (uint32_t i : m_idxSRVArray)
     {
         const auto& b = bindings[i];
         if (b.rootParam == kInvalidAlloc) continue;
         const BindingSlot slot = slotOf(i);
         if (slot.objectKind == BindingObjectKind::BindlessTexture && slot.objectPtr)
-            SetTable(b.rootParam,
-                reinterpret_cast<BindlessTexture*>(slot.objectPtr)->GetGPUHandle());
+            SetTableOnce(b.rootParam,
+                reinterpret_cast<BindlessTexture*>(slot.objectPtr)->GetGPUHandle(), b.name.c_str());
         else if (slot.objectKind == BindingObjectKind::BindlessBuffer && slot.objectPtr)
-            SetTable(b.rootParam,
-                reinterpret_cast<BindlessBuffer*>(slot.objectPtr)->GetGPUHandle());
+            SetTableOnce(b.rootParam,
+                reinterpret_cast<BindlessBuffer*>(slot.objectPtr)->GetGPUHandle(), b.name.c_str());
     }
 
-    // UAV_ARRAY bindings — each has its own root parameter
     for (uint32_t i : m_idxUAVArray)
     {
         const auto& b = bindings[i];
         if (b.rootParam == kInvalidAlloc) continue;
         const BindingSlot slot = slotOf(i);
         if (slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
-            SetTable(b.rootParam,
-                reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr)->GetGPUHandle());
+            SetTableOnce(b.rootParam,
+                reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr)->GetGPUHandle(), b.name.c_str());
     }
 
-    // Root CBV per CBV binding
-    if (rootParamCBVBase != kInvalidAlloc)
+    // Root CBVs. Shared-layout mode: each volatile CBV carries its own root
+    // param on the binding (static CBVs live in the combined table and were
+    // written by WriteDescriptors). Legacy mode: params are contiguous from
+    // rootParamCBVBase, indexed by heapOffset.
+    auto resolveCbvVA = [&](const BindingSlot& slot) -> D3D12_GPU_VIRTUAL_ADDRESS {
+        // A NativeBuffer resolves its own VA: volatile buffers have no resource
+        // and return the current upload-pool suballocation's address; everything
+        // else binds the raw resource's base VA.
+        if (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
+            return reinterpret_cast<INativeResource*>(slot.objectPtr)->GetGpuVirtualAddress();
+        ID3D12Resource* res = ResolveBoundResource(slot);
+        return res ? res->GetGPUVirtualAddress() : 0;
+    };
+    if (m_shader->UsesSharedLayout())
     {
         for (uint32_t i : m_idxCBV)
         {
             const auto& b = bindings[i];
-            const BindingSlot slot = slotOf(i);
-            // A NativeBuffer resolves its own VA: volatile buffers have no resource
-            // and return the current upload-pool suballocation's address; everything
-            // else binds the raw resource's base VA.
-            D3D12_GPU_VIRTUAL_ADDRESS addr = 0;
-            if (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
-            {
-                addr = reinterpret_cast<INativeResource*>(slot.objectPtr)->GetGpuVirtualAddress();
-            }
-            else
-            {
-                ID3D12Resource* res = ResolveBoundResource(slot);
-                addr = res ? res->GetGPUVirtualAddress() : 0;
-            }
-            SetCBV(rootParamCBVBase + b.heapOffset, addr);
+            if (b.rootParam == kInvalidAlloc) continue;   // table CBV
+            SetCBV(b.rootParam, resolveCbvVA(slotOf(i)));
+        }
+    }
+    else if (rootParamCBVBase != kInvalidAlloc)
+    {
+        for (uint32_t i : m_idxCBV)
+        {
+            const auto& b = bindings[i];
+            SetCBV(rootParamCBVBase + b.heapOffset, resolveCbvVA(slotOf(i)));
         }
     }
 

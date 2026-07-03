@@ -45,7 +45,10 @@ namespace PathTracing
         public RtxptDenoisingGuidesBakePass(NativeComputeShader shader)
         {
             // Root-constant hints (g_denoisingConstants) live on the .computeshader asset (the importer).
-            _cs     = new NativeComputePipeline(shader);
+            // RTXPT parity: DenoisingGuidesBaker builds its PSOs against the shared global
+            // layout only ({ m_bindingLayout }, no bindless); g_denoisingConstants (b1)
+            // rides the same push-constants root param as g_MiniConst.
+            _cs     = new NativeComputePipeline(shader, RtxptBindings.GlobalLayoutNoBindless);
             _pingDs = new NativeComputeDescriptorSet(_cs);
             _pongDs = new NativeComputeDescriptorSet(_cs);
         }
@@ -125,6 +128,7 @@ namespace PathTracing
                 Ping        = ping,
             };
             ds.SetRootConstants("g_denoisingConstants", &cb);
+            RtxptBindings.BindGlobalSamplers(ds);
 
             ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
             ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);

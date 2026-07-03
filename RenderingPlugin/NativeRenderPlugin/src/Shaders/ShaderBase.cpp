@@ -241,50 +241,76 @@ void ShaderBase::AssignHeapOffsets()
 
 // ===========================================================================
 // BuildSharedRootSignature
-//   Explicit-layout mode, modelled after RTXPT/NVRHI's shared BindingLayout idea:
-//   multiple shaders may declare the same global register layout, while reflection
-//   still supplies the per-shader binding names used by C# descriptor sets.
+//   Explicit-layout mode, replicating nvrhi::d3d12::BindingLayout /
+//   Device::buildRootSignature (RTXPT) exactly, so Unity pipelines produce
+//   GPU-identical root signatures to the reference app:
+//     [push constants] [volatile-CBV root descriptors (DATA_STATIC)]
+//     [sampler table] [one combined SRV/UAV/static-CBV table]
+//     [bindless table per consecutive Bindless* run, unbounded ranges]
+//   Ranges in the combined table follow declaration order; adjacent registers
+//   of the same range class merge into one range (nvrhi
+//   AreResourceTypesCompatible collapses to range-class equality).
+//   RootSRV is a plugin extension (nvrhi has none): root descriptors placed
+//   after the volatile CBVs. Reflection still supplies per-shader binding
+//   names used by C# descriptor sets.
 // ===========================================================================
 bool ShaderBase::BuildSharedRootSignature()
 {
     if (m_sharedLayout.empty())
         return BuildRootSignature();
 
-    auto IsSrvLike = [](SharedLayoutKind k) {
-        return k == SharedLayoutKind::SRV || k == SharedLayoutKind::TLAS;
+    // Rebuild-safe: all layout-derived state is recomputed below.
+    m_rootParamSRV         = kInvalidAlloc;
+    m_rootParamUAV         = kInvalidAlloc;
+    m_rootParamSampler     = kInvalidAlloc;
+    m_rootParamCBVBase     = kInvalidAlloc;
+    m_rootParamRootSRVBase = kInvalidAlloc;
+
+    // Range class in the combined CBV_SRV_UAV table (nvrhi's SRVetc table).
+    enum class RangeClass : uint32_t { SRV, UAV, CBV, Sampler, None };
+    auto ClassOf = [](SharedLayoutKind k) {
+        switch (k)
+        {
+        case SharedLayoutKind::SRV:
+        case SharedLayoutKind::TLAS:    return RangeClass::SRV;
+        case SharedLayoutKind::UAV:     return RangeClass::UAV;
+        case SharedLayoutKind::CBV:     return RangeClass::CBV;
+        case SharedLayoutKind::Sampler: return RangeClass::Sampler;
+        default:                        return RangeClass::None;
+        }
     };
-    auto IsUavLike = [](SharedLayoutKind k) {
-        return k == SharedLayoutKind::UAV;
-    };
-    auto IsSamplerLike = [](SharedLayoutKind k) {
-        return k == SharedLayoutKind::Sampler;
-    };
+    // Register-range containment for table kinds; exact match for root-bound
+    // kinds (PushConstants count encodes the byte size, not a register span).
     auto BindingMatches = [&](const Binding& b, const SharedLayoutItem& item) {
-        if (b.registerIndex != item.shaderRegister || b.space != item.space)
-            return false;
+        const bool exact     = b.registerIndex == item.shaderRegister && b.space == item.space;
+        const bool contained = b.space == item.space &&
+                               b.registerIndex >= item.shaderRegister &&
+                               b.registerIndex <  item.shaderRegister + item.count;
         switch (b.type)
         {
         case BindingType::SRV:
-            return item.kind == SharedLayoutKind::SRV || item.kind == SharedLayoutKind::RootSRV;
+            return (item.kind == SharedLayoutKind::SRV && contained) ||
+                   (item.kind == SharedLayoutKind::RootSRV && exact);
         case BindingType::TLAS:
-            return item.kind == SharedLayoutKind::TLAS || item.kind == SharedLayoutKind::SRV ||
-                   item.kind == SharedLayoutKind::RootSRV;
+            return ((item.kind == SharedLayoutKind::TLAS ||
+                     item.kind == SharedLayoutKind::SRV) && contained) ||
+                   (item.kind == SharedLayoutKind::RootSRV && exact);
         case BindingType::UAV:
-            return item.kind == SharedLayoutKind::UAV;
+            return item.kind == SharedLayoutKind::UAV && contained;
         case BindingType::CBV:
-            return item.kind == SharedLayoutKind::CBV ||
-                   item.kind == SharedLayoutKind::VolatileCBV ||
-                   item.kind == SharedLayoutKind::PushConstants;
+            return (item.kind == SharedLayoutKind::CBV && contained) ||
+                   ((item.kind == SharedLayoutKind::VolatileCBV ||
+                     item.kind == SharedLayoutKind::PushConstants) && exact);
         case BindingType::ROOT_CONSTANTS:
-            return item.kind == SharedLayoutKind::PushConstants;
+            return item.kind == SharedLayoutKind::PushConstants && exact;
         case BindingType::ROOT_SRV:
-            return item.kind == SharedLayoutKind::RootSRV;
+            return item.kind == SharedLayoutKind::RootSRV && exact;
         case BindingType::SRV_ARRAY:
-            return item.kind == SharedLayoutKind::BindlessSRV;
+            return item.kind == SharedLayoutKind::BindlessSRV && exact;
         case BindingType::UAV_ARRAY:
-            return item.kind == SharedLayoutKind::BindlessUAV;
+            return item.kind == SharedLayoutKind::BindlessUAV && exact;
         case BindingType::SAMPLER:
-            return item.kind == SharedLayoutKind::Sampler;
+            return item.kind == SharedLayoutKind::Sampler && contained;
         default:
             return false;
         }
@@ -305,85 +331,121 @@ bool ShaderBase::BuildSharedRootSignature()
                m_name.c_str(), static_cast<uint32_t>(m_bindings.size()),
                static_cast<uint32_t>(m_sharedLayout.size()));
 
-    std::vector<D3D12_DESCRIPTOR_RANGE1> srvRanges;
-    std::vector<D3D12_DESCRIPTOR_RANGE1> uavRanges;
+    // --- Build descriptor ranges (nvrhi::d3d12::BindingLayout ctor) ---
+    std::vector<D3D12_DESCRIPTOR_RANGE1> srvEtcRanges;   // combined SRV/UAV/CBV table
     std::vector<D3D12_DESCRIPTOR_RANGE1> samplerRanges;
     std::vector<D3D12_DESCRIPTOR_RANGE1> bindlessRanges;
-    srvRanges.reserve(m_sharedLayout.size());
-    uavRanges.reserve(m_sharedLayout.size());
+    srvEtcRanges.reserve(m_sharedLayout.size());
     samplerRanges.reserve(m_sharedLayout.size());
     bindlessRanges.reserve(m_sharedLayout.size());
 
-    uint32_t srvSlots = 0;
-    uint32_t uavSlots = 0;
-    uint32_t samplerSlots = 0;
-    uint32_t cbvRootCount = 0;
-    uint32_t rootSrvCount = 0;
+    // Bindless groups: a run of consecutive Bindless* items maps to ONE root
+    // parameter whose table holds one unbounded range per item (nvrhi bindless
+    // layout with several registerSpaces). first = index into bindlessRanges.
+    struct BindlessGroup { uint32_t first, count; };
+    std::vector<BindlessGroup> bindlessGroups;
+    std::vector<uint32_t> bindlessGroupOfItem(m_sharedLayout.size(), kInvalidAlloc);
 
-    for (auto& item : m_sharedLayout)
+    uint32_t srvEtcSlots  = 0;
+    uint32_t samplerSlots = 0;
+
+    RangeClass prevClass  = RangeClass::None;
+    uint32_t prevEndReg   = 0;    // one past the last register of the previous table item
+    uint32_t prevSpace    = ~0u;
+    bool prevWasBindless  = false;
+
+    for (size_t itemIdx = 0; itemIdx < m_sharedLayout.size(); ++itemIdx)
     {
-        if (IsSrvLike(item.kind))
+        auto& item = m_sharedLayout[itemIdx];
+        const RangeClass cls = ClassOf(item.kind);
+
+        if (item.kind == SharedLayoutKind::BindlessSRV ||
+            item.kind == SharedLayoutKind::BindlessUAV)
         {
-            item.tableOffset = srvSlots;
-            D3D12_DESCRIPTOR_RANGE1 r = {};
-            r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-            r.NumDescriptors                    = item.count;
-            r.BaseShaderRegister                = item.shaderRegister;
-            r.RegisterSpace                     = item.space;
-            r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
-                                                  D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
-            r.OffsetInDescriptorsFromTableStart = item.tableOffset;
-            srvRanges.push_back(r);
-            srvSlots += item.count;
-        }
-        else if (IsUavLike(item.kind))
-        {
-            item.tableOffset = uavSlots;
-            D3D12_DESCRIPTOR_RANGE1 r = {};
-            r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-            r.NumDescriptors                    = item.count;
-            r.BaseShaderRegister                = item.shaderRegister;
-            r.RegisterSpace                     = item.space;
-            r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
-                                                  D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
-            r.OffsetInDescriptorsFromTableStart = item.tableOffset;
-            uavRanges.push_back(r);
-            uavSlots += item.count;
-        }
-        else if (IsSamplerLike(item.kind))
-        {
-            item.tableOffset = samplerSlots;
-            D3D12_DESCRIPTOR_RANGE1 r = {};
-            r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-            r.NumDescriptors                    = item.count;
-            r.BaseShaderRegister                = item.shaderRegister;
-            r.RegisterSpace                     = item.space;
-            r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
-            r.OffsetInDescriptorsFromTableStart = item.tableOffset;
-            samplerRanges.push_back(r);
-            samplerSlots += item.count;
-        }
-        else if (item.kind == SharedLayoutKind::BindlessSRV ||
-                 item.kind == SharedLayoutKind::BindlessUAV)
-        {
+            if (!prevWasBindless)
+                bindlessGroups.push_back({ static_cast<uint32_t>(bindlessRanges.size()), 0 });
+            bindlessGroupOfItem[itemIdx] = static_cast<uint32_t>(bindlessGroups.size() - 1);
+            ++bindlessGroups.back().count;
+
             D3D12_DESCRIPTOR_RANGE1 r = {};
             r.RangeType                         = (item.kind == SharedLayoutKind::BindlessSRV)
                                                 ? D3D12_DESCRIPTOR_RANGE_TYPE_SRV
                                                 : D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-            r.NumDescriptors                    = UINT_MAX;
+            r.NumDescriptors                    = UINT_MAX;    // unbounded
             r.BaseShaderRegister                = item.shaderRegister;
             r.RegisterSpace                     = item.space;
-            r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
-                                                  D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+            r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
             r.OffsetInDescriptorsFromTableStart = 0;
             bindlessRanges.push_back(r);
+
+            prevWasBindless = true;
+            prevClass = RangeClass::None;
+            continue;
+        }
+        prevWasBindless = false;
+
+        if (cls == RangeClass::Sampler)
+        {
+            item.tableOffset = samplerSlots;
+            if (prevClass == RangeClass::Sampler && item.space == prevSpace &&
+                item.shaderRegister == prevEndReg && !samplerRanges.empty())
+            {
+                samplerRanges.back().NumDescriptors += item.count;
+            }
+            else
+            {
+                D3D12_DESCRIPTOR_RANGE1 r = {};
+                r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+                r.NumDescriptors                    = item.count;
+                r.BaseShaderRegister                = item.shaderRegister;
+                r.RegisterSpace                     = item.space;
+                r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+                r.OffsetInDescriptorsFromTableStart = item.tableOffset;
+                samplerRanges.push_back(r);
+            }
+            samplerSlots += item.count;
+            prevClass  = cls;
+            prevEndReg = item.shaderRegister + item.count;
+            prevSpace  = item.space;
+        }
+        else if (cls == RangeClass::SRV || cls == RangeClass::UAV || cls == RangeClass::CBV)
+        {
+            item.tableOffset = srvEtcSlots;
+            if (cls == prevClass && item.space == prevSpace &&
+                item.shaderRegister == prevEndReg && !srvEtcRanges.empty())
+            {
+                srvEtcRanges.back().NumDescriptors += item.count;
+            }
+            else
+            {
+                D3D12_DESCRIPTOR_RANGE1 r = {};
+                r.RangeType = (cls == RangeClass::SRV) ? D3D12_DESCRIPTOR_RANGE_TYPE_SRV
+                            : (cls == RangeClass::UAV) ? D3D12_DESCRIPTOR_RANGE_TYPE_UAV
+                                                       : D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+                r.NumDescriptors                    = item.count;
+                r.BaseShaderRegister                = item.shaderRegister;
+                r.RegisterSpace                     = item.space;
+                r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+                r.OffsetInDescriptorsFromTableStart = item.tableOffset;
+                srvEtcRanges.push_back(r);
+            }
+            srvEtcSlots += item.count;
+            prevClass  = cls;
+            prevEndReg = item.shaderRegister + item.count;
+            prevSpace  = item.space;
+        }
+        else
+        {
+            // Root-bound kinds don't participate in table-range merging.
+            prevClass = RangeClass::None;
         }
     }
 
+    // --- Assemble root parameters in nvrhi order ---
     std::vector<D3D12_ROOT_PARAMETER1> params;
-    params.reserve(m_sharedLayout.size() + 2);
+    params.reserve(m_sharedLayout.size() + 3);
 
-    // Push constants first, then root CBVs, then root SRVs, then descriptor tables.
+    // 1) Push constants
     for (auto& item : m_sharedLayout)
     {
         if (item.kind != SharedLayoutKind::PushConstants) continue;
@@ -399,30 +461,31 @@ bool ShaderBase::BuildSharedRootSignature()
         params.push_back(p);
     }
 
+    // 2) Volatile CBVs — root descriptors, DATA_STATIC (nvrhi: the versioned
+    //    upload allocation is immutable once bound; our VolatileConstantBuffer
+    //    follows the same write-then-bind discipline).
     for (auto& item : m_sharedLayout)
     {
-        if (item.kind != SharedLayoutKind::CBV && item.kind != SharedLayoutKind::VolatileCBV)
-            continue;
+        if (item.kind != SharedLayoutKind::VolatileCBV) continue;
         if (m_rootParamCBVBase == kInvalidAlloc)
             m_rootParamCBVBase = static_cast<uint32_t>(params.size());
         item.rootParam = static_cast<uint32_t>(params.size());
-        item.tableOffset = cbvRootCount++;
         D3D12_ROOT_PARAMETER1 p = {};
         p.ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
         p.Descriptor.ShaderRegister = item.shaderRegister;
         p.Descriptor.RegisterSpace  = item.space;
-        p.Descriptor.Flags          = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
+        p.Descriptor.Flags          = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
         p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
         params.push_back(p);
     }
 
+    // 3) Root SRVs (plugin extension, absent from RTXPT layouts)
     for (auto& item : m_sharedLayout)
     {
         if (item.kind != SharedLayoutKind::RootSRV) continue;
         if (m_rootParamRootSRVBase == kInvalidAlloc)
             m_rootParamRootSRVBase = static_cast<uint32_t>(params.size());
         item.rootParam = static_cast<uint32_t>(params.size());
-        item.tableOffset = rootSrvCount++;
         D3D12_ROOT_PARAMETER1 p = {};
         p.ParameterType             = D3D12_ROOT_PARAMETER_TYPE_SRV;
         p.Descriptor.ShaderRegister = item.shaderRegister;
@@ -432,28 +495,7 @@ bool ShaderBase::BuildSharedRootSignature()
         params.push_back(p);
     }
 
-    if (!srvRanges.empty())
-    {
-        m_rootParamSRV = static_cast<uint32_t>(params.size());
-        D3D12_ROOT_PARAMETER1 p = {};
-        p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        p.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(srvRanges.size());
-        p.DescriptorTable.pDescriptorRanges   = srvRanges.data();
-        p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
-        params.push_back(p);
-    }
-
-    if (!uavRanges.empty())
-    {
-        m_rootParamUAV = static_cast<uint32_t>(params.size());
-        D3D12_ROOT_PARAMETER1 p = {};
-        p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        p.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(uavRanges.size());
-        p.DescriptorTable.pDescriptorRanges   = uavRanges.data();
-        p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
-        params.push_back(p);
-    }
-
+    // 4) Sampler table (nvrhi puts it before the SRVetc table)
     if (!samplerRanges.empty())
     {
         m_rootParamSampler = static_cast<uint32_t>(params.size());
@@ -465,19 +507,37 @@ bool ShaderBase::BuildSharedRootSignature()
         params.push_back(p);
     }
 
-    uint32_t bindlessRangeIndex = 0;
-    for (auto& item : m_sharedLayout)
+    // 5) Combined SRV/UAV/static-CBV table. m_rootParamSRV doubles as "the"
+    //    table param in shared mode; m_rootParamUAV stays invalid so the
+    //    descriptor sets bind exactly one table.
+    if (!srvEtcRanges.empty())
     {
-        if (item.kind != SharedLayoutKind::BindlessSRV &&
-            item.kind != SharedLayoutKind::BindlessUAV)
-            continue;
-        item.rootParam = static_cast<uint32_t>(params.size());
+        m_rootParamSRV = static_cast<uint32_t>(params.size());
         D3D12_ROOT_PARAMETER1 p = {};
         p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        p.DescriptorTable.NumDescriptorRanges = 1;
-        p.DescriptorTable.pDescriptorRanges   = &bindlessRanges[bindlessRangeIndex++];
+        p.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(srvEtcRanges.size());
+        p.DescriptorTable.pDescriptorRanges   = srvEtcRanges.data();
         p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
         params.push_back(p);
+    }
+
+    // 6) Bindless groups — one root param per consecutive run of Bindless items
+    //    (nvrhi appends each bindless layout as one table of unbounded ranges).
+    {
+        std::vector<uint32_t> groupRootParam(bindlessGroups.size(), kInvalidAlloc);
+        for (size_t g = 0; g < bindlessGroups.size(); ++g)
+        {
+            groupRootParam[g] = static_cast<uint32_t>(params.size());
+            D3D12_ROOT_PARAMETER1 p = {};
+            p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+            p.DescriptorTable.NumDescriptorRanges = bindlessGroups[g].count;
+            p.DescriptorTable.pDescriptorRanges   = &bindlessRanges[bindlessGroups[g].first];
+            p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
+            params.push_back(p);
+        }
+        for (size_t itemIdx = 0; itemIdx < m_sharedLayout.size(); ++itemIdx)
+            if (bindlessGroupOfItem[itemIdx] != kInvalidAlloc)
+                m_sharedLayout[itemIdx].rootParam = groupRootParam[bindlessGroupOfItem[itemIdx]];
     }
 
     bool ok = true;
@@ -503,6 +563,9 @@ bool ShaderBase::BuildSharedRootSignature()
             continue;
         }
 
+        // Offset of this register within the (possibly multi-register) item.
+        const uint32_t regInItem = b.registerIndex - match->shaderRegister;
+
         if (match->kind == SharedLayoutKind::PushConstants)
         {
             b.type           = BindingType::ROOT_CONSTANTS;
@@ -515,13 +578,22 @@ bool ShaderBase::BuildSharedRootSignature()
         {
             b.type       = BindingType::ROOT_SRV;
             b.rootParam  = match->rootParam;
-            b.heapOffset = match->tableOffset;
+            b.heapOffset = 0;
         }
-        else if (match->kind == SharedLayoutKind::CBV || match->kind == SharedLayoutKind::VolatileCBV)
+        else if (match->kind == SharedLayoutKind::VolatileCBV)
         {
+            // Root CBV — bound by GPU VA via its own root parameter.
             b.type       = BindingType::CBV;
             b.rootParam  = match->rootParam;
-            b.heapOffset = match->tableOffset;
+            b.heapOffset = 0;
+        }
+        else if (match->kind == SharedLayoutKind::CBV)
+        {
+            // Static CBV — occupies a slot in the combined table (nvrhi
+            // ConstantBuffer); rootParam stays invalid to mark table residency.
+            b.type       = BindingType::CBV;
+            b.rootParam  = kInvalidAlloc;
+            b.heapOffset = match->tableOffset + regInItem;
         }
         else if (match->kind == SharedLayoutKind::BindlessSRV)
         {
@@ -536,12 +608,13 @@ bool ShaderBase::BuildSharedRootSignature()
         else if (match->kind == SharedLayoutKind::Sampler)
         {
             b.type       = BindingType::SAMPLER;
-            b.heapOffset = match->tableOffset;
+            b.heapOffset = match->tableOffset + regInItem;
             b.rootParam  = kInvalidAlloc;
         }
         else
         {
-            b.heapOffset = match->tableOffset;
+            // SRV / TLAS / UAV — combined-table slot, offset absolute in table.
+            b.heapOffset = match->tableOffset + regInItem;
             b.rootParam  = kInvalidAlloc;
         }
     }
@@ -564,8 +637,11 @@ bool ShaderBase::BuildSharedRootSignature()
         case BindingType::SAMPLER: ++m_numSampler; break;
         }
     }
-    m_numSRVSlots = srvSlots;
-    m_numUAVSlots = uavSlots;
+    // The combined table is exposed through the "SRV slots" total: descriptor
+    // sets allocate/copy one contiguous block for the whole SRV/UAV/CBV table
+    // and bind it via m_rootParamSRV. UAV slots stay 0 in shared mode.
+    m_numSRVSlots = srvEtcSlots;
+    m_numUAVSlots = 0;
     m_numSamplerSlots = samplerSlots;
 
     std::vector<D3D12_STATIC_SAMPLER_DESC> staticSamplers;
@@ -653,8 +729,10 @@ bool ShaderBase::BuildSharedRootSignature()
     vrsDesc.Version  = D3D_ROOT_SIGNATURE_VERSION_1_1;
     vrsDesc.Desc_1_1 = rsDesc1;
 
-    AppendLogf("  shared root params=%u, srvSlots=%u, uavSlots=%u, samplerSlots=%u",
-               static_cast<uint32_t>(params.size()), srvSlots, uavSlots, samplerSlots);
+    AppendLogf("  shared root params=%u, srvEtcSlots=%u (ranges=%u), samplerSlots=%u, bindlessGroups=%u",
+               static_cast<uint32_t>(params.size()), srvEtcSlots,
+               static_cast<uint32_t>(srvEtcRanges.size()), samplerSlots,
+               static_cast<uint32_t>(bindlessGroups.size()));
     Log(kUnityLogTypeLog, buildLog.c_str());
 
     ComPtr<ID3DBlob> sigBlob, errBlob;
