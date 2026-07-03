@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace NativeRender
 {
@@ -192,6 +193,14 @@ namespace NativeRender
         public uint Visibility;
         public uint FirstSlot;
         public uint MaxCapacity;
+        public uint FirstItem;
+        public uint ItemCount;
+    }
+
+    internal struct NativeBindingLayoutRun
+    {
+        public uint Visibility;
+        public uint RegisterSpace;
         public uint FirstItem;
         public uint ItemCount;
     }
@@ -442,11 +451,11 @@ namespace NativeRender
             return this;
         }
 
-        internal NativeRenderPlugin.NR_BindingLayoutDesc[] BuildNativeDescs()
+        internal NativeBindingLayoutRun[] BuildNativeLayoutRuns()
         {
-            if (_items.Count == 0) return Array.Empty<NativeRenderPlugin.NR_BindingLayoutDesc>();
+            if (_items.Count == 0) return Array.Empty<NativeBindingLayoutRun>();
 
-            var descs = new List<NativeRenderPlugin.NR_BindingLayoutDesc>();
+            var runs = new List<NativeBindingLayoutRun>();
             int runStart = -1;
             uint runSpace = 0;
             var runVisibility = NativeShaderVisibility.All;
@@ -461,12 +470,12 @@ namespace NativeRender
 
                 if (runStart >= 0)
                 {
-                    descs.Add(new NativeRenderPlugin.NR_BindingLayoutDesc
+                    runs.Add(new NativeBindingLayoutRun
                     {
-                        visibility = (uint)runVisibility,
-                        registerSpace = runSpace,
-                        firstItem = (uint)runStart,
-                        itemCount = (uint)(i - runStart),
+                        Visibility = (uint)runVisibility,
+                        RegisterSpace = runSpace,
+                        FirstItem = (uint)runStart,
+                        ItemCount = (uint)(i - runStart),
                     });
                     runStart = -1;
                 }
@@ -479,7 +488,7 @@ namespace NativeRender
                 }
             }
 
-            return descs.ToArray();
+            return runs.ToArray();
         }
 
         internal NativeRenderPlugin.NR_BindlessLayoutDesc[] BuildNativeBindlessDescs()
@@ -494,8 +503,8 @@ namespace NativeRender
                     visibility = desc.Visibility,
                     firstSlot = desc.FirstSlot,
                     maxCapacity = desc.MaxCapacity,
-                    firstItem = desc.FirstItem,
-                    itemCount = desc.ItemCount
+                    registerSpaces = IntPtr.Zero,
+                    registerSpaceCount = 0
                 };
             }
             return dst;
@@ -553,32 +562,109 @@ namespace NativeRender
 
             var handles = new List<ulong>(2);
             var layoutItems = BuildNativeItems();
-            var layoutDescs = BuildNativeDescs();
+            var layoutRuns = BuildNativeLayoutRuns();
             var staticSamplers = BuildNativeStaticSamplers();
-            if (layoutDescs.Length != 0 || staticSamplers.Length != 0)
+            var bindlessDescs = BuildNativeBindlessDescs();
+            int regularIndex = 0;
+            int bindlessIndex = 0;
+            bool staticSamplersAttached = false;
+
+            while (regularIndex < layoutRuns.Length || bindlessIndex < _bindlessLayouts.Count)
             {
+                bool emitRegular = bindlessIndex >= _bindlessLayouts.Count ||
+                    (regularIndex < layoutRuns.Length &&
+                     layoutRuns[regularIndex].FirstItem <= _bindlessLayouts[bindlessIndex].FirstItem);
+
+                if (emitRegular)
+                {
+                    var run = layoutRuns[regularIndex++];
+                    var bindings = SliceNativeItems(layoutItems, run.FirstItem, run.ItemCount);
+                    var pin = PinArray(bindings);
+                    var samplers = !staticSamplersAttached
+                        ? staticSamplers
+                        : Array.Empty<NativeRenderPlugin.NR_StaticSampler>();
+                    staticSamplersAttached = true;
+                    try
+                    {
+                        var desc = new NativeRenderPlugin.NR_BindingLayoutDesc
+                        {
+                            visibility = run.Visibility,
+                            registerSpace = run.RegisterSpace,
+                            bindings = pin.IsAllocated ? pin.AddrOfPinnedObject() : IntPtr.Zero,
+                            bindingCount = (uint)bindings.Length
+                        };
+                        ulong handle = NativeRenderPlugin.NR_CreateBindingLayout(
+                            ref desc,
+                            samplers, (uint)samplers.Length);
+                        if (handle == 0)
+                            throw new InvalidOperationException("NR_CreateBindingLayout returned 0.");
+                        handles.Add(handle);
+                    }
+                    finally
+                    {
+                        if (pin.IsAllocated)
+                            pin.Free();
+                    }
+                    continue;
+                }
+
+                var range = _bindlessLayouts[bindlessIndex];
+                var registerSpaces = SliceNativeItems(layoutItems, range.FirstItem, range.ItemCount);
+                var bindlessPin = PinArray(registerSpaces);
+                try
+                {
+                    var desc = bindlessDescs[bindlessIndex++];
+                    desc.registerSpaces = bindlessPin.IsAllocated
+                        ? bindlessPin.AddrOfPinnedObject()
+                        : IntPtr.Zero;
+                    desc.registerSpaceCount = (uint)registerSpaces.Length;
+                    ulong handle = NativeRenderPlugin.NR_CreateBindlessLayout(ref desc);
+                    if (handle == 0)
+                        throw new InvalidOperationException("NR_CreateBindlessLayout returned 0.");
+                    handles.Add(handle);
+                }
+                finally
+                {
+                    if (bindlessPin.IsAllocated)
+                        bindlessPin.Free();
+                }
+            }
+
+            if (!staticSamplersAttached && staticSamplers.Length != 0)
+            {
+                var desc = new NativeRenderPlugin.NR_BindingLayoutDesc
+                {
+                    bindings = IntPtr.Zero,
+                    bindingCount = 0
+                };
                 ulong handle = NativeRenderPlugin.NR_CreateBindingLayout(
-                    layoutDescs, (uint)layoutDescs.Length,
-                    layoutItems, (uint)layoutItems.Length,
+                    ref desc,
                     staticSamplers, (uint)staticSamplers.Length);
                 if (handle == 0)
                     throw new InvalidOperationException("NR_CreateBindingLayout returned 0.");
                 handles.Add(handle);
             }
 
-            var bindlessDescs = BuildNativeBindlessDescs();
-            if (bindlessDescs.Length != 0)
-            {
-                ulong handle = NativeRenderPlugin.NR_CreateBindlessLayout(
-                    bindlessDescs, (uint)bindlessDescs.Length,
-                    layoutItems, (uint)layoutItems.Length);
-                if (handle == 0)
-                    throw new InvalidOperationException("NR_CreateBindlessLayout returned 0.");
-                handles.Add(handle);
-            }
-
             _nativeLayoutHandles = handles.Count == 0 ? Array.Empty<ulong>() : handles.ToArray();
             return _nativeLayoutHandles;
+        }
+
+        private static NativeRenderPlugin.NR_BindingLayoutItem[] SliceNativeItems(
+            NativeRenderPlugin.NR_BindingLayoutItem[] src, uint firstItem, uint itemCount)
+        {
+            if (src == null || itemCount == 0)
+                return Array.Empty<NativeRenderPlugin.NR_BindingLayoutItem>();
+
+            var dst = new NativeRenderPlugin.NR_BindingLayoutItem[(int)itemCount];
+            Array.Copy(src, (int)firstItem, dst, 0, (int)itemCount);
+            return dst;
+        }
+
+        private static GCHandle PinArray<T>(T[] array) where T : struct
+        {
+            return array != null && array.Length != 0
+                ? GCHandle.Alloc(array, GCHandleType.Pinned)
+                : default;
         }
 
         private void ReleaseNativeLayoutHandles()

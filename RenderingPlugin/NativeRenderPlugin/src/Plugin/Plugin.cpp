@@ -1710,12 +1710,14 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
 }
 
 #pragma pack(push, 4)
+struct NR_BindingLayoutItem;
+
 struct NR_BindingLayoutDesc
 {
     uint32_t visibility;
     uint32_t registerSpace;
-    uint32_t firstItem;
-    uint32_t itemCount;
+    const NR_BindingLayoutItem* bindings;
+    uint32_t bindingCount;
 };
 
 struct NR_BindingLayoutItem
@@ -1730,8 +1732,8 @@ struct NR_BindlessLayoutDesc
     uint32_t visibility;
     uint32_t firstSlot;
     uint32_t maxCapacity;
-    uint32_t firstItem;
-    uint32_t itemCount;
+    const NR_BindingLayoutItem* registerSpaces;
+    uint32_t registerSpaceCount;
 };
 
 struct NR_StaticSampler
@@ -1747,25 +1749,42 @@ struct NR_StaticSampler
 };
 #pragma pack(pop)
 
-static_assert(sizeof(NR_BindingLayoutDesc) == 16, "NR_BindingLayoutDesc ABI mismatch");
+static_assert(sizeof(NR_BindingLayoutDesc) == 20, "NR_BindingLayoutDesc ABI mismatch");
 static_assert(sizeof(NR_BindingLayoutItem) == 12, "NR_BindingLayoutItem ABI mismatch");
-static_assert(sizeof(NR_BindlessLayoutDesc) == 20, "NR_BindlessLayoutDesc ABI mismatch");
+static_assert(sizeof(NR_BindlessLayoutDesc) == 24, "NR_BindlessLayoutDesc ABI mismatch");
 static_assert(sizeof(NR_StaticSampler) == 32, "NR_StaticSampler ABI mismatch");
 
-struct NativeBindingLayoutResource
+struct NativePipelineLayout
 {
+    enum class Kind : uint32_t
+    {
+        Binding,
+        Bindless
+    };
+
+    explicit NativePipelineLayout(Kind kind) : kind(kind) {}
+    virtual ~NativePipelineLayout() = default;
+
+    Kind kind;
+};
+
+struct BindingLayout final : NativePipelineLayout
+{
+    BindingLayout() : NativePipelineLayout(Kind::Binding) {}
+
     std::vector<ShaderBase::SharedLayoutItem> items;
     std::vector<ShaderBase::StaticSamplerDef> staticSamplers;
 };
 
-static bool IsBindlessLayoutKind(ShaderBase::SharedLayoutKind kind)
+struct BindlessLayout final : NativePipelineLayout
 {
-    return kind == ShaderBase::SharedLayoutKind::BindlessSRV ||
-           kind == ShaderBase::SharedLayoutKind::BindlessUAV;
-}
+    BindlessLayout() : NativePipelineLayout(Kind::Bindless) {}
+
+    std::vector<ShaderBase::SharedLayoutItem> items;
+};
 
 static void AppendLayoutItem(
-    NativeBindingLayoutResource* layout,
+    std::vector<ShaderBase::SharedLayoutItem>& items,
     ShaderBase::SharedLayoutKind kind,
     uint32_t shaderRegister,
     uint32_t space,
@@ -1774,8 +1793,6 @@ static void AppendLayoutItem(
     uint32_t visibility,
     uint32_t bindlessLayoutIndex = ShaderBase::kInvalidAlloc)
 {
-    if (!layout) return;
-
     ShaderBase::SharedLayoutItem item;
     item.kind = kind;
     item.shaderRegister = shaderRegister;
@@ -1784,97 +1801,34 @@ static void AppendLayoutItem(
     item.num32BitValues = num32BitValues;
     item.visibility = static_cast<D3D12_SHADER_VISIBILITY>(visibility);
     item.bindlessLayoutIndex = bindlessLayoutIndex;
-    layout->items.push_back(item);
+    items.push_back(item);
 }
 
-static void BuildBindingLayoutResource(
-    NativeBindingLayoutResource* layout,
-    const NR_BindingLayoutDesc* layoutDescs,
-    uint32_t layoutDescCount,
-    const NR_BindingLayoutItem* layoutItems,
-    uint32_t layoutItemCount,
-    const NR_BindlessLayoutDesc* bindlessDescs,
-    uint32_t bindlessDescCount,
+static void BuildBindingLayout(
+    BindingLayout* layout,
+    const NR_BindingLayoutDesc* layoutDesc,
     const NR_StaticSampler* staticSamplers,
     uint32_t staticSamplerCount)
 {
     if (!layout) return;
 
-    struct ItemMeta
+    if (layoutDesc && layoutDesc->bindings)
     {
-        bool regular = false;
-        bool bindless = false;
-        uint32_t visibility = D3D12_SHADER_VISIBILITY_ALL;
-        uint32_t registerSpace = 0;
-        uint32_t firstSlot = 0;
-        uint32_t maxCapacity = 1;
-        uint32_t bindlessLayoutIndex = ShaderBase::kInvalidAlloc;
-    };
-    std::vector<ItemMeta> itemMeta(layoutItemCount);
-
-    for (uint32_t d = 0; layoutDescs && d < layoutDescCount; ++d)
-    {
-        const NR_BindingLayoutDesc& desc = layoutDescs[d];
-        if (!layoutItems || desc.firstItem > layoutItemCount ||
-            desc.itemCount > layoutItemCount - desc.firstItem)
-            continue;
-
-        const uint32_t endItem = desc.firstItem + desc.itemCount;
-        for (uint32_t i = desc.firstItem; i < endItem; ++i)
+        for (uint32_t i = 0; i < layoutDesc->bindingCount; ++i)
         {
-            itemMeta[i].regular = true;
-            itemMeta[i].visibility = desc.visibility;
-            itemMeta[i].registerSpace = desc.registerSpace;
-        }
-    }
-
-    for (uint32_t d = 0; bindlessDescs && d < bindlessDescCount; ++d)
-    {
-        const NR_BindlessLayoutDesc& desc = bindlessDescs[d];
-        if (!layoutItems || desc.firstItem > layoutItemCount ||
-            desc.itemCount > layoutItemCount - desc.firstItem)
-            continue;
-
-        const uint32_t endItem = desc.firstItem + desc.itemCount;
-        for (uint32_t i = desc.firstItem; i < endItem; ++i)
-        {
-            itemMeta[i].bindless = true;
-            itemMeta[i].visibility = desc.visibility;
-            itemMeta[i].firstSlot = desc.firstSlot;
-            itemMeta[i].maxCapacity = desc.maxCapacity == 0 ? 1 : desc.maxCapacity;
-            itemMeta[i].bindlessLayoutIndex = d;
-        }
-    }
-
-    for (uint32_t i = 0; layoutItems && i < layoutItemCount; ++i)
-    {
-        const NR_BindingLayoutItem& item = layoutItems[i];
-        const auto kind = static_cast<ShaderBase::SharedLayoutKind>(item.type);
-        if (itemMeta[i].bindless)
-        {
-            AppendLayoutItem(
-                layout,
-                kind,
-                itemMeta[i].firstSlot,
-                item.slot,
-                itemMeta[i].maxCapacity,
-                0,
-                itemMeta[i].visibility,
-                itemMeta[i].bindlessLayoutIndex);
-        }
-        else if (itemMeta[i].regular)
-        {
+            const NR_BindingLayoutItem& item = layoutDesc->bindings[i];
+            const auto kind = static_cast<ShaderBase::SharedLayoutKind>(item.type);
             const bool isPushConstants = item.type == static_cast<uint32_t>(ShaderBase::SharedLayoutKind::PushConstants);
             const uint32_t count = item.size == 0 ? 1 : item.size;
             const uint32_t num32 = isPushConstants ? item.size / 4 : 0;
             AppendLayoutItem(
-                layout,
+                layout->items,
                 kind,
                 item.slot,
-                itemMeta[i].registerSpace,
+                layoutDesc->registerSpace,
                 count,
                 num32,
-                itemMeta[i].visibility);
+                layoutDesc->visibility);
         }
     }
 
@@ -1894,6 +1848,30 @@ static void BuildBindingLayoutResource(
     }
 }
 
+static void BuildBindlessLayout(
+    BindlessLayout* layout,
+    const NR_BindlessLayoutDesc* bindlessDesc)
+{
+    if (!layout) return;
+    if (!bindlessDesc) return;
+    if (!bindlessDesc->registerSpaces)
+        return;
+
+    for (uint32_t i = 0; i < bindlessDesc->registerSpaceCount; ++i)
+    {
+        const NR_BindingLayoutItem& item = bindlessDesc->registerSpaces[i];
+        AppendLayoutItem(
+            layout->items,
+            static_cast<ShaderBase::SharedLayoutKind>(item.type),
+            bindlessDesc->firstSlot,
+            item.slot,
+            bindlessDesc->maxCapacity == 0 ? 1 : bindlessDesc->maxCapacity,
+            0,
+            bindlessDesc->visibility,
+            0);
+    }
+}
+
 static void ApplyBindingLayouts(
     ShaderBase* shader,
     const uint64_t* layoutHandles,
@@ -1906,14 +1884,34 @@ static void ApplyBindingLayouts(
 
     for (uint32_t h = 0; layoutHandles && h < layoutHandleCount; ++h)
     {
-        auto* layout = reinterpret_cast<NativeBindingLayoutResource*>(layoutHandles[h]);
+        auto* layout = reinterpret_cast<NativePipelineLayout*>(layoutHandles[h]);
         if (!layout) continue;
 
-        std::map<uint32_t, uint32_t> bindlessIndexMap;
-        for (const auto& item : layout->items)
+        if (layout->kind == NativePipelineLayout::Kind::Binding)
         {
-            uint32_t bindlessLayoutIndex = ShaderBase::kInvalidAlloc;
-            if (IsBindlessLayoutKind(item.kind))
+            auto* bindingLayout = static_cast<BindingLayout*>(layout);
+            for (const auto& item : bindingLayout->items)
+            {
+                shader->AddSharedLayoutItem(
+                    item.kind,
+                    item.shaderRegister,
+                    item.space,
+                    item.count,
+                    item.num32BitValues,
+                    static_cast<uint32_t>(item.visibility),
+                    ShaderBase::kInvalidAlloc);
+            }
+
+            for (const auto& sampler : bindingLayout->staticSamplers)
+                shader->AddStaticSampler(sampler);
+            continue;
+        }
+
+        if (layout->kind == NativePipelineLayout::Kind::Bindless)
+        {
+            auto* bindlessLayout = static_cast<BindlessLayout*>(layout);
+            std::map<uint32_t, uint32_t> bindlessIndexMap;
+            for (const auto& item : bindlessLayout->items)
             {
                 auto found = bindlessIndexMap.find(item.bindlessLayoutIndex);
                 if (found == bindlessIndexMap.end())
@@ -1922,62 +1920,46 @@ static void ApplyBindingLayouts(
                         item.bindlessLayoutIndex,
                         nextBindlessLayoutIndex++).first;
                 }
-                bindlessLayoutIndex = found->second;
+
+                shader->AddSharedLayoutItem(
+                    item.kind,
+                    item.shaderRegister,
+                    item.space,
+                    item.count,
+                    item.num32BitValues,
+                    static_cast<uint32_t>(item.visibility),
+                    found->second);
             }
-
-            shader->AddSharedLayoutItem(
-                item.kind,
-                item.shaderRegister,
-                item.space,
-                item.count,
-                item.num32BitValues,
-                static_cast<uint32_t>(item.visibility),
-                bindlessLayoutIndex);
         }
-
-        for (const auto& sampler : layout->staticSamplers)
-            shader->AddStaticSampler(sampler);
     }
 }
 
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateBindingLayout(
-    const NR_BindingLayoutDesc* layoutDescs,
-    uint32_t layoutDescCount,
-    const NR_BindingLayoutItem* layoutItems,
-    uint32_t layoutItemCount,
+    const NR_BindingLayoutDesc* layoutDesc,
     const NR_StaticSampler* staticSamplers,
     uint32_t staticSamplerCount)
 {
-    auto* layout = new NativeBindingLayoutResource();
-    BuildBindingLayoutResource(layout,
-                               layoutDescs, layoutDescCount,
-                               layoutItems, layoutItemCount,
-                               nullptr, 0,
-                               staticSamplers, staticSamplerCount);
+    auto* layout = new BindingLayout();
+    BuildBindingLayout(layout,
+                       layoutDesc,
+                       staticSamplers, staticSamplerCount);
     return reinterpret_cast<uint64_t>(layout);
 }
 
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateBindlessLayout(
-    const NR_BindlessLayoutDesc* bindlessDescs,
-    uint32_t bindlessDescCount,
-    const NR_BindingLayoutItem* layoutItems,
-    uint32_t layoutItemCount)
+    const NR_BindlessLayoutDesc* bindlessDesc)
 {
-    auto* layout = new NativeBindingLayoutResource();
-    BuildBindingLayoutResource(layout,
-                               nullptr, 0,
-                               layoutItems, layoutItemCount,
-                               bindlessDescs, bindlessDescCount,
-                               nullptr, 0);
+    auto* layout = new BindlessLayout();
+    BuildBindlessLayout(layout, bindlessDesc);
     return reinterpret_cast<uint64_t>(layout);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyBindingLayout(uint64_t handle)
 {
-    delete reinterpret_cast<NativeBindingLayoutResource*>(handle);
+    delete reinterpret_cast<NativePipelineLayout*>(handle);
 }
 
 static void ApplyHitGroupAnyHitHints(

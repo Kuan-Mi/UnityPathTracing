@@ -588,8 +588,8 @@ namespace NativeRender
         {
             public uint visibility;
             public uint registerSpace;
-            public uint firstItem;
-            public uint itemCount;
+            public IntPtr bindings;
+            public uint bindingCount;
         }
 
         /// <summary>One nvrhi-style binding-layout item sent when creating a native binding layout.</summary>
@@ -608,8 +608,8 @@ namespace NativeRender
             public uint visibility;
             public uint firstSlot;
             public uint maxCapacity;
-            public uint firstItem;
-            public uint itemCount;
+            public IntPtr registerSpaces;
+            public uint registerSpaceCount;
         }
 
         /// <summary>One explicit static-sampler definition sent when creating a native binding layout.</summary>
@@ -628,19 +628,13 @@ namespace NativeRender
 
         [DllImport(DllName)]
         public static extern ulong NR_CreateBindingLayout(
-            [In] NR_BindingLayoutDesc[] layoutDescs,
-            uint layoutDescCount,
-            [In] NR_BindingLayoutItem[] layoutItems,
-            uint layoutItemCount,
+            [In] ref NR_BindingLayoutDesc layoutDesc,
             [In] NR_StaticSampler[] staticSamplers,
             uint staticSamplerCount);
 
         [DllImport(DllName)]
         public static extern ulong NR_CreateBindlessLayout(
-            [In] NR_BindlessLayoutDesc[] bindlessDescs,
-            uint bindlessDescCount,
-            [In] NR_BindingLayoutItem[] layoutItems,
-            uint layoutItemCount);
+            [In] ref NR_BindlessLayoutDesc bindlessDesc);
 
         [DllImport(DllName)]
         public static extern void NR_DestroyBindingLayout(ulong handle);
