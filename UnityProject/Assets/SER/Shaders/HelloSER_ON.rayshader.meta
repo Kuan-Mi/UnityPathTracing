@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 27bd2b168eba4294a21ed1dd4591eca2
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
+  isRayTraceShader: 1
+  additionalIncludePaths: []
+  extraArgs: []
+  defines: []
+  targetProfile: lib_6_9
+  maxPayloadSizeInBytes: 20
+  rayGenName: MyRaygenShader
