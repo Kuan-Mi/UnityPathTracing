@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -35,6 +36,54 @@ namespace NativeRender
         Mirror     = 2,
         MirrorOnce = 3,
         Border     = 4
+    }
+
+    public sealed class NativeComputePipelineDesc
+    {
+        private readonly List<NativeBindingLayout> _bindingLayouts = new List<NativeBindingLayout>();
+
+        public NativeShaderHandle CS;
+        public NativeComputeShader ReflectionSource;
+        public string DebugName;
+        public IReadOnlyList<NativeBindingLayout> BindingLayouts => _bindingLayouts;
+
+        public NativeComputePipelineDesc SetComputeShader(
+            NativeShaderHandle shader,
+            NativeComputeShader reflectionSource = null)
+        {
+            CS = shader;
+            ReflectionSource = reflectionSource;
+            return this;
+        }
+
+        public NativeComputePipelineDesc SetComputeShader(NativeComputeShader shader)
+        {
+            ReflectionSource = shader;
+            DebugName = shader != null ? shader.name : DebugName;
+            return this;
+        }
+
+        public NativeComputePipelineDesc SetDebugName(string debugName)
+        {
+            DebugName = debugName;
+            return this;
+        }
+
+        public NativeComputePipelineDesc AddBindingLayout(NativeBindingLayout layout)
+        {
+            if (layout != null && !layout.IsEmpty)
+                _bindingLayouts.Add(layout);
+            return this;
+        }
+
+        public NativeComputePipelineDesc SetBindingLayouts(params NativeBindingLayout[] layouts)
+        {
+            _bindingLayouts.Clear();
+            if (layouts == null) return this;
+            for (int i = 0; i < layouts.Length; i++)
+                AddBindingLayout(layouts[i]);
+            return this;
+        }
     }
 
     /// <summary>
@@ -90,11 +139,14 @@ namespace NativeRender
     {
         private ulong               _handle;
         private NativeComputeShader _shader;
+        private NativeShaderHandle  _shaderHandle;
+        private bool                _ownsShaderHandle;
         private RootConstantsHint[] _rootConstantsHints; // may be null
         private string[]            _rootSRVHints; // may be null
         private SamplerHint[]       _samplerHints; // from shader asset; may be null
-        private NativeBindingLayout _userLayout;   // hand-authored layout; null = auto-generate
+        private readonly List<NativeBindingLayout> _userLayouts = new List<NativeBindingLayout>();
         private NativeBindingLayout _layout;       // the effective (mandatory) layout
+        private NativeComputePipelineDesc _pipelineDesc;
 
         // Slot layout: name → layout item index, resolved from the import-time
         // reflection JSON against the layout (no native round-trips).
@@ -175,18 +227,56 @@ namespace NativeRender
 
         public NativeComputePipeline(NativeComputeShader shader, RootConstantsHint[] rootConstantsHints,
             string[] rootSRVHints, NativeBindingLayout sharedLayout)
+            : this(BuildCompatDesc(shader, sharedLayout), rootConstantsHints, rootSRVHints)
         {
-            if (shader == null)
-                throw new ArgumentNullException(nameof(shader));
+        }
 
-            _shader             = shader;
+        public NativeComputePipeline(NativeComputePipelineDesc pipelineDesc)
+            : this(pipelineDesc,
+                pipelineDesc != null && pipelineDesc.ReflectionSource != null
+                    ? pipelineDesc.ReflectionSource.RootConstantsHints
+                    : null,
+                pipelineDesc != null && pipelineDesc.ReflectionSource != null
+                    ? pipelineDesc.ReflectionSource.RootSRVHints
+                    : null)
+        {
+        }
+
+        private NativeComputePipeline(NativeComputePipelineDesc pipelineDesc,
+            RootConstantsHint[] rootConstantsHints, string[] rootSRVHints)
+        {
+            if (pipelineDesc == null)
+                throw new ArgumentNullException(nameof(pipelineDesc));
+            if (pipelineDesc.CS == null && pipelineDesc.ReflectionSource == null)
+                throw new ArgumentException("PipelineDesc must provide CS or ReflectionSource.", nameof(pipelineDesc));
+
+            _pipelineDesc       = pipelineDesc;
+            _shader             = pipelineDesc.ReflectionSource;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
-            _samplerHints       = shader.ResolveSamplerHints();
-            _userLayout         = (sharedLayout != null && !sharedLayout.IsEmpty) ? sharedLayout : null;
-            BuildBindingContract(shader);
-            BuildNativeHandle(shader);
+            _samplerHints       = _shader != null ? _shader.ResolveSamplerHints() : null;
+            for (int i = 0; i < pipelineDesc.BindingLayouts.Count; i++)
+                if (pipelineDesc.BindingLayouts[i] != null && !pipelineDesc.BindingLayouts[i].IsEmpty)
+                    _userLayouts.Add(pipelineDesc.BindingLayouts[i]);
+
+            if (_shader == null)
+                throw new InvalidOperationException(
+                    "NativeComputePipelineDesc needs ReflectionSource for C# binding-name validation.");
+
+            BuildBindingContract(_shader);
+            BuildShaderHandle(_shader);
+            BuildNativeHandle();
             NativeComputeShader.OnRecompiled += OnShaderRecompiled;
+        }
+
+        private static NativeComputePipelineDesc BuildCompatDesc(
+            NativeComputeShader shader, NativeBindingLayout sharedLayout)
+        {
+            var desc = new NativeComputePipelineDesc()
+                .SetComputeShader(shader);
+            if (sharedLayout != null && !sharedLayout.IsEmpty)
+                desc.AddBindingLayout(sharedLayout);
+            return desc;
         }
 
         /// <summary>
@@ -206,8 +296,10 @@ namespace NativeRender
                     $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
             var reflected = ShaderReflectionInfo.Parse(shader.ReflectionJson);
-            _layout = _userLayout ?? NativeBindingLayout.FromReflection(
-                reflected, _rootConstantsHints, _rootSRVHints, _samplerHints);
+            _layout = _userLayouts.Count != 0
+                ? CombineLayouts(_userLayouts)
+                : NativeBindingLayout.FromReflection(
+                    reflected, _rootConstantsHints, _rootSRVHints, _samplerHints);
 
             _slotCount  = (uint)_layout.Items.Count;
             _nameToSlot = new Dictionary<string, uint>(reflected.Count);
@@ -234,21 +326,88 @@ namespace NativeRender
                     string.Join(", ", missing));
         }
 
-        private void BuildNativeHandle(NativeComputeShader shader)
+        private static NativeBindingLayout CombineLayouts(IReadOnlyList<NativeBindingLayout> layouts)
         {
-            byte[] dxil = shader.GetOrCompileDxil();
-            if (dxil == null || dxil.Length == 0)
-                throw new InvalidOperationException(
-                    $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
+            if (layouts.Count == 1)
+                return layouts[0];
 
-            var layoutHandles = _layout.GetNativeLayoutHandles();
-            _handle = NativeRenderPlugin.NR_CreateComputeShaderEx(
-                dxil, (uint)dxil.Length, shader.name,
-                layoutHandles, (uint)layoutHandles.Length);
+            var combined = new NativeBindingLayout();
+            for (int i = 0; i < layouts.Count; i++)
+            {
+                foreach (var item in layouts[i].Items)
+                {
+                    combined.Add(item.Kind, item.Slot, item.Space, item.Count,
+                        item.Num32BitValues, item.Visibility, item.BindlessLayoutIndex);
+                }
+                foreach (var sampler in layouts[i].StaticSamplers)
+                {
+                    combined.StaticSampler(sampler.Slot, sampler.Filter, sampler.AddressU,
+                        sampler.AddressV, sampler.AddressW, sampler.Mips,
+                        sampler.MaxAnisotropy, sampler.Space);
+                }
+            }
+            return combined;
+        }
+
+        private void BuildShaderHandle(NativeComputeShader shader)
+        {
+            if (_pipelineDesc.CS != null)
+            {
+                _shaderHandle = _pipelineDesc.CS;
+                _ownsShaderHandle = false;
+                return;
+            }
+
+            _shaderHandle = NativeShaderHandle.FromComputeShader(shader);
+            _ownsShaderHandle = true;
+        }
+
+        private void BuildNativeHandle()
+        {
+            if (_shaderHandle == null || !_shaderHandle.IsValid)
+                throw new InvalidOperationException("[NativeComputePipeline] PipelineDesc.CS is invalid.");
+
+            var layoutHandles = GetPipelineLayoutHandles();
+            var pin = layoutHandles != null && layoutHandles.Length != 0
+                ? GCHandle.Alloc(layoutHandles, GCHandleType.Pinned)
+                : default;
+            try
+            {
+                var desc = new NativeRenderPlugin.NR_ComputePipelineDesc
+                {
+                    CS = _shaderHandle.Handle,
+                    bindingLayouts = pin.IsAllocated ? pin.AddrOfPinnedObject() : IntPtr.Zero,
+                    bindingLayoutCount = (uint)(layoutHandles?.Length ?? 0),
+                    debugName = string.IsNullOrEmpty(_pipelineDesc.DebugName)
+                        ? _shader.name
+                        : _pipelineDesc.DebugName
+                };
+                _handle = NativeRenderPlugin.NR_CreateComputePipeline(ref desc);
+            }
+            finally
+            {
+                if (pin.IsAllocated)
+                    pin.Free();
+            }
 
             if (_handle == 0)
                 throw new InvalidOperationException(
-                    $"[NativeComputePipeline] NR_CreateComputeShaderEx returned 0 for: {shader.name}");
+                    $"[NativeComputePipeline] NR_CreateComputePipeline returned 0 for: {_shader.name}");
+        }
+
+        private ulong[] GetPipelineLayoutHandles()
+        {
+            if (_userLayouts.Count == 0)
+                return _layout.GetNativeLayoutHandles();
+
+            var handles = new List<ulong>(_userLayouts.Count);
+            for (int i = 0; i < _userLayouts.Count; i++)
+            {
+                var h = _userLayouts[i].GetNativeLayoutHandles();
+                if (h == null) continue;
+                handles.AddRange(h);
+            }
+            return handles.ToArray();
         }
 
         private void OnShaderRecompiled(NativeComputeShader shader)
@@ -267,8 +426,14 @@ namespace NativeRender
                 // Block main thread until render thread + GPU are fully idle.
                 NativeRenderPlugin.NR_WaitForGpuFlush();
 
-                NativeRenderPlugin.NR_DestroyComputeShader(_handle);
+                NativeRenderPlugin.NR_DestroyComputePipeline(_handle);
                 _handle = 0;
+            }
+            if (_ownsShaderHandle && _shaderHandle != null)
+            {
+                _shaderHandle.Dispose();
+                _shaderHandle = null;
+                _ownsShaderHandle = false;
             }
 
             try
@@ -276,7 +441,8 @@ namespace NativeRender
                 // Re-derive the contract: an auto-generated layout must track the
                 // recompiled shader's bindings; a hand-authored one is revalidated.
                 BuildBindingContract(shader);
-                BuildNativeHandle(shader);
+                BuildShaderHandle(shader);
+                BuildNativeHandle();
                 Debug.Log($"[NativeComputePipeline] Rebuilt pipeline for: {shader.name}");
                 OnRebuilt?.Invoke(this);
             }
@@ -297,8 +463,14 @@ namespace NativeRender
             if (_handle != 0)
             {
                 GL.Flush();
-                NativeRenderPlugin.NR_DestroyComputeShader(_handle);
+                NativeRenderPlugin.NR_DestroyComputePipeline(_handle);
                 _handle = 0;
+            }
+            if (_ownsShaderHandle && _shaderHandle != null)
+            {
+                _shaderHandle.Dispose();
+                _shaderHandle = null;
+                _ownsShaderHandle = false;
             }
         }
 

@@ -1,23 +1,13 @@
 #pragma once
-#include "ShaderBase.h"  // pulls in all D3D12/DXC/Unity/ShaderBindings.h headers
-
-class BindlessTexture;
-class BindlessBuffer;
-class BindlessUAVTexture;
-class AccelerationStructure;
-class NativeBuffer;
-
-// BindingType, Binding, BindingSlot, BindingObjectKind are defined in
-// ShaderBindings.h (included transitively via ShaderBase.h).
+#include "ShaderBase.h"
 
 // ---------------------------------------------------------------------------
 // ComputeShader
-//   One self-contained compute shader object.  Root signature and binding
-//   table are derived entirely from the explicit binding layout declared by
-//   the caller before load (nvrhi BindingLayout model — see ShaderBase); the
-//   DXIL is never reflected.
+//   NVRHI-style shader object: owns ShaderDesc metadata and pre-compiled DXIL
+//   bytecode only. Root signatures and PSOs are created later by
+//   ComputePipeline from a ComputePipelineDesc.
 // ---------------------------------------------------------------------------
-class ComputeShader : public ShaderBase
+class ComputeShader
 {
 public:
     ComputeShader()  = default;
@@ -25,17 +15,22 @@ public:
 
     bool Initialize(ID3D12Device5* device, IUnityLog* log, IUnityGraphicsD3D12v8* d3d12v8);
 
-    // Build pipeline from pre-compiled DXIL bytes (compiled as cs_6_x).
-    bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name = nullptr);
+    bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
+                             const char* debugName = nullptr,
+                             const char* entryName = nullptr);
 
-    // --- Accessors for ComputeDescriptorSet ---
-    ID3D12PipelineState* GetPSO()         const { return m_pso.Get(); }
-    uint32_t GetNumUAVArray()             const { return m_numUAVArray; }
-    uint32_t GetNumRootConstants()        const { return m_numRootConstants; }
-    uint32_t GetNumRootSRV()              const { return m_numRootSRV; }
+    IDxcBlob*   GetBlob()      const { return m_shaderBlob.Get(); }
+    const char* GetName()      const { return m_name.c_str(); }
+    const char* GetEntryName() const { return m_entryName.c_str(); }
 
 private:
-    bool BuildPipeline  (IDxcBlob* shaderBlob);
+    void Log (UnityLogType type, const char* msg)      const;
+    void Logf(UnityLogType type, const char* fmt, ...) const;
 
-    ComPtr<ID3D12PipelineState> m_pso;
+    IUnityLog*             m_log     = nullptr;
+    ComPtr<ID3D12Device5>  m_device;
+    IUnityGraphicsD3D12v8* m_d3d12v8 = nullptr;
+    std::string            m_name;
+    std::string            m_entryName = "main";
+    ComPtr<IDxcBlob>       m_shaderBlob;
 };

@@ -28,6 +28,7 @@
 #include "RayTraceShader.h"
 #include "RayTraceDescriptorSet.h"
 #include "ComputeShader.h"
+#include "ComputePipeline.h"
 #include "ComputeDescriptorSet.h"
 #include "RasterShader.h"
 #include "RasterDescriptorSet.h"
@@ -1674,32 +1675,50 @@ struct CS_RenderEventData
 
 // ---------------------------------------------------------------------------
 // NR_CreateComputeShader
-//   Builds a compute pipeline from pre-compiled DXIL bytes (cs_6_x).
+//   Creates an NVRHI-style ShaderHandle from pre-compiled DXIL bytes (cs_6_x).
 //   Returns an opaque uint64 handle on success, 0 on failure.
 // ---------------------------------------------------------------------------
+#pragma pack(push, 4)
+struct NR_ShaderDesc
+{
+    uint32_t shaderType;
+    const char* debugName;
+    const char* entryName;
+    int32_t hlslExtensionsUAV;
+};
+#pragma pack(pop)
+
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name)
+NR_CreateShader(const NR_ShaderDesc* desc, const uint8_t* dxilBytes, uint32_t size)
 {
     if (!s_RendererReady)
     {
-        NR_WARN("NR_CreateComputeShader: renderer not ready");
+        NR_WARN("NR_CreateShader: renderer not ready");
         return 0;
     }
     ID3D12Device* device = s_D3D12->GetDevice();
     if (!device)
     {
-        NR_ERROR("NR_CreateComputeShader: failed to obtain ID3D12Device");
+        NR_ERROR("NR_CreateShader: failed to obtain ID3D12Device");
         return 0;
     }
     ID3D12Device5* dev5 = nullptr;
     if (FAILED(device->QueryInterface(IID_PPV_ARGS(&dev5))))
     {
-        NR_ERROR("NR_CreateComputeShader: failed to obtain ID3D12Device5");
+        NR_ERROR("NR_CreateShader: failed to obtain ID3D12Device5");
+        return 0;
+    }
+    if (desc && desc->shaderType != 0 && desc->shaderType != 5)
+    {
+        NR_ERROR("NR_CreateShader: only compute shaders are supported by this entry point");
+        dev5->Release();
         return 0;
     }
     auto* cs = new ComputeShader();
     if (!cs->Initialize(dev5, s_Log, s_D3D12v8) ||
-        !cs->LoadShaderFromBytes(dxilBytes, size, name))
+        !cs->LoadShaderFromBytes(dxilBytes, size,
+                                 desc ? desc->debugName : nullptr,
+                                 desc ? desc->entryName : nullptr))
     {
         delete cs;
         dev5->Release();
@@ -1707,6 +1726,24 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
     }
     dev5->Release();
     return reinterpret_cast<uint64_t>(cs);
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name)
+{
+    NR_ShaderDesc desc = {};
+    desc.shaderType = 5;
+    desc.debugName = name;
+    desc.entryName = "main";
+    desc.hlslExtensionsUAV = -1;
+    return NR_CreateShader(&desc, dxilBytes, size);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyShader(uint64_t handle)
+{
+    if (!handle) return;
+    RetireObject(reinterpret_cast<ComputeShader*>(handle));
 }
 
 #pragma pack(push, 4)
@@ -1747,12 +1784,21 @@ struct NR_StaticSampler
     uint32_t mips;
     uint32_t maxAnisotropy;
 };
+
+struct NR_ComputePipelineDesc
+{
+    uint64_t CS;
+    const uint64_t* bindingLayouts;
+    uint32_t bindingLayoutCount;
+    const char* debugName;
+};
 #pragma pack(pop)
 
 static_assert(sizeof(NR_BindingLayoutDesc) == 20, "NR_BindingLayoutDesc ABI mismatch");
 static_assert(sizeof(NR_BindingLayoutItem) == 12, "NR_BindingLayoutItem ABI mismatch");
 static_assert(sizeof(NR_BindlessLayoutDesc) == 24, "NR_BindlessLayoutDesc ABI mismatch");
 static_assert(sizeof(NR_StaticSampler) == 32, "NR_StaticSampler ABI mismatch");
+static_assert(sizeof(NR_ComputePipelineDesc) == 28, "NR_ComputePipelineDesc ABI mismatch");
 
 struct NativePipelineLayout
 {
@@ -2075,6 +2121,51 @@ NR_CreateRayTracePipelineFromBlobsEx(
 }
 
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateComputePipeline(
+    const NR_ComputePipelineDesc* pipelineDesc)
+{
+    if (!s_RendererReady)
+    {
+        NR_WARN("NR_CreateComputePipeline: renderer not ready");
+        return 0;
+    }
+    if (!pipelineDesc || !pipelineDesc->CS)
+    {
+        NR_WARN("NR_CreateComputePipeline: invalid shader handle");
+        return 0;
+    }
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device)
+    {
+        NR_ERROR("NR_CreateComputePipeline: failed to obtain ID3D12Device");
+        return 0;
+    }
+    ID3D12Device5* dev5 = nullptr;
+    if (FAILED(device->QueryInterface(IID_PPV_ARGS(&dev5))))
+    {
+        NR_ERROR("NR_CreateComputePipeline: failed to obtain ID3D12Device5");
+        return 0;
+    }
+    auto* shader = reinterpret_cast<ComputeShader*>(pipelineDesc->CS);
+    auto* pipeline = new ComputePipeline();
+    if (!pipeline->Initialize(dev5, s_Log, s_D3D12v8))
+    {
+        delete pipeline;
+        dev5->Release();
+        return 0;
+    }
+    ApplyBindingLayouts(pipeline, pipelineDesc->bindingLayouts, pipelineDesc->bindingLayoutCount);
+    if (!pipeline->BuildFromShader(shader, pipelineDesc->debugName))
+    {
+        delete pipeline;
+        dev5->Release();
+        return 0;
+    }
+    dev5->Release();
+    return reinterpret_cast<uint64_t>(pipeline);
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateComputeShaderEx(
     const uint8_t* dxilBytes,
     uint32_t size,
@@ -2082,60 +2173,49 @@ NR_CreateComputeShaderEx(
     const uint64_t* layoutHandles,
     uint32_t layoutHandleCount)
 {
-    if (!s_RendererReady)
-    {
-        NR_WARN("NR_CreateComputeShaderEx: renderer not ready");
-        return 0;
-    }
-    ID3D12Device* device = s_D3D12->GetDevice();
-    if (!device)
-    {
-        NR_ERROR("NR_CreateComputeShaderEx: failed to obtain ID3D12Device");
-        return 0;
-    }
-    ID3D12Device5* dev5 = nullptr;
-    if (FAILED(device->QueryInterface(IID_PPV_ARGS(&dev5))))
-    {
-        NR_ERROR("NR_CreateComputeShaderEx: failed to obtain ID3D12Device5");
-        return 0;
-    }
-    auto* cs = new ComputeShader();
-    if (!cs->Initialize(dev5, s_Log, s_D3D12v8))
-    {
-        delete cs;
-        dev5->Release();
-        return 0;
-    }
-    ApplyBindingLayouts(cs, layoutHandles, layoutHandleCount);
-    if (!cs->LoadShaderFromBytes(dxilBytes, size, name))
-    {
-        delete cs;
-        dev5->Release();
-        return 0;
-    }
-    dev5->Release();
-    return reinterpret_cast<uint64_t>(cs);
+    NR_ShaderDesc shaderDesc = {};
+    shaderDesc.shaderType = 5;
+    shaderDesc.debugName = name;
+    shaderDesc.entryName = "main";
+    shaderDesc.hlslExtensionsUAV = -1;
+    uint64_t shader = NR_CreateShader(&shaderDesc, dxilBytes, size);
+    if (!shader) return 0;
+
+    NR_ComputePipelineDesc pipelineDesc = {};
+    pipelineDesc.CS = shader;
+    pipelineDesc.bindingLayouts = layoutHandles;
+    pipelineDesc.bindingLayoutCount = layoutHandleCount;
+    pipelineDesc.debugName = name;
+    uint64_t pipeline = NR_CreateComputePipeline(&pipelineDesc);
+    NR_DestroyShader(shader);
+    return pipeline;
 }
 // ---------------------------------------------------------------------------
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyComputeShader(uint64_t handle)
 {
     if (!handle) return;
-    RetireObject(reinterpret_cast<ComputeShader*>(handle));
+    RetireObject(reinterpret_cast<ComputePipeline*>(handle));
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyComputePipeline(uint64_t handle)
+{
+    NR_DestroyComputeShader(handle);
 }
 
 // ---------------------------------------------------------------------------
 // NR_CS_CreateDescriptorSet / NR_CS_DestroyDescriptorSet
 //   Each NativeComputeDescriptorSet on the C# side owns a ComputeDescriptorSet
 //   here.  The descriptor set holds its own GPU-heap slice so multiple
-//   dispatches of the same ComputeShader per frame are fully independent.
+//   dispatches of the same ComputePipeline per frame are fully independent.
 // ---------------------------------------------------------------------------
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_CreateDescriptorSet(uint64_t shaderHandle)
+NR_CS_CreateDescriptorSet(uint64_t pipelineHandle)
 {
-    if (!shaderHandle || !s_RendererReady) return 0;
-    auto* cs = reinterpret_cast<ComputeShader*>(shaderHandle);
-    auto* ds = new ComputeDescriptorSet(cs, s_D3D12->GetDevice(), s_Log, &s_DescHeap, s_D3D12v8);
+    if (!pipelineHandle || !s_RendererReady) return 0;
+    auto* pipeline = reinterpret_cast<ComputePipeline*>(pipelineHandle);
+    auto* ds = new ComputeDescriptorSet(pipeline, s_D3D12->GetDevice(), s_Log, &s_DescHeap, s_D3D12v8);
     return reinterpret_cast<uint64_t>(ds);
 }
 
@@ -2155,7 +2235,7 @@ extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CS_GetBindingCount(uint64_t handle)
 {
     if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)->GetBindingCount();
+    return reinterpret_cast<ComputePipeline*>(handle)->GetBindingCount();
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 #include "IUnityGraphicsD3D12.h"
 #include "DescriptorHeapAllocator.h"
 #include "ResourceStateTracker.h"
-#include "ComputeShader.h"   // CS_BindingSlot, CS_BindingObjectKind, ComputeBinding, ComputeBindingType
+#include "ComputePipeline.h"
 
 // ---------------------------------------------------------------------------
 // DescriptorSetBase<ShaderT>
@@ -30,7 +30,7 @@
 //     const std::vector<Binding>&        GetBindings()            const
 //     ID3D12RootSignature*               GetRootSignature()       const
 //
-//   Explicit template instantiations for ComputeShader and RayTraceShader
+//   Explicit template instantiations for ComputePipeline and RayTraceShader
 //   are provided in DescriptorSetBase.cpp.
 // ---------------------------------------------------------------------------
 template<typename ShaderT>

@@ -1,5 +1,5 @@
 #include "DescriptorSetBase.h"
-#include "ComputeShader.h"
+#include "ComputePipeline.h"
 #include "RayTraceShader.h"
 #include "RasterShader.h"
 #include "AccelerationStructure.h"
@@ -1265,6 +1265,6 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
 // Explicit template instantiations
 // ===========================================================================
 
-template class DescriptorSetBase<ComputeShader>;
+template class DescriptorSetBase<ComputePipeline>;
 template class DescriptorSetBase<RayTraceShader>;
 template class DescriptorSetBase<RasterShader>;

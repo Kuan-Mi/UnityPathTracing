@@ -516,11 +516,38 @@ namespace NativeRender
         // ComputeShader API  (generic compute pipeline, cs_6_x)
         // -------------------------------------------------------------------
 
-        /// <summary>
-        /// Builds a compute pipeline from pre-compiled DXIL bytes (cs_6_x).
-        /// Returns an opaque handle on success, 0 on failure.
-        /// name is used as the D3D12 debug name visible in PIX / RenderDoc (optional, can be null).
-        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct NR_ShaderDesc
+        {
+            public uint shaderType;
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string debugName;
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string entryName;
+            public int hlslExtensionsUAV;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct NR_ComputePipelineDesc
+        {
+            public ulong CS;
+            public IntPtr bindingLayouts;
+            public uint bindingLayoutCount;
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string debugName;
+        }
+
+        /// <summary>Creates an NVRHI-style shader handle from pre-compiled DXIL bytes.</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateShader(
+            [In] ref NR_ShaderDesc desc,
+            byte[] dxilBytes,
+            uint size);
+
+        [DllImport(DllName)]
+        public static extern void NR_DestroyShader(ulong handle);
+
+        /// <summary>Compatibility alias for creating a compute shader handle.</summary>
         [DllImport(DllName)]
         public static extern ulong NR_CreateComputeShader(byte[] dxilBytes, uint size, string name);
 
@@ -537,7 +564,16 @@ namespace NativeRender
             [In] ulong[] layoutHandles,
             uint layoutHandleCount);
 
-        /// <summary>Destroys a ComputeShader created by NR_CreateComputeShader.</summary>
+        /// <summary>Creates an NVRHI-style compute pipeline handle from a shader handle and binding layouts.</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateComputePipeline(
+            [In] ref NR_ComputePipelineDesc pipelineDesc);
+
+        /// <summary>Destroys a ComputePipeline created by NR_CreateComputePipeline.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyComputePipeline(ulong handle);
+
+        /// <summary>Compatibility alias for destroying a compute pipeline handle.</summary>
         [DllImport(DllName)]
         public static extern void NR_DestroyComputeShader(ulong handle);
 

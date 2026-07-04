@@ -87,6 +87,8 @@ namespace NativeRender
         /// <summary>Root SRV hints stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
         internal string[] RootSRVHints => _rootSRVHints ?? Array.Empty<string>();
 
+        internal string EntryPoint => string.IsNullOrEmpty(_entryPoint) ? "main" : _entryPoint;
+
         /// <summary>Per-sampler references stored by the importer. Read by the editor inspector.</summary>
         internal SamplerBinding[] SamplerBindings => _samplerBindings ?? Array.Empty<SamplerBinding>();
 

@@ -1,18 +1,18 @@
 #pragma once
 #include "DescriptorSetBase.h"
-#include "ComputeShader.h"
+#include "ComputePipeline.h"
 
 // ---------------------------------------------------------------------------
 // ComputeDescriptorSet
-//   Binds resources and issues one compute Dispatch for a ComputeShader.  Holds
+//   Binds resources and issues one compute Dispatch for a ComputePipeline. Holds
 //   no per-frame GPU-heap state of its own: each Dispatch bump-allocates its
 //   SRV/UAV descriptor table from the global TransientDescriptorRing.  All
-//   common descriptor management is provided by DescriptorSetBase<ComputeShader>.
+//   common descriptor management is provided by DescriptorSetBase<ComputePipeline>.
 //
 //   Lifetime: created via NR_CS_CreateDescriptorSet /
 //             destroyed via NR_CS_DestroyDescriptorSet (both called from C#).
 // ---------------------------------------------------------------------------
-class ComputeDescriptorSet : public DescriptorSetBase<ComputeShader>
+class ComputeDescriptorSet : public DescriptorSetBase<ComputePipeline>
 {
 public:
     using DescriptorSetBase::DescriptorSetBase;  // inherit constructor

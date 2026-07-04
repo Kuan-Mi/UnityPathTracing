@@ -334,6 +334,7 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Shaders/RayTraceShader.cpp
     NativeRenderPlugin/src/Descriptors/RayTraceDescriptorSet.cpp
     NativeRenderPlugin/src/Shaders/ComputeShader.cpp
+    NativeRenderPlugin/src/Shaders/ComputePipeline.cpp
     NativeRenderPlugin/src/Descriptors/ComputeDescriptorSet.cpp
     NativeRenderPlugin/src/Shaders/RasterShader.cpp
     NativeRenderPlugin/src/Descriptors/RasterDescriptorSet.cpp
